@@ -1,0 +1,12 @@
+#pragma once
+
+#define WIFI_SSID "your-wifi-name"
+#define WIFI_PASSWORD "your-wifi-password"
+
+#define THINGSPEAK_WRITE_KEY_BIN_A "WRITE_KEY_BIN_A"
+#define THINGSPEAK_WRITE_KEY_BIN_B "WRITE_KEY_BIN_B"
+#define THINGSPEAK_READ_KEY "READ_KEY"
+#define THINGSPEAK_TALKBACK_ID "TALKBACK_ID"
+#define THINGSPEAK_TALKBACK_KEY "TALKBACK_KEY"
+
+#define COLLECT_PIN "0000"
