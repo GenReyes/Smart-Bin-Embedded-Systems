@@ -4,6 +4,11 @@ An ESP32-based IoT waste bin monitoring system with fill, weight, air-quality an
 
 Embedded Systems (Lecture) | TUP Manila | Group 2, BET-CpET 4A-M | IoT Level 6
 
+## Links
+
+- [Smart-Bin Online Document (Google Doc)](https://docs.google.com/document/d/1rWHQXjgQo8KrHvwuqEfFhKnTxFyY96tXlPZCjHuy8gE/edit?tab=t.0)
+- [Gantt chart (PDF)](Documents/SmartBin_Gantt_Chart.pdf)
+
 ## What it is
 
 Two table-size smart bins, each with its own ESP32. Each bin measures how full it is, how heavy it is, and the temperature, humidity, pressure and air quality inside it. It detects tilting or tampering, opens its lid when a hand approaches, and reports to three interfaces:
