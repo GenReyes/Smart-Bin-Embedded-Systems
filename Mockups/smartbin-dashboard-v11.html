@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Smart Bin Dashboard</title>
+<title>Smart Bin Dashboard v11</title>
 <style>
 :root{
   --base:#E4DCD2; --tint:#E4DCD2;
@@ -28,11 +28,11 @@ html[data-theme="dark"]{
 }
 :root{--accentBar:var(--accent);--simSoft:rgba(122,69,181,.3);--calSoft:rgba(13,138,138,.3);
   --c-temp:#C2591B; --c-humid:#1F6FA8; --c-weight:#7A5A2E; --c-gas:#6B4FB8; --c-press:#B03A6F;
-  --c-fill:#1E7A52; --c-bt:#1A62C4; --c-lid:#B07415; --c-motion:#0E7F9E; --c-link:#1E8E3E; --c-tamper:#D93025;
+  --c-fill:#1E7A52; --c-bt:#1A62C4; --c-lid:#B07415; --c-motion:#0E7F9E; --c-link:#1E8E3E; --c-cloud:#D9631E; --c-tamper:#D93025;
   --lv-cool:#1F6FA8; --lv-low:#1E8E3E; --lv-mid:#B88410; --lv-high:#D9641F; --lv-crit:#D93025}
 html[data-theme="dark"]{--simSoft:rgba(185,139,232,.34);--calSoft:rgba(63,199,194,.32);
   --c-temp:#F0A368; --c-humid:#6CB8E8; --c-weight:#D6B98C; --c-gas:#B596F0; --c-press:#E58AB4;
-  --c-fill:#4FC48D; --c-bt:#79AEF5; --c-lid:#E8B45C; --c-motion:#5FD0E8; --c-link:#4FBF6E; --c-tamper:#FF6B5E;
+  --c-fill:#4FC48D; --c-bt:#79AEF5; --c-lid:#E8B45C; --c-motion:#5FD0E8; --c-link:#4FBF6E; --c-cloud:#F29A5C; --c-tamper:#FF6B5E;
   --lv-cool:#6CB8E8; --lv-low:#4FBF6E; --lv-mid:#E8C45A; --lv-high:#F0A368; --lv-crit:#FF6B5E}
 html[data-mode="sim"]{--accent:var(--sim);--accentSoft:rgba(122,69,181,.22);--tint:#E2DAE1}
 html[data-mode="calib"]{--accent:var(--cal);--accentSoft:rgba(13,138,138,.2);--tint:#DBE3E0}
@@ -815,6 +815,29 @@ table.sim th .ico{width:14px;height:14px}
 .picklist button:hover,.picklist button[aria-pressed="true"]{background:var(--accentSoft);color:var(--accent)}
 .picklist button .bcc{width:9px;height:9px;border-radius:50%;flex-shrink:0}
 
+/* ---- v11 additions ---- */
+/* Alert history tools (from Garbage-Guard): kind symbols, date range, scoped actions */
+#alertKinds{display:flex;gap:7px;flex-wrap:wrap}
+#alertKinds .fchip{width:36px;height:36px}
+#alertRange{display:flex;gap:6px;flex-wrap:wrap}
+.alertscope{margin:14px 2px 12px;font-size:13px;font-weight:800;color:var(--ink)}
+.alertscope small{display:block;font-weight:600;color:var(--ink2);margin-top:2px}
+.aconfirm{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 14px;padding:12px 14px;border:2px solid var(--ink);border-radius:8px;box-shadow:4px 4px 0 var(--ink);background:var(--bad);color:#fff;font-weight:700;font-size:13px}
+.aconfirm span{flex:1;min-width:200px}
+.aconfirm .btn{background:var(--base);color:var(--ink)}
+.aconfirm.hide{display:none}
+/* Cloud backup panel */
+.cloudrows{display:flex;flex-direction:column;gap:8px;margin-top:14px}
+.cloudrow{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:700;padding:9px 12px;border-radius:12px;background:var(--well,var(--base));box-shadow:var(--i1)}
+.cloudrow .dot{width:10px;height:10px;border-radius:50%;background:var(--cc);box-shadow:0 0 0 3px color-mix(in srgb,var(--cc) 22%,transparent);flex:none}
+.cloudrow .cn{flex:1;min-width:0}
+.cloudrow .cs{color:var(--cc);white-space:nowrap;font-size:12px}
+.cloudmsg{margin-top:14px;padding:10px 13px;border:2px solid var(--ink);border-radius:8px;box-shadow:3px 3px 0 var(--ink);color:#fff;font-weight:700;font-size:13px}
+.cloudmsg.ok{background:var(--ok)}.cloudmsg.bad{background:var(--bad)}.cloudmsg.hide{display:none}
+#cloudState[data-on="1"]{color:var(--c-cloud);box-shadow:var(--o1),0 0 0 2px color-mix(in srgb,var(--c-cloud) 32%,transparent)}
+.usebar{height:12px;border-radius:6px;background:var(--well,var(--base));box-shadow:var(--i1);overflow:hidden;margin-top:14px}
+.usebar i{display:block;height:100%;width:3.1%;border-radius:6px;background:var(--c-cloud)}
+
 /* Fill chart note */
 .chart-note{font-size:11px;color:var(--ink2);margin:4px 0 0;font-style:italic}
 
@@ -974,6 +997,7 @@ table.sim th .ico{width:14px;height:14px}
         <div class="fields">
           <div class="field"><label for="s_fill">Fill threshold (%)</label><input id="s_fill" type="number" min="10" max="100"></div>
           <div class="field"><label for="s_temp">Temperature threshold (&deg;C)</label><input id="s_temp" type="number" min="10" max="85"></div>
+          <div class="field"><label for="s_hum">Humidity threshold (%RH)</label><input id="s_hum" type="number" min="30" max="100"></div>
           <div class="field"><label for="s_gas">Air quality limit (IAQ)</label><input id="s_gas" type="number" min="50" max="500"></div>
           <div class="field"><label for="s_tilt">Tilt threshold (deg)</label><input id="s_tilt" type="number" min="5" max="90"></div>
           <div class="field"><label for="s_wcap">Weight capacity (g)</label><input id="s_wcap" type="number" min="100" max="5000" step="50"></div>
@@ -983,7 +1007,7 @@ table.sim th .ico{width:14px;height:14px}
         <div class="sect" data-sec="air">
         <h2 style="margin-top:24px">Air sensor (BME680)</h2>
         <div class="fields">
-          <div class="field"><label>Temp raw / corrected</label><div class="readout nm-in" id="s_tlive">-- / -- &deg;C</div></div>
+          <div class="field"><label>Temperature raw / corrected</label><div class="readout nm-in" id="s_tlive">-- / -- &deg;C</div></div>
           <div class="field span2"><label for="s_tref">Reference thermometer (&deg;C)</label>
             <div class="withbtn"><input id="s_tref" type="number" min="-40" max="85" step="0.1" placeholder="e.g. 27.5"><button class="btn sm" id="btnRefT">SET OFFSET</button></div></div>
           <div class="field"><label for="s_toff">Temperature offset (&deg;C)</label><input id="s_toff" type="number" min="-10" max="10" step="0.1"></div>
@@ -1054,6 +1078,31 @@ table.sim th .ico{width:14px;height:14px}
       <p class="hint" id="btWhy"></p>
       <p class="hint" id="btRoleNote"></p>
     </div>
+
+    <div class="panel nm" id="cloudPanel" style="margin-top:22px">
+      <div class="sechead">
+        <h2 class="ph" style="--cc:var(--c-cloud)" id="cloudHead"></h2>
+        <span class="btstate" id="cloudState">Not tested</span>
+      </div>
+      <p class="hint" style="margin:-6px 0 16px">The bins copy their readings to Firebase so the phone app keeps working away from this Wi-Fi. Local Wi-Fi always comes first: this dashboard and the app both use the bins’ own API whenever a bin answers, and the app falls back to Firebase only when none does.</p>
+      <div class="fields">
+        <div class="field span2"><label for="fb_url">Database URL</label><input id="fb_url" type="text" inputmode="url" spellcheck="false" placeholder="https://...firebasedatabase.app"></div>
+        <div class="field"><label for="fb_key">Web API key</label><input id="fb_key" type="text" spellcheck="false" placeholder="AIza..."></div>
+        <div class="field"><label for="fb_email">Bin account email</label><input id="fb_email" type="text" inputmode="email" spellcheck="false"></div>
+        <div class="field"><label for="fb_pass">Password</label>
+          <div class="withbtn"><input id="fb_pass" type="password" spellcheck="false"><button class="btn sm" id="fbEye"></button></div></div>
+      </div>
+      <div class="actions" style="margin-top:20px">
+        <button class="btn" id="fbTest" style="flex:0 0 auto"></button>
+        <button class="btn" id="fbSave" style="flex:0 0 auto"></button>
+        <button class="btn" id="fbRestore" style="flex:0 0 auto"></button>
+      </div>
+      <div class="cloudmsg hide" id="cloudMsg"></div>
+      <div class="cloudrows" id="cloudRows"></div>
+      <div class="usebar"><i></i></div>
+      <p class="hint" id="cloudUse">312 MB of the 10 GB the free Firebase plan allows each month. Each bin writes every 5 s while a phone is watching over cloud, every minute otherwise, and at once when an alert starts. Commands the app sends through the cloud (LOCK, UNLOCK, COLLECT) reach the bin within a few seconds.</p>
+      <p class="hint" id="cloudRoleNote"></p>
+    </div>
   </section>
   <section data-view="sim" class="hide">
     <div class="panel nm">
@@ -1074,21 +1123,14 @@ table.sim th .ico{width:14px;height:14px}
       <div class="sechead">
         <h2 class="ph" style="--cc:var(--c-tamper)" id="alertHead"></h2>
         <div class="alertctl">
-          <div class="filterchips" id="alertFilters">
-            <button class="chip2 on" data-af="all">ALL</button>
-            <button class="chip2" data-af="unread">UNREAD</button>
-            <button class="chip2" data-af="critical">CRITICAL</button>
-          </div>
+          <div class="filterchips" id="alertKinds"></div>
+          <div id="alertRange"></div>
           <button class="btn sm" id="btnMarkAll" disabled></button>
-          <select id="clearRange" aria-label="What to clear">
-            <option value="0">Everything</option>
-            <option value="24">Older than 24 hours</option>
-            <option value="168">Older than 7 days</option>
-            <option value="720">Older than 30 days</option>
-          </select>
           <button class="btn sm" id="btnClear"></button>
         </div>
       </div>
+      <p class="alertscope" id="alertScope"></p>
+      <div class="aconfirm hide" id="alertConfirm"><span id="alertConfirmText"></span><button class="btn sm" id="alertNo">CANCEL</button><button class="btn sm" id="alertYes">DELETE</button></div>
       <div class="scrollpane alertpane"><div class="alerts" id="alertList"></div></div>
     </div>
   </section>
@@ -1103,12 +1145,12 @@ function binColor(i){
   const s=50,l=dark?(round===0?64:round===1?55:72):(round===0?46:round===1?38:54);
   return 'hsl('+h+','+s+'%,'+l+'%)';
 }
-const DEF_CAL={d_empty:30,d_full:5,fill_th:80,temp_th:40,gas_th:200,tilt_th:30,weight_cap:4500,auto_lock:0,servo_closed:0,servo_open:90,collect_pin:1234,pir_hold_s:5,buzz_s:2,temp_off:-2,hum_off:0,press_off:0};
+const DEF_CAL={d_empty:30,d_full:5,fill_th:80,temp_th:40,hum_th:85,gas_th:200,tilt_th:30,weight_cap:4500,auto_lock:0,servo_closed:0,servo_open:90,collect_pin:1234,pir_hold_s:5,buzz_s:2,temp_off:-2,hum_off:0,press_off:0};
 const SENSORS=[
   {key:'fill',bit:0,label:'Fill level',icon:'fill',kind:'range',min:0,max:100,step:1,unit:'%'},
   {key:'weight',bit:1,label:'Weight',icon:'weight',kind:'number',min:0,max:5000,step:10,unit:'g'},
   {key:'gas',bit:2,label:'Air quality',icon:'gas',kind:'range',min:0,max:500,step:5,unit:'IAQ'},
-  {key:'temp',bit:3,label:'Temp / humidity',icon:'temp',kind:'pair'},
+  {key:'temp',bit:3,label:'Temperature and humidity',icon:'temp',kind:'pair'},
   {key:'tamper',bit:4,label:'Tamper',icon:'tamper',kind:'toggle'},
   {key:'motion',bit:5,label:'Motion',icon:'motion',kind:'toggle'},
   {key:'lid',bit:6,label:'Lid',icon:'lid',kind:'lid'}
@@ -1160,6 +1202,7 @@ const ICONS={
     '<path class="vap" d="M6.5 17c0-2.6 2.6-2.6 2.6-5.2S6.5 9.2 6.5 6.6"/>'+
     '<path class="vap v2" d="M12 18c0-2.6 2.6-2.6 2.6-5.2S12 10.2 12 7.6"/>'+
     '<path class="vap v3" d="M17.5 17c0-2.6 2.6-2.6 2.6-5.2s-2.6-2.6-2.6-5.2"/></svg>',
+  cloud:()=>S('<path d="M7 18.6h10.4a4.2 4.2 0 0 0 .5-8.4 6 6 0 0 0-11.5-1A4.8 4.8 0 0 0 7 18.6z"/>'),
   press:()=>S('<path d="M4.6 17.6a8.6 8.6 0 1 1 14.8 0"/><path d="M12 14l3.6-4.4"/><circle cx="12" cy="14.2" r="1.5" fill="currentColor" stroke="none"/><path d="M7.2 17.6h9.6"/>'),
   weight:()=>'<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+
     '<path d="M4.6 20.5h14.8l-1.9-9.6H6.5z"/><path d="M9 10.9a3 3 0 1 1 6 0"/>'+
@@ -1240,7 +1283,7 @@ function newBin(seed){
 const saved=store.read();
 const state={
   role:'operator',view:'overview',rangeMin:60,alerts:[],calib:null,envBin:null,addCount:1,chartPick:[],envMode:'both',
-  ovView:'list',ovFilter:'all',collectShowAll:false,alertFilter:'all',ovTile:null,
+  ovView:'list',ovFilter:'all',collectShowAll:false,akind:'all',arange:'any',ovTile:null,
   bins:(saved&&saved.length?saved:[
     {id:'b1',name:'Bin 01',place:'Main Hall',ip:'',fill:34},
     {id:'b2',name:'Bin 02',place:'Cafeteria',ip:'',fill:62}
@@ -1274,7 +1317,7 @@ state.bins.forEach(seedHistory);
 
 const LABEL_ICONS={
   s_dempty:['ruler','var(--cal)'],      s_dfull:['fill','var(--c-fill)'],
-  s_fill:['percent','var(--c-fill)'],   s_temp:['temp','var(--c-temp)'],
+  s_fill:['percent','var(--c-fill)'],   s_temp:['temp','var(--c-temp)'],   s_hum:['humid','var(--c-humid)'],
   s_gas:['gas','var(--c-gas)'],         s_tilt:['tilt','var(--c-tamper)'],
   s_wcap:['weight','var(--c-weight)'],  s_sclosed:['servo','var(--c-lid)'],
   s_sopen:['servo','var(--c-lid)'],     s_pin:['pin','var(--sim)'],
@@ -1333,12 +1376,12 @@ function paintHeadings(){
   const bc=$('#btnClear');
   if(bc&&!bc.dataset.deco){bc.dataset.deco='1';bc.classList.add('tint');
     bc.style.setProperty('--cc','var(--c-tamper)');
-    bc.innerHTML=icon('trash')+'<span>CLEAR</span>';
+    bc.innerHTML=icon('trash')+'<span>DELETE</span>';
     bc.style.display='inline-flex';bc.style.alignItems='center';bc.style.gap='8px';}
   const bm=$('#btnMarkAll');
   if(bm&&!bm.dataset.deco){bm.dataset.deco='1';bm.classList.add('tint');
     bm.style.setProperty('--cc','var(--ok)');
-    bm.innerHTML=icon('check')+'<span>MARK ALL READ</span>';
+    bm.innerHTML=icon('check')+'<span>MARK READ</span>';
     bm.style.display='inline-flex';bm.style.alignItems='center';bm.style.gap='8px';}
   const TH={thSensor:['sliders','SENSOR','var(--c-humid)'],thMode:['power','MODE','var(--sim)'],
     thValue:['capture','MANUAL VALUE','var(--cal)']};
@@ -1380,9 +1423,51 @@ function btRender(){
   const note=$('#btRoleNote');
   if(note)note.textContent=op?''
     :'You are signed in as a collector. You can pair a bin and read the address it is using, but only an operator can send new Wi-Fi credentials or switch the bin\u2019s Bluetooth off.';
+  if($('#cloudHead')&&$('#cloudHead').innerHTML)cloudRender();
   const st=$('#btState');
   st.dataset.on=paired?'1':'0';
   st.innerHTML=icon('bluetooth')+'<span>'+(bt.demo&&paired?'Paired (demo)':paired?'Paired':'Not paired')+'</span>';
+}
+/* ---------- cloud backup (Firebase), from Garbage-Guard: local Wi-Fi first, Firebase second ---------- */
+const FB_DEF={url:'https://smart-bin-g2-default-rtdb.asia-southeast1.firebasedatabase.app',key:'AIzaSySmartBinG2-demo-key-not-real-0001',email:'bins@smart-bin.test',pass:'demo-pass'};
+const cloud={working:Object.assign({},FB_DEF),tested:false,msg:null,show:false};
+function fbVals(){return {url:$('#fb_url').value.trim(),key:$('#fb_key').value.trim(),email:$('#fb_email').value.trim(),pass:$('#fb_pass').value}}
+function fbFill(v){$('#fb_url').value=v.url;$('#fb_key').value=v.key;$('#fb_email').value=v.email;$('#fb_pass').value=v.pass}
+function fbCheck(f){
+  if(!/^https:\/\/.+\.(firebasedatabase\.app|firebaseio\.com)$/.test(f.url))return 'The database URL is wrong. It starts with https:// and ends in .firebasedatabase.app, with no / at the end.';
+  if(!/^AIza.{35}$/.test(f.key))return 'The Web API key is wrong. It starts with AIza and is 39 characters long.';
+  if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email)||f.pass.length<6)return 'Wrong email or password.';
+  return '';
+}
+function cloudRender(){
+  const op=state.role==='operator';
+  ['fb_url','fb_key','fb_email','fb_pass','fbSave','fbRestore'].forEach(id=>{const e=$('#'+id);if(e)e.disabled=!op});
+  const st=$('#cloudState');st.dataset.on=cloud.tested?'1':'0';
+  st.innerHTML=icon('cloud')+'<span>'+(cloud.tested?'Working':'Not tested')+'</span>';
+  const m=$('#cloudMsg');m.classList.toggle('hide',!cloud.msg);if(cloud.msg){m.className='cloudmsg '+cloud.msg[0];m.textContent=cloud.msg[1];}
+  $('#cloudRows').innerHTML=state.bins.slice(0,6).map((b,i)=>{const live=b.live,s=live?['var(--c-link)','writes every minute, last 12 s ago']:b.ip?['var(--c-tamper)','not answering, last write 4 min ago']:['var(--warn)','demo bin, nothing sent'];
+    return '<div class="cloudrow" style="--cc:'+s[0]+'"><span class="dot"></span><span class="cn">'+esc(b.name)+'</span><span class="cs">'+s[1]+'</span></div>'}).join('')+
+    (state.bins.length>6?'<div class="cloudrow" style="--cc:var(--ink2)"><span class="cn">and '+(state.bins.length-6)+' more</span></div>':'')+
+    '<div class="cloudrow" style="--cc:var(--c-cloud)"><span class="dot"></span><span class="cn">Phones watching over cloud</span><span class="cs">1 phone, so bins write every 5 s</span></div>';
+  $('#cloudRoleNote').textContent=op?'':'You are signed in as a collector. You can test the details, but only an operator can change or save them.';
+}
+function cloudDecorate(){
+  const defs={fbTest:['radar','tint','var(--c-cloud)','TEST'],fbSave:['save','solid','var(--c-cloud)','TEST AND SAVE'],fbRestore:['undo','tint','var(--ink2)','RESTORE WORKING'],fbEye:['eye','tint','var(--ink2)','SHOW']};
+  for(const id in defs){const el=$('#'+id);if(!el)continue;const [ic,cls,cc,tx]=defs[id];
+    el.classList.add(cls);el.style.setProperty('--cc',cc);el.innerHTML=icon(ic)+'<span>'+tx+'</span>';
+    el.style.display='inline-flex';el.style.alignItems='center';el.style.gap='8px';}
+  $('#cloudHead').innerHTML=icon('cloud')+'<span>CLOUD BACKUP (FIREBASE)</span>';
+  fbFill(cloud.working);cloudRender();
+  $('#fbEye').addEventListener('click',()=>{cloud.show=!cloud.show;$('#fb_pass').type=cloud.show?'text':'password';$('#fbEye').innerHTML=icon(cloud.show?'eyeoff':'eye')+'<span>'+(cloud.show?'HIDE':'SHOW')+'</span>';});
+  const test=save=>{const v=fbVals(),e=fbCheck(v);
+    if(e){cloud.msg=['bad',e+(save?' Nothing was saved.':'')];cloudRender();return;}
+    cloud.tested=true;
+    if(save){cloud.working=Object.assign({},v);cloud.msg=['ok','Signed in and read the bin list. Saved, and sent to every bin that answers over the local API (POST /api/cloud).'];}
+    else cloud.msg=['ok','Signed in as '+v.email+' and read the bin list. Nothing was saved yet.'];
+    cloudRender();};
+  $('#fbTest').addEventListener('click',()=>test(false));
+  $('#fbSave').addEventListener('click',()=>test(true));
+  $('#fbRestore').addEventListener('click',()=>{fbFill(cloud.working);cloud.msg=['ok','Put back the last details that passed a test.'];cloudRender();});
 }
 function btDecorate(){
   const defs={btPair:['bluetooth','tint','var(--c-bt)','PAIR A BIN'],btSend:['key','solid','var(--c-bt)','SEND WI-FI'],
@@ -1590,9 +1675,23 @@ const SEV_RANK=['critical','warning','info','success'];
 const SEV_TONE={critical:['bell','var(--bad)','red'],warning:['bell','var(--warn)','amber'],
   info:['bell','var(--sim)','purple'],success:['bell','var(--ok)','green']};
 const unreadCount=()=>state.alerts.reduce((n,a)=>n+(a.read?0:1),0);
-function addAlert(sev,ic,title,meta){
-  state.alerts.unshift({id:++alertSeq,sev,ic,title,meta,t:Date.now(),read:false});
+const KIND_BY_IC={fill:'full',temp:'sensor',humid:'sensor',gas:'sensor',tamper:'tamper',lock:'lock',truck:'pickup',calib:'setup'};
+function addAlert(sev,ic,title,meta,k){
+  state.alerts.unshift({id:++alertSeq,sev,ic,k:k||KIND_BY_IC[ic]||'setup',title,meta,t:Date.now(),read:false});
   state.alerts=state.alerts.slice(0,120);
+}
+/* Demo history so the alert tools have something to act on. Only when no bin has an address. */
+function seedAlerts(){
+  if(state.bins.some(b=>b.ip))return;
+  const n=state.bins.map(b=>b.name),a=n[0]||'Bin 01',b2=n[1]||a,M=60000;
+  [[2,'critical','fill','Fill threshold passed',b2+' is at 81%'],[9,'warning','gas','Air quality warning',b2+' index 212, limit 200'],
+   [34,'critical','tamper','Tamper detected',a+' was moved or tilted'],[41,'warning','humid','Humidity high',b2+' at 88%, limit 85%'],
+   [60,'info','lock','Bin locked',a+' locked from the dashboard'],[62,'success','check','Bin unlocked',a+' is open for use again','lock'],
+   [180,'success','truck','Collection complete',b2+' is back to normal'],[300,'info','calib','Calibration started',a+' is being calibrated'],
+   [302,'success','check','Settings saved',a+': empty 30 cm, full 5 cm, alert at 80%','setup'],[1260,'critical','temp','Temperature high',a+' at 41.2 \u00B0C'],
+   [4320,'success','truck','Collection complete',a+' is back to normal'],[17280,'critical','fill','Fill threshold passed',a+' is at 83%']]
+  .forEach((s,i)=>state.alerts.push({id:++alertSeq,sev:s[1],ic:s[2],k:s[5]||KIND_BY_IC[s[2]]||'setup',title:s[3],meta:s[4],t:Date.now()-s[0]*M,read:i>=2}));
+  lastUnread=unreadCount();
 }
 function markAllRead(){
   const n=unreadCount();
@@ -1609,15 +1708,16 @@ function toggleRead(id){
 }
 function watchAlerts(b){
   const d=b.data,p=b.prev,c=b.cal;
-  const full=d.fill>=c.fill_th,hot=d.temp>=c.temp_th,gassy=d.gas>=c.gas_th;
+  const full=d.fill>=c.fill_th,hot=d.temp>=c.temp_th,humid=d.humidity>=c.hum_th,gassy=d.gas>=c.gas_th;
   if(full&&!p.full)addAlert('critical','fill','Fill threshold passed',b.name+' is at '+Math.round(d.fill)+'%');
   if(hot&&!p.hot)addAlert('critical','temp','Temperature high',b.name+' at '+fmt(d.temp)+' °C');
+  if(humid&&!p.humid)addAlert('warning','humid','Humidity high',b.name+' at '+Math.round(d.humidity)+'%, limit '+c.hum_th+'%');
   if(gassy&&!p.gassy)addAlert('warning','gas','Air quality warning',b.name+' index '+Math.round(d.gas)+', limit '+c.gas_th);
   if(d.status==='TAMPER'&&p.status!=='TAMPER')addAlert('critical','tamper','Tamper detected',b.name+' was moved or tilted');
   if(d.status==='LOCKED'&&p.status!=='LOCKED')addAlert('info','lock','Bin locked',b.name+' locked from the dashboard');
-  if(d.status!=='LOCKED'&&p.status==='LOCKED')addAlert('success','check','Bin unlocked',b.name+' is open for use again');
+  if(d.status!=='LOCKED'&&p.status==='LOCKED')addAlert('success','check','Bin unlocked',b.name+' is open for use again','lock');
   if(d.status==='CALIBRATING'&&p.status!=='CALIBRATING')addAlert('info','calib','Calibration started',b.name+' is being calibrated');
-  b.prev={full,hot,gassy,status:d.status};
+  b.prev={full,hot,humid,gassy,status:d.status};
 }
 
 /* ---------- commands ---------- */
@@ -1714,7 +1814,7 @@ function updateTiles(){
     t.style.outlineOffset='-2px';
     const fn=t.querySelector('.tfill');if(fn)fn.textContent=pct+'%';
     let warn=t.querySelector('.twarn');
-    const hasWarn=b.data.temp>=c.temp_th||b.data.gas>=c.gas_th;
+    const hasWarn=b.data.temp>=c.temp_th||b.data.humidity>=c.hum_th||b.data.gas>=c.gas_th;
     if(hasWarn&&!warn){warn=document.createElement('span');warn.className='twarn';warn.textContent='!';t.appendChild(warn);}
     if(warn)warn.style.display=hasWarn?'':'none';
     const bar=t.querySelector('.tbar i');
@@ -1820,7 +1920,7 @@ function renderOverlayCard(){
   /* sensors */
   const vals={
     temp:[fmt(d.temp,1)+'°',d.temp>=c.temp_th,d.temp<22?'cool':(d.temp/c.temp_th>=1?'crit':d.temp/c.temp_th>=.8?'high':d.temp/c.temp_th>=.5?'mid':'low')],
-    humid:[Math.round(d.humidity)+'%',false,d.humidity>=80?'high':d.humidity>=60?'mid':d.humidity<=35?'cool':'low'],
+    humid:[Math.round(d.humidity)+'%',d.humidity>=c.hum_th,d.humidity>=c.hum_th?'crit':d.humidity>=c.hum_th-10?'high':d.humidity>=60?'mid':d.humidity<=35?'cool':'low'],
     weight:[(d.weight_g/1000).toFixed(2)+'kg',d.weight_g>=c.weight_cap,(()=>{const f=d.weight_g/(c.weight_cap||4500);return f>=1?'crit':f>=.8?'high':f>=.5?'mid':'low';})()],
     gas:[String(Math.round(d.gas)),d.gas>=c.gas_th,(()=>{const f=d.gas/(c.gas_th||200);return f>=1?'crit':f>=.8?'high':f>=.5?'mid':'low';})()]
   };
@@ -1967,7 +2067,7 @@ function makeTile(b,i){
   const pct=Math.round(d.fill);
   const full=pct>=c.fill_th,tamper=d.status==='TAMPER';
   const bm=binMode(b);
-  const warn=(d.temp>=c.temp_th||d.gas>=c.gas_th)?'<span class="twarn">!</span>':'';
+  const warn=(d.temp>=c.temp_th||d.humidity>=c.hum_th||d.gas>=c.gas_th)?'<span class="twarn">!</span>':'';
   const barCol=full?'var(--bad)':pct>c.fill_th*0.7?'var(--warn)':colorOf(i);
   const statusTxt=tamper?'TAMPER':full?'FULL':d.status==='CALIBRATING'?'CALIB':d.lid==='OPEN'?'LID OPEN':'OK';
   const statusCls=tamper||full?'tstatus alert-status':'tstatus';
@@ -2091,13 +2191,13 @@ function renderCard(b){
   const host=q('sensors');
   if(!host.dataset.built){
     host.dataset.built='1';
-    host.innerHTML=[['temp','Temperature'],['humid','Humidity'],['weight','Weight'],['gas','Air (IAQ)']]
+    host.innerHTML=[['temp','Temperature'],['humid','Humidity'],['weight','Weight'],['gas','Air quality']]
       .map(s=>'<div class="sensor nm-in" data-s="'+s[0]+'">'+icon(s[0])+'<span class="v">--</span><span class="k">'+s[1]+'</span></div>').join('');
   }
   const band=(f)=>f>=1?'crit':f>=.8?'high':f>=.5?'mid':'low';
   const vals={
     temp:[fmt(d.temp,1)+'°',d.temp>=c.temp_th,d.temp<22?'cool':band(d.temp/c.temp_th)],
-    humid:[Math.round(d.humidity)+'%',false,d.humidity>=80?'high':d.humidity>=60?'mid':d.humidity<=35?'cool':'low'],
+    humid:[Math.round(d.humidity)+'%',d.humidity>=c.hum_th,d.humidity>=c.hum_th?'crit':d.humidity>=c.hum_th-10?'high':d.humidity>=60?'mid':d.humidity<=35?'cool':'low'],
     weight:[(d.weight_g/1000).toFixed(2)+'kg',d.weight_g>=c.weight_cap,band(d.weight_g/(c.weight_cap||4500))],
     gas:[String(Math.round(d.gas)),d.gas>=c.gas_th,band(d.gas/(c.gas_th||200))]
   };
@@ -2266,16 +2366,53 @@ function renderBanners(){
 }
 function ban(cls,ic,t,s){return '<div class="banner '+cls+'">'+icon(ic)+'<span>'+t+'</span>'+(s?'<small>'+s+'</small>':'')+'</div>'}
 let alertSig='';
+/* History tools from Garbage-Guard: one bar of symbols filters by kind, a second bar by date,
+   and MARK READ and DELETE act on exactly the alerts shown. */
+const AKINDS=[['all','layers','All','var(--accent)'],['full','fill','Full bins','var(--bad)'],['sensor','temp','Sensor readings','var(--c-temp)'],['tamper','tamper','Tamper','var(--c-tamper)'],
+  ['lock','lock','Lock and unlock','var(--sim)'],['pickup','truck','Pickups','var(--c-link)'],['setup','calib','Calibration and settings','var(--cal)']];
+const AKNAME={all:['alert','alerts'],full:['full-bin alert','full-bin alerts'],sensor:['sensor alert','sensor alerts'],tamper:['tamper alert','tamper alerts'],
+  lock:['lock event','lock events'],pickup:['pickup','pickups'],setup:['setup event','setup events']};
+const ARANGE=[['today','Today'],['7','7 days'],['30','30 days'],['any','Any']];
+function rangeStart(){const r=state.arange,d=new Date();if(r==='today'){d.setHours(0,0,0,0);return +d}if(r==='any')return 0;return Date.now()-(+r)*86400000}
+function shownAlerts(){const s=rangeStart();return state.alerts.filter(a=>(state.akind==='all'||a.k===state.akind)&&a.t>=s)}
+function scopeTxt(n){const nm=AKNAME[state.akind]||AKNAME.all,w=n===1?nm[0]:nm[1],r={today:' from today','7':' from the last 7 days','30':' from the last 30 days',any:''}[state.arange];
+  return (state.akind==='all'&&state.arange==='any'?'all '+n+' '+w:n+' '+w)+r}
+function renderAlertTools(){
+  const kh=AKINDS.map(k=>'<button class="fchip'+(state.akind===k[0]?' on':'')+'" data-akind="'+k[0]+'" title="'+k[2]+'" aria-label="'+k[2]+'" style="--fc:'+k[3]+'">'+icon(k[1])+'</button>').join('');
+  if($('#alertKinds').dataset.sig!==kh){$('#alertKinds').dataset.sig=kh;$('#alertKinds').innerHTML=kh;}
+  const rh=ARANGE.map(r=>'<button class="btn sm binbtn" data-arange="'+r[0]+'" aria-pressed="'+(state.arange===r[0])+'" style="--cc:var(--c-tamper)">'+r[1]+'</button>').join('');
+  if($('#alertRange').dataset.sig!==rh){$('#alertRange').dataset.sig=rh;$('#alertRange').innerHTML=rh;}
+}
+function markShown(){
+  const s=shownAlerts().filter(a=>!a.read);if(!s.length)return;
+  s.forEach(a=>{a.read=true});alertSig='';banSig='';renderAlerts();renderBanners();
+  toast('Marked '+s.length+' alert'+(s.length>1?'s':'')+' as read.');
+}
+function askDelete(){
+  const n=shownAlerts().length;if(!n)return;
+  $('#alertConfirmText').textContent='Delete '+scopeTxt(n)+'? This cannot be undone.';
+  $('#alertYes').innerHTML=icon('trash')+'<span>DELETE '+n+'</span>';
+  $('#alertConfirm').classList.remove('hide');
+}
+function doDelete(){
+  const s=shownAlerts(),ids=new Set(s.map(a=>a.id)),t=scopeTxt(s.length);
+  state.alerts=state.alerts.filter(a=>!ids.has(a.id));
+  $('#alertConfirm').classList.add('hide');alertSig='';banSig='';renderAlerts();renderBanners();
+  toast('Deleted '+t+'.');
+}
 function renderAlerts(){
-  const list=$('#alertList'),unread=unreadCount();
-  const mk=$('#btnMarkAll');if(mk)mk.disabled=!unread;
+  const list=$('#alertList'),unread=unreadCount(),shown=shownAlerts(),unShown=shown.filter(a=>!a.read).length;
+  renderAlertTools();
+  const mk=$('#btnMarkAll');if(mk)mk.disabled=!unShown;
+  const dl=$('#btnClear');if(dl)dl.disabled=!shown.length;
+  const sc=$('#alertScope'),kn=(AKINDS.find(k=>k[0]===state.akind)||AKINDS[0])[2];
+  const sh=state.alerts.length?(shown.length?'Showing '+scopeTxt(shown.length)+'<small>'+kn+(unShown?', '+unShown+' unread':', all read')+'. MARK READ and DELETE act on exactly these.</small>':'No alerts match.<small>Change the kind or the dates.</small>'):'';
+  if(sc&&sc.dataset.sig!==sh){sc.dataset.sig=sh;sc.innerHTML=sh;}
   const hd=$('#alertHead');
   if(hd){
     const hh=icon('clock')+'<span>ALERT HISTORY</span>'+(unread?'<em class="unreadpip">'+unread+' UNREAD</em>':'');
     if(hd.dataset.sig!==hh){hd.dataset.sig=hh;hd.innerHTML=hh;}
   }
-  /* sync filter chips */
-  $$('#alertFilters .chip2').forEach(c=>{c.classList.toggle('on',c.dataset.af===state.alertFilter)});
   if(!state.alerts.length){
     if(alertSig!=='@empty'){alertSig='@empty';
       list.innerHTML='<div class="empty">No alerts yet. This fills up as bins reach their limits.</div>';}
@@ -2283,12 +2420,7 @@ function renderAlerts(){
   }
   const sv={critical:['var(--bad)','CRITICAL'],warning:['var(--warn)','WARNING'],
     info:['var(--sim)','INFO'],success:['var(--ok)','RESOLVED']};
-  const filt=a=>{
-    if(state.alertFilter==='unread')return !a.read;
-    if(state.alertFilter==='critical')return a.sev==='critical';
-    return true;
-  };
-  const visible=state.alerts.filter(filt);
+  const visible=shown;
   const html=visible.map(a=>{
     const s=sv[a.sev]||['var(--ink2)','NOTE'];
     const lbl=a.read?'Mark as unread':'Mark as read';
@@ -2298,11 +2430,11 @@ function renderAlerts(){
       '</span><span style="flex:1;min-width:0"><span class="ttl">'+a.title+'</span><div class="meta">'+a.meta+' &middot; '+ago(a.t)+'</div></span>'+
       '<span class="lvtag" style="'+(a.sev==='critical'?'':'background:'+s[0])+'">'+s[1]+'</span>'+
       '<button class="del" data-del="'+a.id+'" title="Remove this alert">'+icon('cross')+'</button></div>';
-  }).join('')||(visible.length===0&&state.alerts.length?'<div class="empty">No '+state.alertFilter+' alerts.</div>':'');
+  }).join('')||(visible.length===0&&state.alerts.length?'<div class="empty">No alerts match. Change the kind or the dates.</div>':'');
   if(html===alertSig)return;
   alertSig=html;list.innerHTML=html;
 }
-function ago(t){const s=Math.round((Date.now()-t)/1000);return s<60?s+' s ago':s<3600?Math.round(s/60)+' min ago':Math.round(s/3600)+' h ago'}
+function ago(t){const s=Math.round((Date.now()-t)/1000);return s<60?s+' s ago':s<3600?Math.round(s/60)+' min ago':s<172800?Math.round(s/3600)+' h ago':Math.round(s/86400)+' days ago'}
 function renderLink(){
   const live=state.bins.filter(b=>b.live).length,set=state.bins.filter(b=>b.ip).length;
   $('#wifiico').innerHTML=icon('wifi',live>0);
@@ -2340,7 +2472,7 @@ function drawCharts(){
   cn.textContent=capped?'Showing 5 fullest of '+state.bins.length+' bins. Pick a bin above to see others.':'';
 
   const b=byId(state.envBin)||state.bins[0];
-  const SHORT=['ALL','TEMP','HUMIDITY','AIR QUALITY','PRESSURE'];
+  const SHORT=['ALL','TEMPERATURE','HUMIDITY','AIR QUALITY','PRESSURE'];
   const modeHtml=ENV_MODES.map((m,mi)=>'<button class="btn sm binbtn" style="--cc:'+m[3]+'" data-envmode="'+m[0]+
     '" aria-pressed="'+(state.envMode===m[0])+'">'+icon(m[2])+'<span>'+SHORT[mi]+'</span></button>').join('');
   if($('#envMode').dataset.sig!==modeHtml){$('#envMode').dataset.sig=modeHtml;$('#envMode').innerHTML=modeHtml;}
@@ -2356,20 +2488,20 @@ function niceMax(v){
   return Math.ceil(v/4000)*4000;
 }
 /* One reading at a time is drawn in its real unit, on the BME680 datasheet range (see SPEC).
-   ALL would need several y-scales, which cannot be read honestly, so BOTH draws temperature
-   and gas as a share of their own limit (one dashed line at 100% is the limit for both)
-   and humidity as its own 0 to 100 percent. Pressure has no limit, so it only has its own tab. */
+   ALL would need several y-scales, which cannot be read honestly, so BOTH draws temperature,
+   humidity and air quality as a share of their own limit (one dashed line at 100% is the limit
+   for all three). Pressure has no limit, so it only has its own tab. */
 const HKEY={temp:'temp',humid:'humidity',press:'pressure',gas:'gas'};
 function drawEnv(b,since){
   const h=b.hist.filter(p=>p.t>=since),d=b.data;
-  const tTh=b.cal.temp_th||40,gTh=b.cal.gas_th||200;
+  const tTh=b.cal.temp_th||40,hTh=b.cal.hum_th||85,gTh=b.cal.gas_th||200;
   const tc=getVar('--c-temp'),gc=getVar('--c-gas'),hc=getVar('--c-humid'),bad=getVar('--bad');
   const dashed=(c,a,b2)=>'repeating-linear-gradient(90deg,'+c+' 0 '+a+'px,transparent '+a+'px '+b2+'px)';
   let series,marks,min=0,max,ticks,note,leg='';
   if(SPEC[state.envMode]){
     const k=state.envMode,sp=SPEC[k],col=getVar(sp.col),key=HKEY[k];
     const pts=h.filter(p=>Number.isFinite(p[key])).map(p=>({t:p.t,v:p[key]}));
-    const lim=k==='temp'?tTh:k==='gas'?gTh:null;
+    const lim=k==='temp'?tTh:k==='humid'?hTh:k==='gas'?gTh:null;
     min=sp.min;max=sp.max;ticks=sp.ticks;
     series=[{color:col,dash:0,mark:lim,pts:pts}];
     marks=lim==null?[]:[{v:lim,color:bad,text:'ALERT LIMIT '+lim+' '+sp.unit,dash:[7,6]}];
@@ -2378,21 +2510,21 @@ function drawEnv(b,since){
       '<span>Scale '+sp.min+' to '+sp.max+' '+sp.unit+'</span>';
     note={
       temp:'Temperature of '+b.name+' in degrees C, after the offset from Settings. The scale runs to 85 C, the most the BME680 can read. The dashed line is its alert limit.',
-      humid:'Relative humidity of '+b.name+', 0 to 100 percent, the full BME680 range. Humidity has no alert limit.',
+      humid:'Relative humidity of '+b.name+', 0 to 100 percent, the full BME680 range. The dashed line is its alert limit.',
       press:'Air pressure around '+b.name+' in hPa, on the BME680 range of 300 to 1100 hPa, so normal weather changes look small. Pressure is charted here only. It has no tile on the bin card and raises no alert.',
       gas:'Air quality index of '+b.name+' from the BME680 gas sensor, 0 to 500, lower is cleaner. The dashed line is its alert limit.'
     }[k];
   }else{
     const tp=h.map(p=>({t:p.t,v:p.temp/tTh*100})),gp=h.map(p=>({t:p.t,v:p.gas/gTh*100}));
-    const hp=h.filter(p=>Number.isFinite(p.humidity)).map(p=>({t:p.t,v:p.humidity}));
+    const hp=h.filter(p=>Number.isFinite(p.humidity)).map(p=>({t:p.t,v:p.humidity/hTh*100}));
     max=200;ticks=[0,50,100,150,200]; /* fixed, so the 100% limit always sits in the middle */
-    series=[{color:tc,dash:0,mark:100,pts:tp},{color:gc,dash:1,mark:100,pts:gp},{color:hc,dash:2,mark:null,pts:hp}];
+    series=[{color:tc,dash:0,mark:100,pts:tp},{color:gc,dash:1,mark:100,pts:gp},{color:hc,dash:2,mark:100,pts:hp}];
     marks=[{v:100,color:bad,text:'ALERT LIMIT (100%)',dash:[7,6]}];
-    note='Temperature and gas are drawn as a share of their own alert limit, so the single dashed line at 100% is the limit for both. The scale runs to 200%, which keeps that line in the middle. '+
-      'Humidity is drawn as its own percent, 0 to 100, and has no limit. Pick one reading to see real units. Pressure has its own tab.';
+    note='Temperature, humidity and air quality are each drawn as a share of their own alert limit, so the single dashed line at 100% is the limit for all three. The scale runs to 200%, which keeps that line in the middle. '+
+      'Pick one reading to see real units. Pressure has its own tab, last.';
     leg='<span><i style="background:'+tc+'"></i>Temperature, limit '+tTh+' C</span>'+
-      '<span><i style="background:'+dashed(gc,5,9)+'"></i>Gas, limit '+gTh+' IAQ</span>'+
-      '<span><i style="background:'+dashed(hc,2.5,6.5)+'"></i>Humidity, %RH</span>'+
+      '<span><i style="background:'+dashed(hc,2.5,6.5)+'"></i>Humidity, limit '+hTh+' %RH</span>'+
+      '<span><i style="background:'+dashed(gc,5,9)+'"></i>Air quality, limit '+gTh+' IAQ</span>'+
       '<span><i style="background:'+dashed(bad,6,11)+'"></i>Alert limit (100%)</span>';
   }
   const lg=$('#legEnv');
@@ -2546,7 +2678,7 @@ function adaptiveSeg(hostId,attr,selIds,withAll){
     '<div class="picklist hide" id="'+hostId+'List">'+searchRow+items+'</div></div>';
 }
 /* ---------- settings ---------- */
-const MAP={s_dempty:'d_empty',s_dfull:'d_full',s_fill:'fill_th',s_temp:'temp_th',s_gas:'gas_th',s_tilt:'tilt_th',
+const MAP={s_dempty:'d_empty',s_dfull:'d_full',s_fill:'fill_th',s_temp:'temp_th',s_hum:'hum_th',s_gas:'gas_th',s_tilt:'tilt_th',
   s_wcap:'weight_cap',s_sclosed:'servo_closed',s_sopen:'servo_open',s_pin:'collect_pin',
   s_pirhold:'pir_hold_s',s_buzz:'buzz_s',s_toff:'temp_off',s_hoff:'hum_off',s_poff:'press_off'};
 function loadSettings(){
@@ -2627,12 +2759,13 @@ async function saveSettings(){
   if(c.d_full>=c.d_empty){$('#setMsg').textContent='Distance full must be smaller than distance empty.';return;}
   if(Math.abs(c.temp_off)>10||Math.abs(c.hum_off)>20||Math.abs(c.press_off)>50){
     $('#setMsg').textContent='An offset that large means the sensor is faulty or wired wrong. Temperature up to 10 C, humidity up to 20 %RH, pressure up to 50 hPa.';return;}
-  if(c.temp_th>85||c.gas_th>500){$('#setMsg').textContent='The BME680 reads up to 85 C and an air quality index of 500, so a limit above that can never trigger.';return;}
+  if(c.temp_th>85||c.hum_th>100||c.gas_th>500){$('#setMsg').textContent='The BME680 reads up to 85 C, 100 %RH and an air quality index of 500, so a limit above that can never trigger.';return;}
+  if(c.hum_th<30){$('#setMsg').textContent='A humidity limit under 30 %RH would sound in normal indoor air. Use 30 or more.';return;}
   Object.assign(b.cal,c);
   let msg='Saved to '+b.name+'.';
   if(b.ip){try{await call(b,'/api/calibrate',c);}catch(e){msg=b.name+' did not answer, so the change is only on this screen.';}}
   else msg='Saved on this screen. Add '+b.name+'’s IP address to send it to the bin.';
-  addAlert('success','check','Settings saved',b.name+': empty '+c.d_empty+' cm, full '+c.d_full+' cm, alert at '+c.fill_th+'%');
+  addAlert('success','check','Settings saved',b.name+': empty '+c.d_empty+' cm, full '+c.d_full+' cm, alert at '+c.fill_th+'%','setup');
   $('#setMsg').textContent=msg;render();
 }
 /* ---------- simulation ---------- */
@@ -2860,14 +2993,10 @@ $('#btEye').addEventListener('click',()=>{
   i.type=show?'text':'password';
   $('#btEye').innerHTML=icon(show?'eyeoff':'eye')+'<span>'+(show?'HIDE':'SHOW')+'</span>';
 });
-$('#btnMarkAll').addEventListener('click',markAllRead);
-$('#btnClear').addEventListener('click',()=>{
-  const h=+$('#clearRange').value;
-  const before=state.alerts.length;
-  state.alerts=h?state.alerts.filter(a=>Date.now()-a.t<h*3600000):[];
-  alertSig='';banSig='';renderAlerts();renderBanners();
-  toast(before-state.alerts.length?'Cleared '+(before-state.alerts.length)+' alert'+(before-state.alerts.length>1?'s':'')+'.':'Nothing matched that range.');
-});
+$('#btnMarkAll').addEventListener('click',markShown);
+$('#btnClear').addEventListener('click',askDelete);
+$('#alertYes').addEventListener('click',doDelete);
+$('#alertNo').addEventListener('click',()=>$('#alertConfirm').classList.add('hide'));
 $('#setFields').addEventListener('input',refreshDirty);
 $('#btnCancel').addEventListener('click',()=>{
   const b=byId(state.selSet);if(!b)return;
@@ -2935,7 +3064,7 @@ document.addEventListener('pointerdown',e=>{
 });
 window.addEventListener('resize',()=>{if(state.view==='charts')drawCharts()});
 
-buildTabs();setAddCount(1);decorateStatics();paintHeadings();btDecorate();setRole('operator');setView('overview');render();
+buildTabs();setAddCount(1);decorateStatics();paintHeadings();btDecorate();cloudDecorate();seedAlerts();setRole('operator');setView('overview');render();
 
 /* overview filter chips */
 document.addEventListener('click',e=>{
@@ -2952,8 +3081,10 @@ document.addEventListener('click',e=>{
   /* collect toggle */
   if(e.target.id==='collectToggle'){state.collectShowAll=!state.collectShowAll;collectSig='';renderCollectNext();return;}
   /* alert filter chips */
-  const af=e.target.closest('#alertFilters .chip2');
-  if(af){state.alertFilter=af.dataset.af;alertSig='';renderAlerts();return;}
+  const ak=e.target.closest('#alertKinds [data-akind]');
+  if(ak){state.akind=ak.dataset.akind;$('#alertConfirm').classList.add('hide');alertSig='';renderAlerts();return;}
+  const ar=e.target.closest('#alertRange [data-arange]');
+  if(ar){state.arange=ar.dataset.arange;$('#alertConfirm').classList.add('hide');alertSig='';renderAlerts();return;}
   /* adaptive picker toggle — only match buttons inside a .pickwrap */
   const pb=e.target.closest('.pickwrap > [id$="Btn"]');
   if(pb){const listId=pb.id.replace('Btn','List');const lst=document.getElementById(listId);if(lst){lst.classList.toggle('hide');return;}}

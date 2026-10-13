@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Smart Bin Touchscreen Mockup</title>
+<title>Smart Bin Touchscreen Mockup v3</title>
 <style>
 *{box-sizing:border-box}
 html,body{margin:0;height:100%}
@@ -240,10 +240,10 @@ function fillbar(x,y,w,h,pct,color){
   return s;
 }
 function reading(y,label,value,o){o=o||{};
-  if(o.fault) return T(56,y+2,70,label,13,{color:'var(--tx2)'})+T(110,y+1,122,'<span style="font-size:12px;border:2px solid var(--tx2);padding:0 4px;margin-right:6px;color:var(--tx2)">!</span>--',15,{align:'r',color:'var(--tx2)'});
-  if(o.alarm) return E(54,y-1,180,18,'b2 sh3','background:var(--r);color:var(--on-r)')+T(60,y+2,70,label,13,{color:'var(--on-r)'})+T(120,y+1,106,value,15,{align:'r',color:'var(--on-r)',weight:800});
+  if(o.fault) return T(56,y+2,90,label,13,{color:'var(--tx2)'})+T(110,y+1,122,'<span style="font-size:12px;border:2px solid var(--tx2);padding:0 4px;margin-right:6px;color:var(--tx2)">!</span>--',15,{align:'r',color:'var(--tx2)'});
+  if(o.alarm) return E(54,y-1,180,18,'b2 sh3','background:var(--r);color:var(--on-r)')+T(60,y+2,90,label,13,{color:'var(--on-r)'})+T(120,y+1,106,value,15,{align:'r',color:'var(--on-r)',weight:800});
   const sq=o.dot?'<span style="display:inline-block;width:9px;height:9px;margin-right:6px;background:'+o.dot+'"></span>':'';
-  return T(56,y+2,70,label,13,{color:'var(--tx2)'})+T(110,y+1,122,sq+value,15,{align:'r',style:'white-space:nowrap;overflow:hidden;'});
+  return T(56,y+2,90,label,13,{color:'var(--tx2)'})+T(110,y+1,122,sq+value,15,{align:'r',style:'white-space:nowrap;overflow:hidden;'});
 }
 function chipsStrip(o){o=o||{};
   let wifi=o.wifi===false?chip(8,42,70,20,'OFFLINE','var(--r)','var(--on-r)',{cls:'press'}):chip(8,42,52,20,'WI-FI','var(--g)','var(--on-g)',{cls:'press'});
@@ -273,7 +273,7 @@ function A1(o){
   h+=o.fillFault?chip(150,64,82,20,'NO READING','var(--surf)','var(--tx2)',{size:11}):chip(172,64,60,20,badge,fillv(lvl),onv(lvl),{});
   h+=o.fillFault?T(56,82,176,'--',56,{weight:800,lh:58}):T(56,82,176,o.fill+'<span style="font-size:26px">%</span>',56,{weight:800,lh:58});
   h+=reading(146,'Weight',o.weight||'2.30 kg',{alarm:o.alarmW,fault:o.faultW});
-  h+=reading(164,'Temp',o.temp||'28.4 C',{alarm:o.alarmT,fault:o.faultT});
+  h+=reading(164,'Temperature',o.temp||'28.4 C',{alarm:o.alarmT,fault:o.faultT});
   h+=reading(182,'Humidity',o.hum||'62%',{alarm:o.alarmH,fault:o.faultH});
   h+=reading(200,'Air',o.air||'Good 340',{alarm:o.alarmG,fault:o.faultG,dot:o.airDot||'var(--g)'});
   if(o.rows) h+=o.rows; else if(o.ttf) h+=T(8,230,224,o.ttf,13,{color:'var(--tx)',weight:700,style:'font-style:normal'});
@@ -386,10 +386,10 @@ function A8cal(){
   h+=btn(60,268,120,42,'CANCEL','var(--r)','var(--on-r)',{size:15,go:'main'});
   return E(0,0,240,320,'','background:var(--t)',h);
 }
-function A9(){
+function A9(o){
   let h=topBar({lid:false,extra:'<div class="abs b2 press fl" data-go="main" style="left:168px;top:4px;width:64px;height:26px;background:var(--bg);font-size:12px;font-weight:800">BACK</div>'});
   h+=E(8,46,224,66,'bx sh','background:var(--surf)',T(10,8,200,'IP ADDRESS',12,{color:'var(--tx2)',ls:.5})+T(10,26,204,'192.168.1.101',27,{weight:800,lh:30}));
-  const rows=[['Wi-Fi','HomeWiFi-2G'],['Signal','-58 dBm'],['Bluetooth','OFF'],['Firmware','v1.0'],['Uptime','3 h 12 m'],['Bin','BIN 01']];
+  const rows=[['Wi-Fi','HomeWiFi-2G'],['Signal','-58 dBm'],['Cloud',o&&o.cloudOff?'NOT SENDING':'Firebase OK'],['Bluetooth','OFF'],['Firmware','v1.1'],['Uptime','3 h 12 m']];
   rows.forEach((r,i)=>{
     const y=124+i*23;
     h+=T(10,y+3,100,r[0],13,{color:'var(--tx2)'})+T(100,y+2,130,r[1],15,{align:'r'});
@@ -525,7 +525,8 @@ const SL=[
  {id:'tamper',tag:'A6',title:'Tamper, countdown',note:'Red screen with a flashing border and a shaking warning sign. The big number counts down from 10. If the bin settles, it clears by itself.',b:()=>A6(false)},
  {id:'tamper2',tag:'A6',title:'Tamper, latched',note:'Still unstable at 15 seconds. The alarm stays on until the dashboard clears it. There is no reset button on the bin.',b:()=>A6(true)},
  {id:'locked',tag:'A7',title:'Locked',note:'Full purple screen. COLLECT still works with the PIN. Collectors can unlock from the app or dashboard.',b:()=>A7()},
- {id:'info',tag:'A9',title:'Info',note:'The IP address in large text, then Wi-Fi, signal, Bluetooth, firmware and uptime. The sun and moon button switches the theme and the choice is kept after a reboot. WI-FI SETUP asks for the PIN first. This screen opens from the i button, the WI-FI chip or the bin name on the main screen.',b:()=>A9()},
+ {id:'info',tag:'A9',title:'Info',note:'The IP address in large text, then Wi-Fi, signal, the Firebase cloud link the phone app falls back to, Bluetooth, firmware and uptime. The bin name is already in the top bar, so its row made room for Cloud. The sun and moon button switches the theme and the choice is kept after a reboot. WI-FI SETUP asks for the PIN first. This screen opens from the i button, the WI-FI chip or the bin name on the main screen.',b:()=>A9()},
+ {id:'info2',tag:'A9',title:'Info, cloud not sending',note:'Wi-Fi works but the bin cannot reach Firebase, for example when the router has no internet. Local control from the dashboard and the app on the same Wi-Fi is not affected.',b:()=>A9({cloudOff:true})},
  {id:'bt1',tag:'A10',title:'Wi-Fi setup, waiting for the dashboard',note:'Blue header and a BT badge while Bluetooth is on. The bin shows its Bluetooth name and a 5 minute countdown to switching itself off.',b:()=>BT('wait')},
  {id:'bt2',tag:'A10',title:'Wi-Fi setup, paired',note:'The dashboard is connected. The bin keeps the list of 2.4 GHz networks it can see ready.',b:()=>BT('paired')},
  {id:'bt3',tag:'A10',title:'Wi-Fi setup, connecting',note:'Credentials received. The password is never drawn on the screen.',b:()=>BT('conn')},
