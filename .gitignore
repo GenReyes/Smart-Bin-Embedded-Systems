@@ -20,3 +20,6 @@ local.properties
 *.aab
 .idea/
 captures/
+
+# Keep the ready-built app release in the repo
+!Android App/release/*.apk

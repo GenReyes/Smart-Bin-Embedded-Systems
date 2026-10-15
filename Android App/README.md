@@ -22,6 +22,8 @@ gradlew :app:assembleDebug
 
 The APK lands in `app/build/outputs/apk/debug/app-debug.apk`. Copy it to a phone to install it there.
 
+A ready-built debug APK is at `release/Smart-Bin-v1.apk` for installing on a phone without building.
+
 ## What is in it
 
 **First launch.** Pick Operator or Collector, then the app asks once for permission to send alerts. The role chip in the header switches roles later.
