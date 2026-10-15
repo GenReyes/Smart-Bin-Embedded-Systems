@@ -1,6 +1,6 @@
 # Smart-Bin Android app
 
-The phone app for the Smart-Bin system, for both the operator and the collector. It follows `Mockups/smartbin-app-mockup v2.html` screen for screen and borrows the feel of the Garbage-Guard app: a light and a dark logo on the home screen, its own sound for each kind of action, and a vibration pattern for each kind of alert.
+The phone app for the Smart-Bin system, for both the operator and the collector. It follows `Mockups/smartbin-app-mockup v3.html` screen for screen and borrows the feel of the Garbage-Guard app: a light and a dark logo on the home screen, its own sound for each kind of action, and a vibration pattern for each kind of alert.
 
 It runs with no hardware. Bins without an address show demo data that fills and drifts the way real bins do, so every screen can be shown in class. Give a bin an IP address and it switches to live readings over Wi-Fi.
 
