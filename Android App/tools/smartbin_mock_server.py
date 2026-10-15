@@ -18,16 +18,25 @@ with the same paths the app uses for cloud mode:
     /sb_users/<uid>.json         GET   the allowed-user check
     /__auth/signInWithPassword   POST  sign-in, any email and a password of 6+ characters
 
+and a small ThingSpeak on a third port, with --ts PORT:
+
+    /channels/<id>/feeds/last.json   GET   the newest entry, fields 1 to 8 and the status text
+    /talkbacks/<id>/commands.json    POST  command_string=LOCK, UNLOCK or COLLECT
+    Bin 1 is channel 1001 and TalkBack 2001, bin 2 is 1002 and 2002, and so on. Any key works.
+
 Plain Python 3, no packages. Run it on a computer on the same Wi-Fi as the phone:
 
     python smartbin_mock_server.py                 two bins on ports 8081 and 8082
     python smartbin_mock_server.py --bins 3        three bins, 8081 to 8083
     python smartbin_mock_server.py --cloud 8090    also the fake Firebase on 8090
+    python smartbin_mock_server.py --ts 8095       also the fake ThingSpeak on 8095
 
 In the app, open a bin with SET and type <computer IP>:8081 as its address.
 For cloud mode, use http://<computer IP>:8090 as the database URL, any API
 key, any email and a 6+ character password, then stop the bins with
---no-local so only the cloud answers.
+--no-local so only the cloud answers. For ThingSpeak, put http://<computer IP>:8095
+as the server on the Connection page, and channel 1001, TalkBack 2001 (any keys)
+in bin 1's SET sheet.
 """
 
 import argparse
@@ -37,7 +46,7 @@ import socket
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 DEFAULT_CAL = {
     "d_empty": 30, "d_full": 5, "fill_th": 80, "temp_th": 40, "hum_th": 85, "gas_th": 200,
@@ -263,6 +272,64 @@ def cloud_handler(bins, ip):
     return H
 
 
+STATUS_CODES = ["OK", "LOCKED", "TAMPER", "COLLECTING", "CALIBRATING"]
+
+
+def ts_handler(bins, ip):
+    """ThingSpeak's read and TalkBack calls, laid out as the app reads them."""
+
+    class H(BaseHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+        def send(self, code, obj):
+            data = json.dumps(obj).encode()
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+
+        def bin_for(self, n, base):
+            k = n - base
+            return bins[k] if 0 <= k < len(bins) else None
+
+        def do_GET(self):
+            parts = urlparse(self.path).path.strip("/").split("/")
+            if len(parts) == 4 and parts[0] == "channels" and parts[2:] == ["feeds", "last.json"] and parts[1].isdigit():
+                b = self.bin_for(int(parts[1]), 1001)
+                if b is None:
+                    self.send(404, -1)
+                    return
+                s = b.status_json()
+                code = STATUS_CODES.index(s["status"]) if s["status"] in STATUS_CODES else 0
+                flags = (1 if s["motion"] else 0) + (2 if s["lid"] == "OPEN" else 0) + 4 * code
+                self.send(200, {
+                    "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "entry_id": int(time.time()),
+                    "field1": str(s["fill"]), "field2": str(s["weight_g"]), "field3": str(s["temp"]), "field4": str(s["humidity"]),
+                    "field5": str(s["iaq"]), "field6": str(s["pressure"]), "field7": str(s["tilt"]), "field8": str(flags),
+                    "status": "%s:%d" % (ip, b.port),
+                })
+            else:
+                self.send(404, -1)
+
+        def do_POST(self):
+            parts = urlparse(self.path).path.strip("/").split("/")
+            n = int(self.headers.get("Content-Length") or 0)
+            form = parse_qs((self.rfile.read(n) or b"").decode())
+            if len(parts) == 3 and parts[0] == "talkbacks" and parts[2] == "commands.json" and parts[1].isdigit():
+                b = self.bin_for(int(parts[1]), 2001)
+                cmd = (form.get("command_string") or [""])[0]
+                if b is not None and cmd in ("LOCK", "UNLOCK", "COLLECT") and b.command(cmd, {}):
+                    self.send(200, {"id": int(time.time()), "command_string": cmd, "position": 1})
+                else:
+                    self.send(400, {"status": "400", "error": "bad command"})
+            else:
+                self.send(404, -1)
+
+    return H
+
+
 def my_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
@@ -279,6 +346,7 @@ def main():
     ap.add_argument("--bins", type=int, default=2, help="how many bins (default 2)")
     ap.add_argument("--port", type=int, default=8081, help="port of the first bin (default 8081)")
     ap.add_argument("--cloud", type=int, default=0, help="also serve a fake Firebase on this port")
+    ap.add_argument("--ts", type=int, default=0, help="also serve a fake ThingSpeak on this port")
     ap.add_argument("--no-local", action="store_true", help="do not answer on the bin ports, to test cloud mode")
     a = ap.parse_args()
 
@@ -292,6 +360,9 @@ def main():
     if a.cloud:
         servers.append(ThreadingHTTPServer(("0.0.0.0", a.cloud), cloud_handler(bins, ip)))
         print("Fake Firebase at http://%s:%d" % (ip, a.cloud))
+    if a.ts:
+        servers.append(ThreadingHTTPServer(("0.0.0.0", a.ts), ts_handler(bins, ip)))
+        print("Fake ThingSpeak at http://%s:%d (channels %s)" % (ip, a.ts, ", ".join(str(1001 + i) for i in range(len(bins)))))
     for s in servers:
         threading.Thread(target=s.serve_forever, daemon=True).start()
     print("Press Ctrl+C to stop.", flush=True)

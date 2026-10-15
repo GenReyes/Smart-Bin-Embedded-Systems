@@ -11,7 +11,9 @@ import kotlin.random.Random
  * One demo minute fills a bin as much as one real hour would.
  */
 object Demo {
-    private const val SPEED = 60.0
+    /** How many times faster than real life the demo bins fill. Demo options can change it; 60 is normal. */
+    const val NORMAL_SPEED = 60.0
+    var speed = NORMAL_SPEED
 
     fun bins(): List<Bin> = listOf(
         bin(0, "Bin 01", "Main Hall", fill = 34.0, weight = 1430.0, temp = 28.0, hum = 62.0, gas = 72.0, rate = 0.38),
@@ -75,7 +77,7 @@ object Demo {
         val fill = when {
             s.on(0) -> (sv["fill"] ?: r.fill).coerceIn(0.0, 100.0)
             status == BinStatus.COLLECTING -> r.fill
-            else -> (r.fill + b.rate * SPEED / 3600.0 * (0.7 + Random.nextDouble() * 0.6)).coerceIn(0.0, 100.0)
+            else -> (r.fill + b.rate * speed / 3600.0 * (0.7 + Random.nextDouble() * 0.6)).coerceIn(0.0, 100.0)
         }
         val weight = if (s.on(1)) sv["weight"] ?: r.weight
         else (fill / 100 * c.v("weight_cap") * 0.92 + Random.nextDouble() * 25).coerceIn(0.0, 5000.0).roundToInt().toDouble()

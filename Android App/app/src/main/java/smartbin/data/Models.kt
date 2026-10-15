@@ -1,10 +1,16 @@
 package smartbin.data
 
-/** How the app is reaching the bins right now. Local Wi-Fi first, Firebase second. */
-enum class Link { DEMO, LIVE, CLOUD, OFFLINE }
+/** How the app is reaching the bins right now. Local Wi-Fi first, Firebase second, ThingSpeak third. */
+enum class Link { DEMO, LIVE, CLOUD, THINGSPEAK, OFFLINE }
 
 /** Where one bin's latest reading came from. */
-enum class Source { DEMO, LIVE, CLOUD, STALE }
+enum class Source { DEMO, LIVE, CLOUD, THINGSPEAK, STALE }
+
+/** The three ways to the bins, and which of them answer right now. */
+data class Routes(val local: Boolean = false, val firebase: Boolean = false, val thingspeak: Boolean = false) {
+    val any get() = local || firebase || thingspeak
+    val count get() = listOf(local, firebase, thingspeak).count { it }
+}
 
 enum class BinStatus { OK, LOCKED, TAMPER, COLLECTING, CALIBRATING }
 
@@ -89,7 +95,15 @@ data class Bin(
     val lastSeen: Long = 0L,
     /** Demo only: how fast it fills, in percent per hour. */
     val rate: Double = 0.5,
+    /** ThingSpeak: the bin's channel and its read key, and the TalkBack queue it takes commands from. */
+    val tsChannel: String = "",
+    val tsKey: String = "",
+    val tbId: String = "",
+    val tbKey: String = "",
 ) {
+    val onThingSpeak get() = tsChannel.isNotBlank()
+    /** No address and no ThingSpeak channel: the app makes up its readings. */
+    val demo get() = ip.isBlank() && !onThingSpeak
     val stale get() = source == Source.STALE
     val calibrating get() = reading.status == BinStatus.CALIBRATING
     val simulating get() = sim.mask > 0
@@ -115,9 +129,19 @@ data class AlertRow(
     val read: Boolean = false,
 )
 
+/** The ThingSpeak server. The real one unless the mock server is used. */
+const val THINGSPEAK_URL = "https://api.thingspeak.com"
+
 data class FirebaseConfig(val url: String = "", val key: String = "", val email: String = "", val password: String = "") {
     val filled get() = url.isNotBlank() && key.isNotBlank() && email.isNotBlank() && password.isNotBlank()
 }
+
+/**
+ * A command sent through Firebase or ThingSpeak that the bin has not confirmed
+ * yet. Its key stays locked until the bin's next reading shows it was done,
+ * or until [deadline] passes.
+ */
+data class Pending(val cmd: String, val via: Source, val at: Long, val deadline: Long)
 
 /** Everything the screens draw, in one value. */
 data class HubState(
@@ -129,7 +153,19 @@ data class HubState(
     /** Bytes the cloud reported for this month, when it reports them. */
     val cloudBytes: Long? = null,
     val loading: Boolean = true,
+    /** Firebase and ThingSpeak answered within the last minute. Null when they are not set up. */
+    val fbUp: Boolean? = null,
+    val tsUp: Boolean? = null,
+    /** ThingSpeak messages a day for all channels, estimated from how fast their entry numbers rise. */
+    val tsPerDay: Double? = null,
+    /** Demo options: links to pretend are up, so the link colours can be shown with no hardware. */
+    val demoLinks: Routes = Routes(),
+    /** Cloud commands waiting for the bin to confirm them, by bin id. */
+    val pending: Map<String, Pending> = emptyMap(),
 ) {
+    val routes: Routes
+        get() = if (link == Link.DEMO) demoLinks
+        else Routes(local = bins.any { it.source == Source.LIVE }, firebase = fbUp == true, thingspeak = tsUp == true)
     val mode: Mode
         get() {
             val cal = calibBin != null

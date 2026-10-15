@@ -39,8 +39,16 @@ fun Overlays(vm: AppViewModel, hub: HubState, allowAlerts: () -> Unit) {
                 Field("Name") { Inp(vm.formName, { vm.formName = it }) }
                 Field("Location") { Inp(vm.formPlace, { vm.formPlace = it }) }
                 Field("IP address") { Inp(vm.formIp, { vm.formIp = it.trim() }, placeholder = "192.168.1.101", keyboard = KeyboardType.Uri) }
-                Field("Cloud name") { Inp(vm.formCloud, { vm.formCloud = it.trim() }, placeholder = "bin01") }
-                Hint("With an IP address the app reads this bin live over Wi-Fi. Without one it shows demo data. Bluetooth setup in Settings can fill it in for you. The cloud name is the bin's node in Firebase, used when the Wi-Fi does not answer.")
+                Field("Cloud name (Firebase)") { Inp(vm.formCloud, { vm.formCloud = it.trim() }, placeholder = "bin01") }
+                Field("ThingSpeak channel ID", Ic.chart, Sb.c.ts) { Inp(vm.formTsCh, { vm.formTsCh = it.trim() }, placeholder = "2345678", keyboard = KeyboardType.Number) }
+                Field("ThingSpeak read API key", Ic.key, Sb.c.ts) { Inp(vm.formTsKey, { vm.formTsKey = it.trim() }, placeholder = "Only for a private channel") }
+                Field("TalkBack ID and API key", Ic.key, Sb.c.ts) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Inp(vm.formTbId, { vm.formTbId = it.trim() }, Modifier.weight(0.42f), placeholder = "ID", keyboard = KeyboardType.Number)
+                        Inp(vm.formTbKey, { vm.formTbKey = it.trim() }, Modifier.weight(0.58f), placeholder = "API key")
+                    }
+                }
+                Hint("With an IP address the app reads this bin live over Wi-Fi. With none of the three it shows demo data. Bluetooth setup can fill the address in. The cloud name is the bin's node in Firebase, tried when Wi-Fi does not answer. The ThingSpeak channel is tried after that, and TalkBack carries LOCK, UNLOCK and COLLECT to the bin.")
                 Acts {
                     Btn("Remove", { vm.removeBin(b.id) }, Modifier.weight(1f), Ic.trash, Look.DANGER, sound = Sfx.DANGER)
                     Btn("Save", { vm.saveBinEdit(b.id) }, Modifier.weight(1f), Ic.save, Look.ACCENT, sound = Sfx.SAVED)

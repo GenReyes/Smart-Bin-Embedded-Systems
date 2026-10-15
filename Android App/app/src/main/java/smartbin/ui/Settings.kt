@@ -29,28 +29,21 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import smartbin.data.AlertType
 import smartbin.data.Bin
 import smartbin.data.Cal
 import smartbin.data.HubState
 import smartbin.data.Link
-import smartbin.data.Role
 import smartbin.data.Source
 import smartbin.data.v
-import smartbin.notify.Alerts
-import smartbin.notify.Feel
-import smartbin.notify.Haptics
 import smartbin.notify.Sfx
 
 @Composable
-fun SettingsPage(vm: AppViewModel, hub: HubState, allowAlerts: () -> Unit) {
+fun SettingsPage(vm: AppViewModel, hub: HubState) {
     val c = Sb.c
-    val context = LocalContext.current
     val b = vm.binFor(vm.selSet, hub.bins)
     val scroll = rememberScrollState()
     val calHere = b != null && hub.calibBin == b.id
@@ -71,55 +64,12 @@ fun SettingsPage(vm: AppViewModel, hub: HubState, allowAlerts: () -> Unit) {
                 val v: Cal = if (on) vm.edit!! else b.cal
                 Sections(vm, b, v, on)
             }
-            Row(Modifier.padding(top = 4.dp)) { Sh(Ic.gear, "App and bins") }
-            val linkCc = when (hub.link) { Link.CLOUD -> c.cloud; Link.OFFLINE -> c.bad; else -> c.link }
-            LRow(
-                if (hub.link == Link.CLOUD) Ic.cloud else Ic.wifi(hub.link == Link.LIVE), "Connection",
-                when (hub.link) {
-                    Link.LIVE -> "Local Wi-Fi now. Firebase is the backup."
-                    Link.CLOUD -> "On Firebase now. Wi-Fi is tried again every 30 s."
-                    Link.OFFLINE -> "Nothing answers. Check Wi-Fi and the cloud account."
-                    Link.DEMO -> if (vm.fb.filled) "Demo data. Firebase is set up as the backup." else "Demo data. No Firebase account yet."
-                },
-                linkCc, onClick = { vm.go(Screen.NET) },
-            )
-            LRow(
-                Ic.bluetooth, "Bluetooth setup",
-                when { vm.bt in 1..3 -> "Paired, step ${vm.bt + 1} of 4"; vm.bt >= 4 -> "Done, Bluetooth is off"; else -> "Send Wi-Fi to a bin" },
-                c.bt, onClick = { vm.go(Screen.BT) },
-            )
-            if (b != null) LRow(Ic.reload, "Reload from bin", "Read the values ${b.name} is running on", onClick = { vm.reload(b) }, chevron = false, sound = Sfx.TAP)
-            if (vm.operator) LRow(Ic.download, "Export bin list", "Names, places and addresses as a file", onClick = { vm.exportBins(hub.bins) }, chevron = false, sound = Sfx.SAVED)
-            LRow(Ic.user, "Signed in as", chevron = false) {
-                TwoWay {
-                    Tw(vm.operator, { vm.pickRole(Role.OPERATOR) }, "Operator", grow = null)
-                    Tw(!vm.operator, { vm.pickRole(Role.COLLECTOR) }, "Collector", grow = null)
-                }
+            if (b != null) {
+                Row(Modifier.padding(top = 4.dp)) { Sh(Ic.reload, "Bin tools") }
+                LRow(Ic.reload, "Reload from bin", "Read the values ${b.name} is running on", onClick = { vm.reload(b) }, chevron = false, sound = Sfx.TAP)
             }
-            LRow(Ic.palette, "Appearance", chevron = false) {
-                TwoWay {
-                    ThemeMode.entries.forEach { m ->
-                        Tw(vm.theme == m, { vm.setThemeMode(m) }, m.name.lowercase().replaceFirstChar { it.uppercase() }, grow = null)
-                    }
-                }
-            }
-            LRow(
-                Ic.bell, "Push alerts",
-                when (vm.notifications) {
-                    Perm.ON -> "On. Alerts arrive with the app closed."
-                    Perm.BLOCKED -> "Blocked in Android settings."
-                    Perm.OFF -> "Not turned on yet."
-                },
-                c.tamper, chevron = false,
-            ) {
-                when (vm.notifications) {
-                    Perm.ON -> Tag("ON", c.ok)
-                    Perm.OFF -> Btn("TURN ON", { vm.overlay = Overlay.NotifPre }, look = Look.TINT, cc = c.tamper, small = true)
-                    Perm.BLOCKED -> Btn("OPEN", { openAlertSettings(context) }, look = Look.TINT, cc = c.tamper, small = true, sound = Sfx.OPEN)
-                }
-            }
-            SoundAndFeel(vm, context)
-            Hint("Smart-Bin app 1.1, matches dashboard v11", Modifier.fillMaxWidth(), align = TextAlign.Center)
+            // The app's own settings live behind the gear key in the header.
+            LRow(Ic.gear, "App settings", "Sound, vibration, battery, links and demo options. Also the gear at the top right.", onClick = { vm.go(Screen.APP) })
         }
         if (showSave) {
             SaveBar(
@@ -319,56 +269,6 @@ private fun Sections(vm: AppViewModel, b: Bin, v: Cal, on: Boolean) {
     }
 }
 
-/** Garbage-Guard's sound and feel settings, with a preview of each alert's own sound and buzz. */
-@Composable
-private fun SoundAndFeel(vm: AppViewModel, context: android.content.Context) {
-    val c = Sb.c
-    Row(Modifier.padding(top = 4.dp)) { Sh(Ic.speaker, "Sound and feel") }
-    LRow(Ic.speaker, "Button sounds", "A soft sound on keys, switches and tabs", chevron = false) {
-        Toggle(vm.sounds, { vm.toggleSounds() })
-    }
-    LRow(Ic.vibrate, "Vibration", "A tick under the finger, and a pattern for each kind of alert", chevron = false) {
-        Toggle(vm.haptics, { vm.toggleHaptics() })
-    }
-    Column(
-        Modifier.fillMaxWidth().bump(c, 14.dp).padding(horizontal = 13.dp, vertical = 11.dp),
-        verticalArrangement = Arrangement.spacedBy(9.dp),
-    ) {
-        T("Vibration strength", weight = FontWeight.Bold)
-        TwoWay(full = true) {
-            Haptics.Strength.entries.forEach { s ->
-                Tw(vm.strength == s, { vm.chooseStrength(s) }, s.label, enabled = vm.haptics)
-            }
-        }
-    }
-    LRow(Ic.sun, "Keep screen on", "Stops the phone dimming while the app is open", chevron = false) {
-        Toggle(vm.keepAwake, { vm.toggleAwake() })
-    }
-    Column(
-        Modifier.fillMaxWidth().bump(c, 14.dp).padding(horizontal = 13.dp, vertical = 11.dp),
-        verticalArrangement = Arrangement.spacedBy(9.dp),
-    ) {
-        T("Alert sounds", weight = FontWeight.Bold)
-        T("Each kind of alert has its own sound and vibration, so you can tell them apart without looking. Tap one to hear it.", size = 0.8f, weight = FontWeight.SemiBold, color = c.ink2)
-        val kinds: List<Triple<AlertType, String, Pair<ImageVector, Color>>> = listOf(
-            Triple(AlertType.FULL, "Full", Ic.fill to c.bad),
-            Triple(AlertType.TAMPER, "Tamper", Ic.tamper to c.tamper),
-            Triple(AlertType.SENSOR, "Sensor", Ic.temp(41.0) to c.temp),
-            Triple(AlertType.LOCK, "Lock", Ic.lock(true) to c.sim),
-            Triple(AlertType.PICKUP, "Pickup", Ic.truck to c.cal),
-            Triple(AlertType.INFO, "Setup", Ic.calib to c.ink2),
-        )
-        kinds.chunked(3).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                row.forEach { (type, label, ic) ->
-                    Btn(label, { Feel.event(Alerts.sfxFor(type)) }, Modifier.weight(1f), ic.first, Look.TINT, ic.second, small = true, sound = Sfx.TAP)
-                }
-            }
-        }
-    }
-    LRow(Ic.bell, "Android alert settings", "Change or silence each kind of alert while the app is closed", onClick = { openAlertSettings(context) })
-}
-
 // ---------- connection ----------
 
 @Composable
@@ -376,23 +276,29 @@ fun Connection(vm: AppViewModel, hub: HubState) {
     val c = Sb.c
     val link = hub.link
     val (stateText, stateCc) = when (link) {
-        Link.LIVE -> "Local Wi-Fi" to c.link; Link.CLOUD -> "Cloud" to c.cloud; Link.OFFLINE -> "Not connected" to c.bad; Link.DEMO -> "Demo data" to c.warn
+        Link.LIVE -> "Local Wi-Fi" to c.link; Link.CLOUD -> "Firebase" to c.cloud; Link.THINGSPEAK -> "ThingSpeak" to c.ts
+        Link.OFFLINE -> "Not connected" to c.bad; Link.DEMO -> "Demo data" to c.warn
     }
+    val r = hub.routes
+    val demo = link == Link.DEMO
     ScrollPage {
-        BackBar("Connection", { vm.go(Screen.SETTINGS) }) {
-            StatePill(if (link == Link.CLOUD) Ic.cloud else Ic.wifi(link == Link.LIVE), stateText, stateCc, true)
+        BackBar("Connection", { vm.back() }) {
+            StatePill(when (link) { Link.CLOUD -> Ic.cloud; Link.THINGSPEAK -> Ic.chart; else -> Ic.wifi(link == Link.LIVE) }, stateText, stateCc, true)
         }
         Card {
             Sh(Ic.layers, "How the app reaches the bins", c.link)
-            Route(1, Ic.wifi(link == Link.LIVE), c.link, link == Link.LIVE, "Local Wi-Fi", "Always tried first. Readings every second and every control.")
-            Route(2, Ic.cloud, c.cloud, link == Link.CLOUD, "Firebase cloud", "Only when no bin answers on Wi-Fi. Readings every 5 s. LOCK, UNLOCK and COLLECT only.")
+            Route(1, Ic.wifi(true), c.link, link == Link.LIVE, if (demo) r.local else r.local.takeIf { hub.bins.any { it.ip.isNotBlank() } }, "Local Wi-Fi", "Always tried first. Readings every second and every control.")
+            Route(2, Ic.cloud, c.cloud, link == Link.CLOUD, if (demo) r.firebase else hub.fbUp, "Firebase", "When no bin answers on Wi-Fi. Readings every 5 s. LOCK, UNLOCK and COLLECT only.")
+            Route(3, Ic.chart, c.ts, link == Link.THINGSPEAK, if (demo) r.thingspeak else hub.tsUp, "ThingSpeak", "When Wi-Fi and Firebase do not answer. Readings every 15 s. LOCK, UNLOCK and COLLECT through TalkBack.")
+            if (demo && r.any) Hint("These are pretend links from the demo options, to show the colours.")
             Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
                 hub.bins.take(4).forEach { b ->
                     val (cc, txt) = when (b.source) {
                         Source.DEMO -> c.warn to "demo data"
                         Source.STALE -> c.bad to "not answering"
                         Source.LIVE -> c.link to "answers on Wi-Fi"
-                        Source.CLOUD -> c.cloud to "via cloud"
+                        Source.CLOUD -> c.cloud to "via Firebase"
+                        Source.THINGSPEAK -> c.ts to "via ThingSpeak"
                     }
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
                         Box(Modifier.size(10.dp).ring(cc.soft(0.22f), 5.dp, 3.dp).clip(RoundedCornerShape(5.dp)).background(cc))
@@ -435,6 +341,42 @@ fun Connection(vm: AppViewModel, hub: HubState) {
             Hint("TEST signs in and reads the list of bins. TEST AND SAVE keeps the details only when the test passes. RESTORE WORKING puts back the last details that passed. The password is stored encrypted on this phone.")
         }
         Card {
+            Sh(Ic.chart, "ThingSpeak", c.ts)
+            Field("Server", Ic.chart, c.ts) { Inp(vm.tsUrl, { vm.tsUrl = it.trim() }, placeholder = "https://api.thingspeak.com", keyboard = KeyboardType.Uri) }
+            vm.tsMsg?.let { (ok, msg) ->
+                Row(
+                    Modifier.fillMaxWidth().brutal(c, 12.dp, if (ok) c.ok else c.bad, off = 3.dp).padding(horizontal = 12.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Ico(if (ok) Ic.check else Ic.tamper, 18.dp, c.onBanner)
+                    T(msg, size = 0.82f, weight = FontWeight.Bold, color = c.onBanner)
+                }
+            }
+            Btn(if (vm.tsBusy) "TESTING" else "TEST AND SAVE", { vm.tsTest() }, Modifier.fillMaxWidth(), Ic.radar, Look.SOLID, c.ts, enabled = !vm.tsBusy)
+            // ThingSpeak has no call that reports the message count, so the app estimates it.
+            val perDay = hub.tsPerDay
+            val year = (perDay ?: 0.0) * 365
+            val yearShare = (year / 3_000_000.0).coerceIn(0.0, 1.0)
+            Box(
+                Modifier.fillMaxWidth().height(14.dp).well(c, 7.dp).drawBehind {
+                    if (yearShare > 0) drawRoundRect(
+                        if (year > 3_000_000) c.bad else c.ts,
+                        size = Size((size.width * yearShare).toFloat().coerceAtLeast(size.height), size.height), cornerRadius = CornerRadius(7.dp.toPx()),
+                    )
+                },
+            )
+            Hint(
+                if (perDay == null) "No estimate yet. Once a channel has been read for two minutes, the app counts how fast its entries rise and works out the year. The free licence allows 3 million messages a year. The exact count is on your ThingSpeak account page."
+                else "About **${"%,d".format(Math.round(perDay))}** messages a day, so about **${"%,d".format(Math.round(year))}** a year of the 3,000,000 the free licence allows" +
+                    (if (year > 3_000_000) ". That is over the limit, so make the bins write less often." else ".") + " This is an estimate. The exact count is on your ThingSpeak account page.",
+            )
+            Hint(
+                "Each bin needs its own channel. Put the channel ID and read API key in the bin's SET sheet, and its TalkBack ID and key for LOCK, UNLOCK and COLLECT. " +
+                    "The write API key stays in the bin's firmware. Fields: **1** fill %, **2** weight g, **3** temperature, **4** humidity, **5** air quality, **6** pressure, **7** tilt, " +
+                    "**8** motion + 2 × lid + 4 × status, and the status text holds the bin's IP address. The free licence allows a write every 15 s per channel and 3 million a year in all.",
+            )
+        }
+        Card {
             Sh(Ic.download, "Data use this month", c.cloud)
             val bytes = hub.cloudBytes
             val limit = 10L * 1024 * 1024 * 1024
@@ -453,7 +395,7 @@ fun Connection(vm: AppViewModel, hub: HubState) {
 }
 
 @Composable
-private fun Route(n: Int, icon: ImageVector, cc: Color, on: Boolean, title: String, sub: String) {
+private fun Route(n: Int, icon: ImageVector, cc: Color, on: Boolean, up: Boolean?, title: String, sub: String) {
     val c = Sb.c
     Row(
         Modifier.fillMaxWidth().then(if (on) Modifier.bump(c, 14.dp, ring = cc.soft(0.34f)) else Modifier.well(c, 14.dp)).padding(horizontal = 12.dp, vertical = 11.dp),
@@ -466,7 +408,12 @@ private fun Route(n: Int, icon: ImageVector, cc: Color, on: Boolean, title: Stri
             T(title, size = 0.92f)
             T(sub, Modifier.padding(top = 2.dp), size = 0.77f, weight = FontWeight.SemiBold, color = c.ink2)
         }
-        if (on) Tag("IN USE", cc)
+        when {
+            on -> Tag("IN USE", cc)
+            up == true -> Tag("ANSWERS", cc.soft(0.85f))
+            up == false -> T("NO ANSWER", size = 0.66f, spacing = 0.05f, color = c.bad, maxLines = 1)
+            else -> T("NOT SET UP", size = 0.66f, spacing = 0.05f, color = c.ink2, maxLines = 1)
+        }
     }
 }
 
@@ -480,7 +427,7 @@ fun Bluetooth(vm: AppViewModel, hub: HubState) {
     val paired = vm.bt > 0
     val name = b?.name ?: "this bin"
     ScrollPage {
-        BackBar("Bluetooth setup", { vm.go(Screen.SETTINGS) }) {
+        BackBar("Bluetooth setup", { vm.back() }) {
             StatePill(Ic.bluetooth, if (vm.bt >= 4) "Off" else if (paired) "Paired" else "Not paired", c.bt, paired && vm.bt < 4)
         }
         Card {

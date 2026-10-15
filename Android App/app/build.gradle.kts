@@ -16,7 +16,7 @@ android {
         applicationId = "edu.tup.smartbin"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
+        versionCode = 2
         versionName = "1.1"
 
         // The team's Firebase account, read from local.properties (git-ignored) so the

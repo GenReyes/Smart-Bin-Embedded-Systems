@@ -28,6 +28,8 @@ sealed interface HubEvent {
     data class LinkChanged(val from: Link, val to: Link) : HubEvent
     data class BinLost(val name: String) : HubEvent
     data class BinBack(val name: String) : HubEvent
+    /** A cloud command was confirmed by the bin, or ran out of time. */
+    data class CommandResult(val binId: String, val name: String, val cmd: String, val ok: Boolean) : HubEvent
 }
 
 /**
@@ -55,6 +57,8 @@ object Hub {
 
     lateinit var cloud: Cloud
         private set
+    lateinit var ts: ThingSpeak
+        private set
 
     /** True while the app is on screen. Off screen the bins are read less often. */
     @Volatile var foreground = true
@@ -62,6 +66,14 @@ object Hub {
     private val nextLocal = HashMap<String, Long>()
     private val localFails = HashMap<String, Int>()
     private val nextCloud = HashMap<String, Long>()
+    private val nextTs = HashMap<String, Long>()
+    private var fbOk = 0L
+    private var tsOk = 0L
+    private var lastCheck = 0L
+    /** Per channel: the first and the latest (time, entry number) seen, for the message estimate. */
+    private val tsSeen = HashMap<String, Pair<Pair<Long, Long>, Pair<Long, Long>>>()
+    /** Demo options: bins pretending to have gone quiet. */
+    private val demoQuiet = HashSet<String>()
     private val simDirty = HashSet<String>()
     private val prev = HashMap<String, Flags>()
     private var lastSample = 0L
@@ -75,19 +87,20 @@ object Hub {
         started = true
         store = Store(context)
         cloud = Cloud(store.firebase())
+        ts = ThingSpeak().apply { use(store.string(KEY_TS_URL, THINGSPEAK_URL)) }
         val now = System.currentTimeMillis()
         val bins = store.bins() ?: Demo.bins().also(store::saveBins)
-        val alerts = store.alerts() ?: (if (bins.none { it.ip.isNotBlank() }) Demo.alerts(bins, now) else emptyList()).also(store::saveAlerts)
+        val alerts = store.alerts() ?: (if (bins.all { it.demo }) Demo.alerts(bins, now) else emptyList()).also(store::saveAlerts)
         alertSeq = alerts.maxOfOrNull { it.id } ?: 0L
         _state.value = HubState(bins = bins, alerts = alerts, link = linkOf(bins), loading = true)
-        _history.value = bins.filter { it.ip.isBlank() }.associate { it.id to Demo.history(it, now) }
+        _history.value = bins.filter { it.demo }.associate { it.id to Demo.history(it, now) }
 
         // A new network (joining the bins' Wi-Fi, or leaving it) means try Wi-Fi again at once.
         runCatching {
             val cm = context.getSystemService(ConnectivityManager::class.java)
             cm?.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
-                    scope.launch { nextLocal.clear(); localFails.clear(); nextCloud.clear() }
+                    scope.launch { nextLocal.clear(); localFails.clear(); nextCloud.clear(); nextTs.clear(); lastCheck = 0L }
                 }
             })
         }
@@ -130,27 +143,37 @@ object Hub {
         }
         val link = linkOf(merged)
         if (link != current.link && !current.loading) _events.tryEmit(HubEvent.LinkChanged(current.link, link))
-        _state.value = current.copy(bins = merged, link = link, loading = false)
+        checkRoutes(merged, now)
+        val pending = settle(_state.value.pending, merged, now)
+        _state.value = current.copy(
+            pending = pending,
+            bins = merged, link = link, loading = false,
+            fbUp = if (cloud.ready) now - fbOk < 60_000 else null,
+            tsUp = if (merged.any { it.onThingSpeak }) now - tsOk < 60_000 else null,
+            tsPerDay = tsPerDay(merged),
+        )
         if (merged.any { it.ip != (current.bins.firstOrNull { c -> c.id == it.id }?.ip) }) store.saveBins(merged)
         watch(merged, now)
         if (now - lastSample >= 10_000) {
             lastSample = now
             sample(merged, now)
         }
-        if (link == Link.CLOUD && now - lastUsage > 60_000) {
+        if (current.fbUp == true && now - lastUsage > 60_000) {
             lastUsage = now
             runCatching { cloud.usageBytes() }.getOrNull()?.let { _state.value = _state.value.copy(cloudBytes = it) }
         }
     }
 
     private suspend fun poll(b: Bin, now: Long): Bin {
-        if (b.ip.isBlank()) {
+        if (b.demo) {
+            // Demo options can make a bin go quiet; it keeps its last reading until it comes back.
+            if (b.id in demoQuiet) return b.copy(source = Source.STALE)
             val r = Demo.step(b, _state.value.calibBin == b.id, now)
             return b.copy(reading = r, source = Source.DEMO)
         }
         // Local Wi-Fi first: every second while it answers. After a miss it is tried
         // again in 2 s, and after three misses in a row every 30 s, as on the dashboard.
-        if (now >= (nextLocal[b.id] ?: 0L)) {
+        if (b.ip.isNotBlank() && now >= (nextLocal[b.id] ?: 0L)) {
             try {
                 val s = LocalApi.status(b.ip)
                 nextLocal.remove(b.id)
@@ -174,6 +197,7 @@ object Hub {
                 nextCloud[b.id] = now + 5_000
                 try {
                     val c = cloud.status(b.cloudId)
+                    fbOk = now
                     val age = if (c != null && c.ts > 0) now - c.ts else 0L
                     if (c != null && age < 90_000) {
                         return b.copy(
@@ -191,16 +215,98 @@ object Hub {
                 return b
             }
         }
+        // Then ThingSpeak, every 15 s, the fastest its free licence lets a bin write.
+        if (b.onThingSpeak) {
+            if (now >= (nextTs[b.id] ?: 0L)) {
+                nextTs[b.id] = now + 15_000
+                try {
+                    val e = ts.last(b.tsChannel, b.tsKey)
+                    tsOk = now
+                    e?.let { noteEntry(b.tsChannel, it.entryId, now) }
+                    val age = if (e != null && e.ts > 0) now - e.ts else 0L
+                    if (e != null && age < 90_000) {
+                        return b.copy(reading = e.reading, source = Source.THINGSPEAK, lastSeen = now, ip = e.localIp ?: b.ip)
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                }
+            } else if (b.source == Source.THINGSPEAK && now - b.lastSeen < 90_000) {
+                return b
+            }
+        }
         // A bin is called lost only after 90 s with no reading at all; until then its last one stays.
-        if ((b.source == Source.LIVE || b.source == Source.CLOUD) && now - b.lastSeen < 90_000) return b
+        if ((b.source == Source.LIVE || b.source == Source.CLOUD || b.source == Source.THINGSPEAK) && now - b.lastSeen < 90_000) return b
         return b.copy(source = Source.STALE)
     }
 
     private fun linkOf(bins: List<Bin>): Link = when {
-        bins.none { it.ip.isNotBlank() } -> Link.DEMO
+        bins.all { it.demo } -> Link.DEMO
         bins.any { it.source == Source.LIVE } -> Link.LIVE
         bins.any { it.source == Source.CLOUD } -> Link.CLOUD
+        bins.any { it.source == Source.THINGSPEAK } -> Link.THINGSPEAK
         else -> Link.OFFLINE
+    }
+
+    /**
+     * Firebase and ThingSpeak are only read for data when Wi-Fi fails, so every
+     * 30 s the one not in use gets a small call, and the link chip can show each
+     * route that answers.
+     */
+    private suspend fun checkRoutes(bins: List<Bin>, now: Long) {
+        if (now - lastCheck < 30_000) return
+        lastCheck = now
+        if (cloud.ready && now - fbOk > 30_000 && cloud.ping()) fbOk = now
+        // Every channel is read here too, so the message estimate covers all of them.
+        bins.filter { it.onThingSpeak && it.source != Source.THINGSPEAK }.distinctBy { it.tsChannel }.forEach { t ->
+            runCatching { ts.last(t.tsChannel, t.tsKey) }.onSuccess { e ->
+                tsOk = now
+                e?.let { noteEntry(t.tsChannel, it.entryId, now) }
+            }
+        }
+    }
+
+    /** Drops each cloud command the bin has now carried out, or that waited too long. */
+    private fun settle(pending: Map<String, Pending>, bins: List<Bin>, now: Long): Map<String, Pending> {
+        if (pending.isEmpty()) return pending
+        val out = HashMap<String, Pending>()
+        pending.forEach { (id, p) ->
+            val b = bins.firstOrNull { it.id == id } ?: return@forEach
+            val fresh = b.lastSeen > p.at
+            val done = fresh && when (p.cmd) {
+                "LOCK" -> b.reading.status == BinStatus.LOCKED
+                "UNLOCK" -> b.reading.status != BinStatus.LOCKED
+                "COLLECT" -> b.reading.status == BinStatus.COLLECTING
+                else -> true
+            }
+            when {
+                done -> _events.tryEmit(HubEvent.CommandResult(id, b.name, p.cmd, true))
+                now > p.deadline -> _events.tryEmit(HubEvent.CommandResult(id, b.name, p.cmd, false))
+                else -> out[id] = p
+            }
+        }
+        return out
+    }
+
+    private fun noteEntry(channel: String, entry: Long, now: Long) {
+        if (entry <= 0) return
+        val seen = tsSeen[channel]
+        tsSeen[channel] = if (seen == null || entry < seen.second.second) (now to entry) to (now to entry) else seen.first to (now to entry)
+    }
+
+    /** Sums each channel's writes per day, once it has been watched for two minutes. */
+    private fun tsPerDay(bins: List<Bin>): Double? {
+        val channels = bins.filter { it.onThingSpeak }.map { it.tsChannel }.toSet()
+        var total = 0.0
+        var any = false
+        channels.forEach { ch ->
+            val (a, b) = tsSeen[ch] ?: return@forEach
+            val ms = b.first - a.first
+            if (ms < 120_000) return@forEach
+            any = true
+            total += (b.second - a.second).toDouble() / ms * 86_400_000.0
+        }
+        return if (any) total else null
     }
 
     private fun sample(bins: List<Bin>, now: Long) {
@@ -245,7 +351,7 @@ object Hub {
                     else -> {}
                 }
             }
-            if (b.ip.isNotBlank()) {
+            run {
                 if (f.source == Source.STALE && p.source != Source.STALE) _events.tryEmit(HubEvent.BinLost(n))
                 if (f.source != Source.STALE && p.source == Source.STALE) _events.tryEmit(HubEvent.BinBack(n))
             }
@@ -280,7 +386,10 @@ object Hub {
      */
     suspend fun command(id: String, cmd: String, extra: Map<String, Any> = emptyMap()): String? {
         val b = bin(id) ?: return null
+        _state.value.pending[id]?.let { return "Waiting for ${b.name} to confirm ${it.cmd}." }
         var problem: String? = null
+        // Set when the command went through Firebase or ThingSpeak, so its key waits for the bin.
+        var via: Source? = null
         when (b.source) {
             Source.DEMO -> {}
             Source.LIVE -> try {
@@ -288,15 +397,34 @@ object Hub {
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                problem = if (cloud.ready && cmd in Cloud.CLOUD_COMMANDS) {
-                    runCatching { cloud.command(b.cloudId, cmd) }.exceptionOrNull()?.let { "${b.name} did not answer on Wi-Fi or the cloud." }
+                problem = if (cmd in Cloud.CLOUD_COMMANDS && (cloud.ready || b.tbId.isNotBlank())) {
+                    val viaFb = cloud.ready && runCatching { cloud.command(b.cloudId, cmd) }.isSuccess
+                    val viaTs = !viaFb && b.tbId.isNotBlank() && runCatching { ts.command(b.tbId, b.tbKey, cmd) }.isSuccess
+                    if (viaFb) via = Source.CLOUD
+                    if (viaTs) via = Source.THINGSPEAK
+                    if (viaFb || viaTs) null else "${b.name} did not answer on Wi-Fi or the cloud."
                 } else "${b.name} did not answer. Check its power and Wi-Fi."
             }
             Source.CLOUD -> problem = if (cmd !in Cloud.CLOUD_COMMANDS) "That needs the bins' Wi-Fi."
             else runCatching { cloud.command(b.cloudId, cmd) }.exceptionOrNull()?.let { "The cloud did not take it. ${it.message.orEmpty()}" }
+                .also { if (it == null) via = Source.CLOUD }
+            Source.THINGSPEAK -> problem = when {
+                cmd !in Cloud.CLOUD_COMMANDS -> "That needs the bins' Wi-Fi."
+                b.tbId.isBlank() -> "Add ${b.name}'s TalkBack ID and key in SET to send commands through ThingSpeak."
+                else -> runCatching { ts.command(b.tbId, b.tbKey, cmd) }.exceptionOrNull()?.let { "ThingSpeak did not take it. ${it.message.orEmpty()}" }
+                    .also { if (it == null) via = Source.THINGSPEAK }
+            }
             Source.STALE -> problem = "${b.name} is not answering."
         }
         if (problem != null && b.source != Source.LIVE) return problem
+        // Over the cloud the card does not change until the bin confirms; the key stays locked meanwhile.
+        via?.let { v ->
+            if (problem != null) return problem
+            val now = System.currentTimeMillis()
+            val wait = if (v == Source.THINGSPEAK) 120_000L else 60_000L
+            _state.value = _state.value.copy(pending = _state.value.pending + (id to Pending(cmd, v, now, now + wait)))
+            return null
+        }
         update(id) { x ->
             val r = x.reading
             x.copy(
@@ -399,18 +527,25 @@ object Hub {
         store.saveBins(bins)
     }
 
-    fun editBin(id: String, name: String, place: String, ip: String, cloudId: String) {
+    fun editBin(
+        id: String, name: String, place: String, ip: String, cloudId: String,
+        tsChannel: String? = null, tsKey: String? = null, tbId: String? = null, tbKey: String? = null,
+    ) {
         val clean = ip.trim()
         update(id, persist = true) {
-            val moved = clean != it.ip
-            it.copy(
+            val next = it.copy(
                 name = name.trim().ifBlank { it.name }, place = place.trim(), ip = clean,
                 cloudId = cloudId.trim().ifBlank { it.cloudId },
-                source = if (moved) (if (clean.isBlank()) Source.DEMO else Source.STALE) else it.source,
+                tsChannel = tsChannel?.trim() ?: it.tsChannel, tsKey = tsKey?.trim() ?: it.tsKey,
+                tbId = tbId?.trim() ?: it.tbId, tbKey = tbKey?.trim() ?: it.tbKey,
             )
+            val moved = next.ip != it.ip || next.tsChannel != it.tsChannel
+            next.copy(source = if (moved) (if (next.demo) Source.DEMO else Source.STALE) else it.source)
         }
         nextLocal.remove(id)
         nextCloud.remove(id)
+        nextTs.remove(id)
+        demoQuiet.remove(id)
     }
 
     fun removeBin(id: String) {
@@ -430,6 +565,88 @@ object Hub {
         val list = f(_state.value.alerts)
         _state.value = _state.value.copy(alerts = list)
         store.saveAlerts(list)
+    }
+
+    // ---------- demo options ----------
+
+    /** Demo options change only bins with no address. Left alone, the demo runs as normal. */
+    val demoInUse get() = Demo.speed != Demo.NORMAL_SPEED || _state.value.demoLinks.any || demoQuiet.isNotEmpty()
+
+    fun demoSpeed(x: Double) {
+        Demo.speed = x
+        _state.value = _state.value.copy()
+    }
+
+    fun demoLinks(r: Routes) {
+        _state.value = _state.value.copy(demoLinks = r)
+    }
+
+    fun demoQuiet(id: String) = id in demoQuiet
+
+    fun setDemoQuiet(id: String, quiet: Boolean) {
+        if (quiet) demoQuiet.add(id) else demoQuiet.remove(id)
+        if (quiet) update(id) { it.copy(lastSeen = System.currentTimeMillis()) }
+        if (!quiet) update(id) { it.copy(source = Source.DEMO) }
+    }
+
+    enum class DemoEvent { FULL, TAMPER, AIR, EMPTY }
+
+    fun demoEvent(id: String, e: DemoEvent) {
+        update(id) { b ->
+            val r = b.reading
+            val c = b.cal
+            b.copy(
+                reading = when (e) {
+                    DemoEvent.FULL -> r.copy(fill = minOf(100.0, c.v("fill_th") + 3), distance = Demo.distanceFor(c.v("fill_th") + 3, c))
+                    DemoEvent.TAMPER -> r.copy(status = BinStatus.TAMPER, tilt = 38.0, lidOpen = false)
+                    DemoEvent.AIR -> r.copy(gas = c.v("gas_th") + 60)
+                    DemoEvent.EMPTY -> r.copy(fill = 0.0, weight = 0.0, gas = minOf(r.gas, 48.0), status = BinStatus.OK, distance = c.v("d_empty"))
+                },
+            )
+        }
+    }
+
+    /** Puts every demo option back, so the demo runs as it does on a fresh start. */
+    fun resetDemo() {
+        Demo.speed = Demo.NORMAL_SPEED
+        demoQuiet.clear()
+        val now = System.currentTimeMillis()
+        val start = Demo.bins().associateBy { it.id }
+        val s = _state.value
+        val bins = s.bins.map { b -> if (!b.demo) b else start[b.id]?.let { o -> b.copy(reading = o.reading, rate = o.rate, source = Source.DEMO) } ?: b.copy(source = Source.DEMO) }
+        _state.value = s.copy(bins = bins, demoLinks = Routes())
+        _history.value = _history.value + bins.filter { it.demo }.associate { it.id to Demo.history(it, now) }
+    }
+
+    // ---------- ThingSpeak ----------
+
+    fun thingSpeakUrl() = ts.url
+
+    fun saveThingSpeak(url: String) {
+        ts.use(url)
+        store.putString(KEY_TS_URL, ts.url)
+        nextTs.clear()
+        lastCheck = 0L
+    }
+
+    /** Reads each bin's channel once. Returns how many answered and the first problem. */
+    suspend fun testThingSpeak(): Pair<Int, String?> {
+        val bins = _state.value.bins.filter { it.onThingSpeak }
+        if (bins.isEmpty()) return 0 to "No bin has a ThingSpeak channel yet. Add one in its SET sheet."
+        var ok = 0
+        var problem: String? = null
+        bins.forEach { b ->
+            try {
+                ts.last(b.tsChannel, b.tsKey)
+                ok++
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (problem == null) problem = "${b.name}: ${e.message ?: "no answer"}"
+            }
+        }
+        if (ok > 0) tsOk = System.currentTimeMillis()
+        return ok to problem
     }
 
     // ---------- Firebase ----------
@@ -454,6 +671,8 @@ object Hub {
         if (hours <= 0.05) return 0.0
         return ((recent.last().fill - recent.first().fill) / hours).coerceAtLeast(0.0)
     }
+
+    private const val KEY_TS_URL = "ts_url"
 
     private fun fmt(v: Double) = if (v == Math.floor(v)) v.toInt().toString() else "%.1f".format(v)
 

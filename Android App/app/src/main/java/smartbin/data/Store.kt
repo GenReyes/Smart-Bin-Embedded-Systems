@@ -47,6 +47,10 @@ class Store(context: Context) {
                     ip = o.optString("ip", ""),
                     cal = cal,
                     rate = o.optDouble("rate", 0.5),
+                    tsChannel = o.optString("tsChannel", ""),
+                    tsKey = o.optString("tsKey", ""),
+                    tbId = o.optString("tbId", ""),
+                    tbKey = o.optString("tbKey", ""),
                     reading = Reading(fill = o.optDouble("fill", 0.0), weight = o.optDouble("weight", 0.0), gas = o.optDouble("gas", 60.0)),
                 )
             }
@@ -61,6 +65,7 @@ class Store(context: Context) {
             a.put(
                 JSONObject().put("id", b.id).put("cloudId", b.cloudId).put("name", b.name).put("place", b.place)
                     .put("ip", b.ip).put("cal", cal).put("rate", b.rate)
+                    .put("tsChannel", b.tsChannel).put("tsKey", b.tsKey).put("tbId", b.tbId).put("tbKey", b.tbKey)
                     .put("fill", b.reading.fill).put("weight", b.reading.weight).put("gas", b.reading.gas)
             )
         }

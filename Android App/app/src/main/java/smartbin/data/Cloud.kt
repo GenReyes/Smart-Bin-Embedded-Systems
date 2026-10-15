@@ -52,6 +52,9 @@ class Cloud(private var config: FirebaseConfig) {
 
     suspend fun usageBytes(): Long? = rest("GET", "sb/usage/bytes_month")?.trim()?.toLongOrNull()
 
+    /** True when Firebase answers with the saved account, for the link chip. */
+    suspend fun ping(): Boolean = runCatching { rest("GET", "sb/usage/bytes_month"); true }.getOrDefault(false)
+
     /** Signs in with [cfg] and reads its line in /sb_users, the same check as the dashboard's TEST. */
     suspend fun test(cfg: FirebaseConfig): Result<Int> = try {
         val (idToken, uid) = signInWith(cfg)

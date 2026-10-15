@@ -42,12 +42,14 @@ class SmartBinApp : Application() {
                         else Alerts.post(this@SmartBinApp, e.row, e.type, e.binId)
                     is HubEvent.LinkChanged -> if (Hub.foreground) when (e.to) {
                         Link.LIVE -> Feel.event(Sfx.LINK_UP)
-                        Link.CLOUD -> Feel.event(Sfx.CLOUD)
+                        Link.CLOUD, Link.THINGSPEAK -> Feel.event(Sfx.CLOUD)
                         Link.OFFLINE -> Feel.event(Sfx.LINK_LOST)
                         Link.DEMO -> {}
                     }
                     is HubEvent.BinLost -> if (Hub.foreground) Feel.event(Sfx.BIN_LOST)
                     is HubEvent.BinBack -> if (Hub.foreground) Feel.event(Sfx.BIN_BACK)
+                    // The screens tell the user; nothing to post.
+                    is HubEvent.CommandResult -> {}
                 }
             }
         }

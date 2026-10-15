@@ -471,14 +471,14 @@ fun Inp(
     )
 }
 
-enum class Tone { RED, PURPLE, TEAL, GREEN, AMBER, ORANGE }
+enum class Tone { RED, PURPLE, TEAL, GREEN, AMBER, ORANGE, BLUE }
 
 /** .banner: the brutal message block. */
 @Composable
 fun Banner(tone: Tone, icon: ImageVector, title: String, small: String? = null, modifier: Modifier = Modifier, iconMod: Modifier = Modifier) {
     val c = Sb.c
     val bg = when (tone) {
-        Tone.RED -> c.bad; Tone.PURPLE -> c.sim; Tone.TEAL -> c.cal; Tone.GREEN -> c.ok; Tone.AMBER -> c.warn; Tone.ORANGE -> c.cloud
+        Tone.RED -> c.bad; Tone.PURPLE -> c.sim; Tone.TEAL -> c.cal; Tone.GREEN -> c.ok; Tone.AMBER -> c.warn; Tone.ORANGE -> c.cloud; Tone.BLUE -> c.ts
     }
     val fg = if (c.isDark || tone == Tone.AMBER) (if (c.isDark) Color(0xFF13100D) else Color(0xFF241C10)) else Color.White
     Row(

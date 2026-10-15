@@ -1,5 +1,7 @@
 package smartbin.ui
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -26,18 +28,28 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathMeasure
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -212,6 +224,7 @@ fun BinCard(vm: AppViewModel, b: Bin, hub: HubState, inSheet: Boolean = false) {
         // Six chips
         val live = b.source == Source.LIVE
         val cloud = b.source == Source.CLOUD
+        val tsp = b.source == Source.THINGSPEAK
         val stKey = if (calOn) BinStatus.OK else r.status
         val stIcon = when (stKey) {
             BinStatus.TAMPER -> Ic.tamper; BinStatus.LOCKED -> Ic.lock(true); BinStatus.COLLECTING -> Ic.truck; else -> Ic.check
@@ -223,9 +236,9 @@ fun BinCard(vm: AppViewModel, b: Bin, hub: HubState, inSheet: Boolean = false) {
                 Chip(Ic.lid(r.lidOpen), if (r.lidOpen) "OPEN" else "CLOSED", r.lidOpen, c.lid, Modifier.weight(1f))
                 Chip(stIcon, stText, true, stColor, Modifier.weight(1f), Modifier.shake(stKey == BinStatus.TAMPER))
                 Chip(
-                    if (cloud) Ic.cloud else Ic.wifi(live),
-                    when { live -> "WI-FI"; cloud -> "CLOUD"; stale -> "OFFLINE"; else -> "DEMO" }, true,
-                    when { live -> c.link; cloud -> c.cloud; stale -> c.tamper; else -> c.warn }, Modifier.weight(1f),
+                    if (cloud) Ic.cloud else if (tsp) Ic.chart else Ic.wifi(live),
+                    when { live -> "WI-FI"; cloud -> "CLOUD"; tsp -> "TSPEAK"; stale -> "OFFLINE"; else -> "DEMO" }, true,
+                    when { live -> c.link; cloud -> c.cloud; tsp -> c.ts; stale -> c.tamper; else -> c.warn }, Modifier.weight(1f),
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -272,22 +285,98 @@ fun BinCard(vm: AppViewModel, b: Bin, hub: HubState, inSheet: Boolean = false) {
             SensorTile(Ic.gas, c.gas, Math.round(r.gas).toString(), "Air quality", r.gas >= gTh, band(r.gas / gTh), Modifier.weight(1f))
         }
         // LOCK or UNLOCK, RESET TAMPER (operator), COLLECT or DONE
-        val busy = calOn || stale
+        // A command sent through Firebase or ThingSpeak holds every key until the bin confirms it.
+        val wait = hub.pending[b.id]
+        val busy = calOn || stale || wait != null
         val locked = r.status == BinStatus.LOCKED
         val tamper = r.status == BinStatus.TAMPER
         val coll = r.status == BinStatus.COLLECTING
+        // Once the bin answers, the key that sent the command flashes green (confirmed) or red (timed out).
+        val done = vm.settled[b.id]
+        val fade = settleFade(done)
+        fun flashFor(vararg cmds: String) = if (done != null && done.cmd in cmds) Modifier.settleFlash(done.ok, fade, c) else Modifier
         Row(Modifier.padding(top = 14.dp), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
             val m = Modifier.weight(1f)
-            if (locked) Btn("UNLOCK", { vm.command(b.id, "UNLOCK") }, m, Ic.lock(false), Look.SOLID, c.sim, enabled = !busy, stack = true, sound = Sfx.UNLOCK)
-            else Btn("LOCK", { vm.command(b.id, "LOCK") }, m, Ic.lock(true), Look.TINT, c.sim, enabled = !busy && !tamper, stack = true, sound = Sfx.LOCK)
+            val lm = m.then(flashFor("LOCK", "UNLOCK"))
+            val cm = m.then(flashFor("COLLECT", "COLLECT_DONE"))
+            if (wait != null && (wait.cmd == "LOCK" || wait.cmd == "UNLOCK")) WaitKey(wait, if (wait.cmd == "LOCK") "LOCKING" else "UNLOCKING", c.sim, m)
+            else if (locked) Btn("UNLOCK", { vm.command(b.id, "UNLOCK") }, lm, Ic.lock(false), Look.SOLID, c.sim, enabled = !busy, stack = true, sound = Sfx.UNLOCK)
+            else Btn("LOCK", { vm.command(b.id, "LOCK") }, lm, Ic.lock(true), Look.TINT, c.sim, enabled = !busy && !tamper, stack = true, sound = Sfx.LOCK)
             if (op) Btn(
-                "RESET TAMPER", { vm.command(b.id, "CLEAR_TAMPER") }, m, Ic.tamper, if (tamper) Look.DANGER else Look.TINT, c.tamper,
-                enabled = tamper && !stale, stack = true, sound = Sfx.CONFIRM,
+                "RESET TAMPER", { vm.command(b.id, "CLEAR_TAMPER") }, m.then(flashFor("CLEAR_TAMPER")), Ic.tamper, if (tamper) Look.DANGER else Look.TINT, c.tamper,
+                enabled = tamper && !stale && wait == null, stack = true, sound = Sfx.CONFIRM,
             )
-            if (coll) Btn("DONE", { vm.command(b.id, "COLLECT_DONE") }, m, Ic.check, Look.SOLID, c.cal, enabled = !stale, stack = true, sound = Sfx.DONE)
-            else Btn("COLLECT", { vm.command(b.id, "COLLECT") }, m, Ic.truck, Look.TINT, c.link, enabled = !busy, stack = true, sound = Sfx.PICKUP)
+            if (wait != null && wait.cmd == "COLLECT") WaitKey(wait, "STARTING", c.link, m)
+            else if (coll) Btn("DONE", { vm.command(b.id, "COLLECT_DONE") }, cm, Ic.check, Look.SOLID, c.cal, enabled = !stale && wait == null, stack = true, sound = Sfx.DONE)
+            else Btn("COLLECT", { vm.command(b.id, "COLLECT") }, cm, Ic.truck, Look.TINT, c.link, enabled = !busy, stack = true, sound = Sfx.PICKUP)
+        }
+        if (wait != null) {
+            val via = if (wait.via == Source.THINGSPEAK) "ThingSpeak" else "Firebase"
+            T(
+                "Sent through $via. The keys stay locked until ${b.name} confirms.", Modifier.padding(top = 8.dp).fillMaxWidth(),
+                size = 0.74f, weight = FontWeight.Bold, color = if (wait.via == Source.THINGSPEAK) c.ts else c.cloud, align = TextAlign.Center,
+            )
         }
     }
+}
+
+/** Corner radius of a stacked key, for the lines drawn round it. */
+private val KEY_RADIUS = 13.dp
+
+/**
+ * A key held down while a cloud command waits for the bin: pushed in under
+ * a light veil, its icon turning, and a line round its edge running down to
+ * the deadline, moved every frame.
+ */
+@Composable
+private fun WaitKey(p: smartbin.data.Pending, label: String, cc: Color, modifier: Modifier) {
+    val c = Sb.c
+    val clock = remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(p) {
+        while (true) withFrameMillis { clock.longValue = System.currentTimeMillis() }
+    }
+    Btn(
+        label, {}, modifier.drawWithContent {
+            drawContent()
+            val left = ((p.deadline - clock.longValue).toFloat() / (p.deadline - p.at).coerceAtLeast(1)).coerceIn(0f, 1f)
+            drawRoundRect(c.base.soft(0.35f), cornerRadius = CornerRadius(KEY_RADIUS.toPx()))
+            edgeLine(1f, cc.soft(0.22f))
+            edgeLine(left, cc)
+        },
+        Ic.reload, Look.TINT, cc, stack = true, pressedIn = true, iconMod = Modifier.spin(true), sound = Sfx.DENIED,
+    )
+}
+
+/** The part [part] (0 to 1) of a line round a key's edge, from its top-left corner. */
+private fun DrawScope.edgeLine(part: Float, color: Color) {
+    if (part <= 0f) return
+    val w = 3.dp.toPx()
+    val r = (KEY_RADIUS.toPx() - w / 2f).coerceAtLeast(0f)
+    val whole = Path().apply { addRoundRect(RoundRect(w / 2f, w / 2f, size.width - w / 2f, size.height - w / 2f, CornerRadius(r, r))) }
+    val measure = PathMeasure().apply { setPath(whole, false) }
+    val piece = Path()
+    measure.getSegment(0f, measure.length * part, piece, true)
+    drawPath(piece, color, style = Stroke(width = w, cap = StrokeCap.Round))
+}
+
+/** Runs from 1 to 0 over [SETTLE_MILLIS] each time a new answer arrives. */
+@Composable
+private fun settleFade(s: Settled?): State<Float> {
+    val fade = remember(s) { Animatable(if (s == null) 0f else 1f) }
+    LaunchedEffect(s) {
+        if (s != null) fade.animateTo(0f, tween(SETTLE_MILLIS.toInt(), easing = LinearEasing))
+    }
+    return fade.asState()
+}
+
+/** A green or red wash and edge over a key, fading out as [fade] runs down. */
+private fun Modifier.settleFlash(ok: Boolean, fade: State<Float>, c: SbColors): Modifier = drawWithContent {
+    drawContent()
+    val f = fade.value
+    if (f <= 0f) return@drawWithContent
+    val tone = if (ok) c.ok else c.bad
+    drawRoundRect(tone.soft(0.28f * f), cornerRadius = CornerRadius(KEY_RADIUS.toPx()))
+    edgeLine(1f, tone.soft(f))
 }
 
 /** .ticks: 0, 50, the limit and 100 under the bar, each centred on its mark. */

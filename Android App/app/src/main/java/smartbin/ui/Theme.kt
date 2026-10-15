@@ -16,6 +16,9 @@ import smartbin.data.Mode
 
 enum class ThemeMode { AUTO, LIGHT, DARK }
 
+/** ThingSpeak's colour on the link chip and in Connection: blue, next to Wi-Fi green and Firebase orange. */
+val SbColors.ts: Color get() = humid
+
 /**
  * The design tokens of the mockup, the .ph[data-th] and .ph[data-mode]
  * blocks of smartbin-app-mockup v2.html. The accent and the page tint follow

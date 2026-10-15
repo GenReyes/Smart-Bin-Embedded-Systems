@@ -83,7 +83,7 @@ fun SmartBinUi(vm: AppViewModel, setLandscape: (Boolean) -> Unit) {
         ThemeMode.LIGHT -> false
         ThemeMode.DARK -> true
     }
-    val mode = if (vm.role == null) Mode.NORMAL else hub.mode
+    val mode = if (vm.role == null || !vm.started) Mode.NORMAL else hub.mode
     val c = animated(sbColors(dark, mode))
     val context = LocalContext.current
 
@@ -117,6 +117,7 @@ fun SmartBinUi(vm: AppViewModel, setLandscape: (Boolean) -> Unit) {
         Box(Modifier.fillMaxSize().page(c)) {
             when {
                 vm.role == null -> Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) { Gate(vm) }
+                !vm.started -> Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) { StartPage(vm, hub) }
                 land -> FullChart(vm, hub)
                 else -> Column(
                     Modifier.align(Alignment.TopCenter).fillMaxHeight().widthIn(max = 520.dp).fillMaxWidth().statusBarsPadding(),
@@ -136,9 +137,10 @@ fun SmartBinUi(vm: AppViewModel, setLandscape: (Boolean) -> Unit) {
                             when (s) {
                                 Screen.OVERVIEW -> Overview(vm, hub)
                                 Screen.CHARTS -> Charts(vm, hub)
-                                Screen.SETTINGS -> SettingsPage(vm, hub, allowAlerts)
+                                Screen.SETTINGS -> SettingsPage(vm, hub)
                                 Screen.SIM -> if (vm.operator) Simulation(vm, hub) else Overview(vm, hub)
                                 Screen.ALERTS -> AlertsPage(vm, hub)
+                                Screen.APP -> AppPage(vm, hub)
                                 Screen.BT -> Bluetooth(vm, hub)
                                 Screen.NET -> Connection(vm, hub)
                             }
@@ -149,16 +151,12 @@ fun SmartBinUi(vm: AppViewModel, setLandscape: (Boolean) -> Unit) {
             }
             // Back from a page under Settings, or from a tab, goes one step toward Overview.
             val view = LocalView.current
-            BackHandler(enabled = vm.overlay == null && vm.role != null && (land || vm.screen != Screen.OVERVIEW)) {
+            BackHandler(enabled = vm.overlay == null && vm.role != null && vm.started && (land || vm.screen != Screen.OVERVIEW)) {
                 Feel.play(view, Sfx.BACK)
-                when {
-                    land -> vm.fullscreen = null
-                    vm.screen == Screen.BT || vm.screen == Screen.NET -> vm.go(Screen.SETTINGS)
-                    else -> vm.go(Screen.OVERVIEW)
-                }
+                if (land) vm.fullscreen = null else vm.back()
             }
             Overlays(vm, hub, allowAlerts)
-            vm.toast?.let { Toast(it, bottom = if (land || vm.role == null) 24.dp else 92.dp) }
+            vm.toast?.let { Toast(it, bottom = if (land || vm.role == null || !vm.started) 24.dp else 92.dp) }
         }
     }
 }
@@ -227,7 +225,10 @@ private fun Header(vm: AppViewModel, hub: HubState, dark: Boolean) {
         }
         IconKey(Ic.sunmoon(dark), {
             vm.toggleTheme(dark)
-        }, sound = if (dark) Sfx.THEME_LIGHT else Sfx.THEME_DARK)
+        }, size = 40.dp, iconSize = 19.dp, sound = if (dark) Sfx.THEME_LIGHT else Sfx.THEME_DARK)
+        // The gear opens the app's own settings: sound, vibration, battery, links and demo options.
+        val onApp = vm.screen == Screen.APP || vm.screen == Screen.NET || vm.screen == Screen.BT
+        IconKey(Ic.gear, { if (onApp) vm.back() else vm.go(Screen.APP) }, size = 40.dp, iconSize = 19.dp, tint = if (onApp) c.accent else c.ink2, sound = if (onApp) Sfx.BACK else Sfx.OPEN)
     }
     // The live strip: what needs attention, the link and the role
     Row(
@@ -237,7 +238,7 @@ private fun Header(vm: AppViewModel, hub: HubState, dark: Boolean) {
     ) {
         Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             StatusPill(vm, hub)
-            LinkChip(hub.link, Modifier.weight(1f, fill = false)) { vm.go(Screen.NET) }
+            LinkChip(hub, Modifier.weight(1f, fill = false)) { vm.go(Screen.NET) }
         }
         val src = remember { MutableInteractionSource() }
         val pressed by src.collectIsPressedAsState()
@@ -266,7 +267,7 @@ fun liveBanners(hub: HubState): List<Live> {
     val tam = b.filter { it.reading.status == BinStatus.TAMPER }
     val full = b.filter { it.full }
     val sim = b.filter { it.simulating }
-    val lost = b.filter { it.stale && it.ip.isNotBlank() }
+    val lost = b.filter { it.stale }
     if (cal.isNotEmpty()) out += Live(Tone.TEAL, Ic.calib, "CALIBRATING: " + cal.joinToString { it.name }, "Keep the bin empty and do not touch it.", Ic.calib to c.cal)
     if (tam.isNotEmpty()) out += Live(Tone.RED, Ic.tamper, "TAMPER: " + tam.joinToString { it.name }, "Check the bin before resetting the alert.", Ic.tamper to c.tamper)
     if (full.isNotEmpty()) out += Live(Tone.RED, Ic.truck, "COLLECT NOW: " + full.joinToString { "${it.name} at ${Math.round(it.reading.fill)}%" }, null, Ic.truck to c.tamper)
@@ -278,6 +279,11 @@ fun liveBanners(hub: HubState): List<Live> {
             Tone.ORANGE, Ic.cloud, "Cloud mode",
             "No bin answers on this Wi-Fi, so readings come through Firebase every 5 s. LOCK, UNLOCK and COLLECT still work. Calibration and simulation need the bins’ Wi-Fi.",
             Ic.cloud to c.cloud,
+        )
+        Link.THINGSPEAK -> out += Live(
+            Tone.BLUE, Ic.chart, "ThingSpeak mode",
+            "Wi-Fi and Firebase do not answer, so readings come from ThingSpeak every 15 s. LOCK, UNLOCK and COLLECT go through TalkBack.",
+            Ic.chart to c.ts,
         )
         Link.LIVE -> {}
     }
@@ -324,24 +330,65 @@ fun sevTone(s: Severity) = when (s) {
     Severity.CRITICAL -> Tone.RED; Severity.WARNING -> Tone.AMBER; Severity.INFO -> Tone.PURPLE; Severity.SUCCESS -> Tone.GREEN
 }
 
+/** One way to the bins, as the link chip and Connection draw it. */
+class RouteLook(val name: String, val icon: ImageVector, val color: Color)
+
+/** The routes that answer, in their order: Wi-Fi green, Firebase orange, ThingSpeak blue. */
+fun routeLooks(r: smartbin.data.Routes, c: SbColors): List<RouteLook> = buildList {
+    if (r.local) add(RouteLook("Wi-Fi", Ic.wifi(true), c.link))
+    if (r.firebase) add(RouteLook("Firebase", Ic.cloud, c.cloud))
+    if (r.thingspeak) add(RouteLook("ThingSpeak", Ic.chart, c.ts))
+}
+
+/**
+ * Which links answer. Each route has its own colour and icon, so every mix
+ * looks different: one icon per route that is up, a ring in the colour of the
+ * one the readings come from, and a strip of all their colours underneath.
+ */
 @Composable
-private fun LinkChip(link: Link, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun LinkChip(hub: HubState, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val c = Sb.c
-    val text = when (link) { Link.LIVE -> "Local Wi-Fi"; Link.CLOUD -> "Cloud"; Link.OFFLINE -> "Not connected"; Link.DEMO -> "Demo data" }
-    val iconTint = when (link) { Link.CLOUD -> c.cloud; Link.OFFLINE -> c.bad; else -> c.accent }
+    val link = hub.link
+    val parts = routeLooks(hub.routes, c)
+    val main = when (link) {
+        Link.LIVE -> c.link; Link.CLOUD -> c.cloud; Link.THINGSPEAK -> c.ts
+        Link.OFFLINE -> c.bad; Link.DEMO -> parts.firstOrNull()?.color ?: c.warn
+    }
+    val text = when {
+        parts.size == 3 -> "All 3 links"
+        parts.isNotEmpty() -> parts.joinToString(" + ") { it.name }
+        link == Link.OFFLINE -> "Not connected"
+        link == Link.DEMO -> "Demo data"
+        else -> "Connecting"
+    }
     val src = remember { MutableInteractionSource() }
     val pressed by src.collectIsPressedAsState()
     Row(
         modifier
             .defaultMinSize(minHeight = 36.dp)
-            .then(if (pressed) Modifier.clip(RoundedCornerShape(18.dp)).background(c.base).sunk(c, 18.dp) else Modifier.bump(c, 18.dp))
+            .then(if (pressed) Modifier.clip(RoundedCornerShape(18.dp)).background(c.base).sunk(c, 18.dp) else Modifier.bump(c, 18.dp, ring = if (parts.isNotEmpty()) main.soft(0.34f) else null))
             .press(true, Sfx.OPEN, src, onClick)
+            .drawBehind {
+                // The colour strip: one segment per route that answers.
+                if (parts.size > 1) {
+                    val h = 3.dp.toPx()
+                    val w = (size.width - 26.dp.toPx()) / parts.size
+                    parts.forEachIndexed { k, p ->
+                        drawRoundRect(
+                            p.color, topLeft = Offset(13.dp.toPx() + k * w, size.height - h - 3.dp.toPx()),
+                            size = androidx.compose.ui.geometry.Size(w - 2.dp.toPx(), h),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(h / 2),
+                        )
+                    }
+                }
+            }
             .padding(horizontal = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
-        Ico(if (link == Link.CLOUD) Ic.cloud else Ic.wifi(link == Link.LIVE), 17.dp, iconTint, Modifier.breathe(link == Link.LIVE, 2200))
-        T(text, size = 0.8f, weight = FontWeight.Bold, color = if (link == Link.CLOUD) c.cloud else c.ink, maxLines = 1)
+        if (parts.isEmpty()) Ico(Ic.wifi(false), 17.dp, if (link == Link.OFFLINE) c.bad else c.warn)
+        parts.forEach { p -> Ico(p.icon, 16.dp, p.color, Modifier.breathe(p.color == main, 2200)) }
+        T(text, Modifier.padding(start = 2.dp), size = 0.8f, weight = FontWeight.Bold, color = if (parts.size == 1) main else c.ink, fit = true)
     }
 }
 
@@ -360,7 +407,8 @@ private val TABS = listOf(
 @Composable
 private fun BottomNav(vm: AppViewModel, hub: HubState) {
     val c = Sb.c
-    val current = if (vm.screen == Screen.BT || vm.screen == Screen.NET) Screen.SETTINGS else vm.screen
+    // The gear pages belong to no tab.
+    val current = vm.screen.takeIf { it.ordinal < Screen.APP.ordinal }
     val unread = hub.unread
     Row(
         Modifier

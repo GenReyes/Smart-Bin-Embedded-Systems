@@ -3,10 +3,14 @@ package smartbin.ui
 import android.app.Application
 import android.content.ContentValues
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
 import android.provider.MediaStore
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
@@ -24,7 +28,10 @@ import smartbin.data.Cal
 import smartbin.data.Cloud
 import smartbin.data.DEFAULT_SIM
 import smartbin.data.FirebaseConfig
+import smartbin.data.Demo
 import smartbin.data.Hub
+import smartbin.data.HubEvent
+import smartbin.data.Routes
 import smartbin.data.Role
 import smartbin.data.Source
 import smartbin.data.v
@@ -34,7 +41,8 @@ import smartbin.notify.Haptics
 import smartbin.notify.Sfx
 import java.util.Calendar
 
-enum class Screen { OVERVIEW, CHARTS, SETTINGS, SIM, ALERTS, BT, NET }
+/** The five tabs, then the pages opened from the gear key: app settings, Bluetooth setup and Connection. */
+enum class Screen { OVERVIEW, CHARTS, SETTINGS, SIM, ALERTS, APP, BT, NET }
 
 enum class BinView { AUTO, GRID, CARDS }
 enum class BinFilter { ALL, ACTION, MODES }
@@ -64,8 +72,41 @@ sealed interface Overlay {
  * the role, the theme, the choices on each page and the edits not saved yet.
  * The bins, their readings and the alerts live in [Hub].
  */
+/** A cloud command's answer: confirmed ([ok]) or timed out, and when. */
+data class Settled(val cmd: String, val ok: Boolean, val at: Long)
+
+/** How long a key flashes after its cloud command is answered. */
+const val SETTLE_MILLIS = 1100L
+
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val store = Hub.store()
+
+    /** Cloud commands just confirmed or timed out, by bin, while their key flashes. */
+    val settled = mutableStateMapOf<String, Settled>()
+
+    init {
+        // A cloud command's key unlocks when the bin confirms it, or when it waited too long.
+        viewModelScope.launch {
+            Hub.events.collect { e ->
+                if (e is HubEvent.CommandResult) {
+                    // The key flashes green or red for a moment, then lets go.
+                    val s = Settled(e.cmd, e.ok, System.currentTimeMillis())
+                    settled[e.binId] = s
+                    launch {
+                        delay(SETTLE_MILLIS)
+                        if (settled[e.binId] == s) settled.remove(e.binId)
+                    }
+                    if (e.ok) {
+                        Feel.event(Sfx.SAVED)
+                        say("${e.name} confirmed ${e.cmd}.")
+                    } else {
+                        Feel.event(Sfx.DENIED)
+                        say("${e.name} did not confirm ${e.cmd}. Check the bin, then try again.")
+                    }
+                }
+            }
+        }
+    }
 
     // ---------- whole app ----------
 
@@ -73,6 +114,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         private set
     val operator get() = role != Role.COLLECTOR
     var screen by mutableStateOf(Screen.OVERVIEW)
+    /** The tab the gear key was pressed on, so back returns there. */
+    private var beforeApp = Screen.OVERVIEW
+    /**
+     * False until the start page lets go. A new view model means the app was
+     * closed or Android ended it, so the start page shows while the bins are
+     * reached. Coming back from the background keeps this one, and the page
+     * the user left.
+     */
+    var started by mutableStateOf(false)
     var overlay by mutableStateOf<Overlay?>(null)
     var theme by mutableStateOf(runCatching { ThemeMode.valueOf(store.string(SmartBinApp.KEY_THEME, "AUTO")) }.getOrDefault(ThemeMode.AUTO))
         private set
@@ -95,7 +145,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun go(s: Screen) {
         overlay = null
         fullscreen = null
+        if (s == Screen.APP && screen.ordinal < Screen.APP.ordinal) beforeApp = screen
         screen = if (s == Screen.SIM && !operator) Screen.OVERVIEW else s
+    }
+
+    /** Back from a page: Bluetooth and Connection go to the gear page, the gear page to its tab, a tab to Overview. */
+    fun back() = when (screen) {
+        Screen.BT, Screen.NET -> go(Screen.APP)
+        Screen.APP -> go(beforeApp)
+        else -> go(Screen.OVERVIEW)
     }
 
     fun toggleTheme(nowDark: Boolean) = setThemeMode(if (nowDark) ThemeMode.LIGHT else ThemeMode.DARK)
@@ -126,6 +184,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun openFromNotification() {
         if (role == null) return
+        started = true
         overlay = null
         fullscreen = null
         screen = Screen.OVERVIEW
@@ -167,12 +226,42 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         store.putBool(SmartBinApp.KEY_AWAKE, keepAwake)
     }
 
+    // ---------- battery ----------
+
+    /** True when Android lets the app run in the background with no battery limits. */
+    var unrestricted by mutableStateOf(batteryFree())
+        private set
+
+    private fun batteryFree(): Boolean {
+        val ctx = getApplication<Application>()
+        return ctx.getSystemService(PowerManager::class.java)?.isIgnoringBatteryOptimizations(ctx.packageName) == true
+    }
+
+    /** Asks Android for unrestricted battery, or opens the list when the phone has no such prompt. */
+    fun askUnrestricted() {
+        val ctx = getApplication<Application>()
+        val ask = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, Uri.parse("package:${ctx.packageName}"))
+        val list = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+        val ok = runCatching { ctx.startActivity(ask.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess ||
+            runCatching { ctx.startActivity(list.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }.isSuccess
+        if (!ok) say("This phone has no battery setting for apps.")
+    }
+
+    /** Opens the app's own page in Android settings, where some phones keep the battery choice. */
+    fun openAppInfo() {
+        val ctx = getApplication<Application>()
+        runCatching {
+            ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+    }
+
     // ---------- push alerts ----------
 
     var notifications by mutableStateOf(if (Alerts.allowed(app)) Perm.ON else Perm.OFF)
         private set
 
     fun refreshSystemState() {
+        unrestricted = batteryFree()
         val on = Alerts.allowed(getApplication())
         notifications = when {
             on -> Perm.ON
@@ -217,7 +306,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 "COLLECT_DONE" -> "$n is empty and back to normal."
                 else -> "Sent to $n."
             }
-            say(msg + if (b.source == Source.CLOUD) " Sent through the cloud, so the bin can take a few seconds." else "")
+            val waiting = Hub.state.value.pending[id]
+            if (waiting != null) {
+                val via = if (waiting.via == Source.THINGSPEAK) "ThingSpeak" else "Firebase"
+                Feel.event(Sfx.CLOUD)
+                say("Sent ${waiting.cmd} to $n through $via. Its key stays locked until the bin confirms.")
+            } else say(msg)
         }
     }
 
@@ -226,19 +320,33 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var formPlace by mutableStateOf("")
     var formIp by mutableStateOf("")
     var formCloud by mutableStateOf("")
+    var formTsCh by mutableStateOf("")
+    var formTsKey by mutableStateOf("")
+    var formTbId by mutableStateOf("")
+    var formTbKey by mutableStateOf("")
 
     fun openBinEdit(b: Bin) {
         formName = b.name
         formPlace = b.place
         formIp = b.ip
         formCloud = b.cloudId
+        formTsCh = b.tsChannel
+        formTsKey = b.tsKey
+        formTbId = b.tbId
+        formTbKey = b.tbKey
         overlay = Overlay.BinEdit(b.id)
     }
 
     fun saveBinEdit(id: String) {
-        Hub.editBin(id, formName, formPlace, formIp, formCloud)
+        Hub.editBin(id, formName, formPlace, formIp, formCloud, formTsCh, formTsKey, formTbId, formTbKey)
         overlay = null
-        say("Saved ${Hub.bin(id)?.name ?: "the bin"}." + if (formIp.isNotBlank()) " Reading it over Wi-Fi now." else "")
+        say(
+            "Saved ${Hub.bin(id)?.name ?: "the bin"}." + when {
+                formIp.isNotBlank() -> " Reading it over Wi-Fi now."
+                formTsCh.isNotBlank() -> " Reading it from ThingSpeak now."
+                else -> ""
+            }
+        )
     }
 
     fun removeBin(id: String) {
@@ -548,6 +656,99 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         overlay = null
         Feel.event(Sfx.DANGER)
         say("Deleted $t.")
+    }
+
+    // ---------- demo options ----------
+
+    /** Demo fill speed as a multiple of real life. 60 is the normal demo. */
+    var demoSpeed by mutableStateOf(Demo.speed)
+        private set
+    var demoLinks by mutableStateOf(Routes())
+        private set
+
+    fun changeDemoSpeed(x: Double) {
+        demoSpeed = x
+        Hub.demoSpeed(x)
+    }
+
+    fun toggleDemoLink(which: Int) {
+        val r = demoLinks
+        demoLinks = when (which) {
+            0 -> r.copy(local = !r.local)
+            1 -> r.copy(firebase = !r.firebase)
+            else -> r.copy(thingspeak = !r.thingspeak)
+        }
+        Hub.demoLinks(demoLinks)
+    }
+
+    fun demoEvent(b: Bin, e: Hub.DemoEvent) {
+        if (!b.demo) {
+            Feel.event(Sfx.DENIED)
+            say("${b.name} is a real bin. Demo options only change bins with no address.")
+            return
+        }
+        Hub.demoEvent(b.id, e)
+        say(
+            when (e) {
+                Hub.DemoEvent.FULL -> "${b.name} is now over its fill limit."
+                Hub.DemoEvent.TAMPER -> "${b.name} was tipped. Reset it from its card."
+                Hub.DemoEvent.AIR -> "Air quality spiked in ${b.name}. It settles by itself."
+                Hub.DemoEvent.EMPTY -> "${b.name} is empty."
+            }
+        )
+    }
+
+    fun toggleDemoQuiet(b: Bin) {
+        if (!b.demo) {
+            Feel.event(Sfx.DENIED)
+            say("${b.name} is a real bin. Demo options only change bins with no address.")
+            return
+        }
+        val quiet = !Hub.demoQuiet(b.id)
+        Hub.setDemoQuiet(b.id, quiet)
+        demoTick++
+        say(if (quiet) "${b.name} stops answering. It shows as lost after 90 s." else "${b.name} answers again.")
+    }
+
+    /** Bumped when a demo choice kept in [Hub] changes, so the page redraws. */
+    var demoTick by mutableIntStateOf(0)
+        private set
+
+    fun resetDemo() {
+        Hub.resetDemo()
+        demoSpeed = Demo.speed
+        demoLinks = Routes()
+        demoTick++
+        Feel.event(Sfx.SAVED)
+        say("Demo options are back to normal.")
+    }
+
+    // ---------- ThingSpeak ----------
+
+    var tsUrl by mutableStateOf(Hub.thingSpeakUrl())
+    var tsMsg by mutableStateOf<Pair<Boolean, String>?>(null)
+    var tsBusy by mutableStateOf(false)
+
+    fun tsTest() {
+        val url = tsUrl.trim()
+        if (!url.startsWith("https://") && !url.startsWith("http://")) {
+            Feel.event(Sfx.DENIED)
+            tsMsg = false to "The server address starts with https://."
+            return
+        }
+        Hub.saveThingSpeak(url)
+        tsBusy = true
+        viewModelScope.launch {
+            val (ok, problem) = Hub.testThingSpeak()
+            tsBusy = false
+            if (ok > 0 && problem == null) {
+                Feel.event(Sfx.CLOUD)
+                tsMsg = true to "$ok channel${if (ok == 1) "" else "s"} answered. Saved."
+            } else {
+                Feel.event(Sfx.DENIED)
+                tsMsg = false to (if (ok > 0) "$ok answered. " else "") + (problem ?: "No channel answered.")
+            }
+        }
     }
 
     // ---------- Firebase ----------

@@ -67,7 +67,7 @@ fun Simulation(vm: AppViewModel, hub: HubState) {
             }
             BinSeg(vm, hub, PickFor.SIM, vm.selSim, allowAll = false) { vm.selSim = it }
             Hint("AUTO reads the real hardware and lets the firmware drive the outputs. MANUAL holds the value you set, one row at a time.")
-            if (b.source == Source.CLOUD) Row(
+            if (b.source == Source.CLOUD || b.source == Source.THINGSPEAK) Row(
                 Modifier.fillMaxWidth().well(c, 16.dp).padding(14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -86,7 +86,7 @@ fun Simulation(vm: AppViewModel, hub: HubState) {
                 .bump(c, 16.dp, Out.O2).padding(10.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Btn("APPLY", { vm.applySim(b) }, Modifier.weight(1f), Ic.flask, Look.ACCENT, enabled = b.source != Source.CLOUD, sound = Sfx.CONFIRM)
+            Btn("APPLY", { vm.applySim(b) }, Modifier.weight(1f), Ic.flask, Look.ACCENT, enabled = b.source != Source.CLOUD && b.source != Source.THINGSPEAK, sound = Sfx.CONFIRM)
             Btn("ALL TO AUTO", { vm.simAllAuto(b) }, Modifier.weight(1f), Ic.reload, Look.TINT, c.ok, enabled = b.sim.mask > 0, sound = Sfx.SWITCH_OFF)
         }
     }

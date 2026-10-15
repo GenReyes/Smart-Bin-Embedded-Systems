@@ -22,27 +22,33 @@ gradlew :app:assembleDebug
 
 The APK lands in `app/build/outputs/apk/debug/app-debug.apk`. Copy it to a phone to install it there.
 
-A ready-built debug APK is at `release/Smart-Bin-v1.apk` for installing on a phone without building.
+A ready-built debug APK, `Smart-Bin v1.1.apk`, sits in this folder for installing on a phone without building.
 
 ## What is in it
 
 **First launch.** Pick Operator or Collector, then the app asks once for permission to send alerts. The role chip in the header switches roles later.
 
-**Header.** The SMART-BIN brand (tap it for the logo chime), the mode chip (NORMAL, SIMULATION, CALIBRATING, SIM + CAL, ALERT) and the sun and moon theme key. Under it: a pill with unread or active alerts that opens the Needs attention sheet, the link chip (Local Wi-Fi, Cloud, Not connected, Demo data) that opens Connection, and the role chip. The accent colour of the whole app follows the mode, as on the dashboard.
+**Start page.** When the app opens after it was closed, or after Android ended it, a start page shows the logo and each link (Local Wi-Fi, Firebase, ThingSpeak) while the bins are reached. It moves on by itself once one answers, or at once with demo data. After 10 s with no answer it offers GO IN and CONNECTION. Coming back from the background skips it and returns to the page you left.
 
-**Overview.** With one or two bins, a full card per bin: the bin icon with a moving fill wave, fill percent, six status chips, the fill bar with its limit mark, four sensor tiles that turn red at their limit, and LOCK or UNLOCK, RESET TAMPER (operator) and COLLECT or DONE. With three or more, a grid of tiles with filters (All, Needs action, Sim / Cal) and a legend. Collect next lists the fullest bins first with a time to full. Operators can add bins (1 to 3 at a time) and edit a bin's name, place, IP address and cloud name with SET.
+**Header.** The SMART-BIN brand (tap it for the logo chime), the mode chip (NORMAL, SIMULATION, CALIBRATING, SIM + CAL, ALERT) the sun and moon theme key, and the gear key for App settings. Under it: a pill with unread or active alerts that opens the Needs attention sheet, the link chip that opens Connection, and the role chip. The accent colour of the whole app follows the mode, as on the dashboard.
+
+**Link chip.** It shows every route that answers, each in its own colour and icon: Wi-Fi green, Firebase orange, ThingSpeak blue. With one route it names it; with two it shows both names, such as Wi-Fi + Firebase; with all three it says All 3 links. A ring in the colour of the route the readings come from and a strip of all the colours underneath make each mix look different.
+
+**Overview.** With one or two bins, a full card per bin: the bin icon with a moving fill wave, fill percent, six status chips, the fill bar with its limit mark, four sensor tiles that turn red at their limit, and LOCK or UNLOCK, RESET TAMPER (operator) and COLLECT or DONE. With three or more, a grid of tiles with filters (All, Needs action, Sim / Cal) and a legend. Collect next lists the fullest bins first with a time to full. Operators can add bins (1 to 3 at a time) and edit a bin's name, place, IP address and cloud name with SET, including its Firebase cloud name and its ThingSpeak channel, read key and TalkBack ID and key.
 
 **Charts.** Fill level over 15 minutes, 1 hour, 6 hours or 24 hours, for one bin or the five fullest, with the alert line. Environment shows temperature, humidity and air quality as a share of their limits, or one reading in real units (temperature 0 to 85 C, humidity 0 to 100 %, air quality 0 to 500 IAQ, pressure 300 to 1100 hPa). The expand key turns the phone sideways for a full-width chart.
 
-**Settings.** The calibration switch (one bin at a time, Wi-Fi only), then fold-out groups: fill range with USE NOW, alert limits, the BME680 offsets and gas baseline, lid and lock, and weight with tare and calibrate. Changes wait in a save bar until SAVE. Collectors see the collect PIN and read-only values. The App section has Connection, Bluetooth setup, Reload from bin, Export bin list, role, appearance (Auto, Light, Dark) and push alerts.
+**Settings.** The calibration switch (one bin at a time, Wi-Fi only), then fold-out groups: fill range with USE NOW, alert limits, the BME680 offsets and gas baseline, lid and lock, and weight with tare and calibrate. Changes wait in a save bar until SAVE. Collectors see the collect PIN and read-only values. Under it are Reload from bin and a row to App settings. Everything about the app itself is behind the gear.
 
-**Sound and feel** (in Settings). Button sounds on or off, vibration on or off, vibration strength (Light, Normal, Strong), keep the screen on, a preview of each alert's sound and buzz, and a shortcut to Android's alert settings.
+**App settings** (the gear at the top right). Two big keys for Sound and Vibration, vibration strength (Light, Normal, Strong), a preview of each alert's sound and buzz, and keep the screen on. Then appearance (Auto, Light, Dark) and role, Connection and Bluetooth setup, push alerts, Unrestricted battery (asks Android to stop pausing the app in the background), Android alert settings, Export bin list, and the demo options.
+
+**Demo options** (in App settings). They act out what simulation cannot, on bins with no address only: fill speed (Pause, Real, Normal, Fast), pretend links (Wi-Fi, Firebase, ThingSpeak in any mix, to show the link colours), and one-tap events on a bin: FULL, TAMPER, BAD AIR, EMPTY, and GO QUIET, which makes the bin stop answering until ANSWER AGAIN. RESET puts it all back. They are forgotten when the app closes, and while none is used the demo runs as normal.
 
 **Simulation** (operator). One row per sensor with AUTO or MANUAL: fill and air quality sliders, weight, temperature and humidity steppers, tamper and motion switches, and the lid. APPLY sends it to the bin; ALL TO AUTO ends it.
 
 **Alerts.** Filter by kind (all, full, sensor, tamper, lock, pickup, setup) and by date (today, 7 days, 30 days, any). MARK READ and DELETE act on exactly what is shown, delete asks first, the dot marks one read or unread, the cross removes one, and Show older loads six more at a time.
 
-**Connection.** The two routes with the one in use, each bin's address and state, the Firebase account form with TEST, TEST AND SAVE and RESTORE WORKING, and the data used this month.
+**Connection.** The three routes, each marked IN USE, ANSWERS, NO ANSWER or NOT SET UP, each bin's address and state, the Firebase account form with TEST, TEST AND SAVE and RESTORE WORKING, the ThingSpeak server with TEST AND SAVE, and the data used this month.
 
 **Bluetooth setup.** The four steps from the mockup: pair, pick a network, send, Bluetooth off. It is a walkthrough with a stand-in for the bin until the firmware has Bluetooth provisioning; USE FOR stores the address it shows.
 
@@ -51,14 +57,14 @@ A ready-built debug APK is at `release/Smart-Bin-v1.apk` for installing on a pho
 - **Light and dark home-screen logo.** The app has two launcher entries, one per logo, and switches them as it leaves the screen to match the theme it was left in. Some launchers take a few seconds to redraw the icon.
 - **Sounds.** 34 short sounds made by `tools/make_sounds.py`: taps, choices, switches, steppers, tabs, open and back, confirm and danger, theme changes, the boot chime, saved, lock and unlock, pickup and done, calibration, simulation, the link going up, down or to the cloud, a bin going quiet or coming back, and one per kind of alert. Rising tones mean on, forward or OK; falling tones mean off, back or no. Run `python tools/make_sounds.py` to make them again after changing the table.
 - **Vibration.** Plain keys use Android's own touch clicks. Events and alerts each have their own rhythm, so a full bin, a tamper and a lock feel different in a pocket. The strength setting scales them all.
-- **Notifications.** One Android channel per kind of alert (full, tamper, sensor, lock, pickup, setup), each with its own sound and vibration, so each can be changed or silenced in Android settings. A full-bin alert has a Start pickup button that works without opening the app. While push alerts are on, a quiet foreground service keeps reading the bins after the app is closed.
+- **Notifications.** One Android channel per kind of alert (full, tamper, sensor, lock, pickup, setup), each with its own sound and vibration, so each can be changed or silenced in Android settings. A full-bin alert has a Start pickup button that works without opening the app. While push alerts are on, a quiet foreground service keeps reading the bins every 5 s after the app is closed, so alerts arrive in the background. Unrestricted battery in App settings keeps Android from pausing it.
 - **Keep screen on**, and the logo tap chime.
 
 ## Connecting to the bins
 
-The app reads every bin once a second over the local Wi-Fi first. When a bin stops answering it tries again after 2 s, and after three misses every 30 s. If a Firebase account is saved, it reads that bin from the cloud every 5 s in the meantime. A bin with no reading for 90 s shows as not answering. A change of network makes it try Wi-Fi again at once.
+The app reads every bin once a second over the local Wi-Fi first. When a bin stops answering it tries again after 2 s, and after three misses every 30 s. If a Firebase account is saved, it reads that bin from Firebase every 5 s in the meantime, and if the bin has a ThingSpeak channel and Firebase gives nothing, from ThingSpeak every 15 s. A bin with no reading for 90 s shows as not answering. A change of network makes it try Wi-Fi again at once. Every 30 s the routes not in use get one small call, so the link chip knows which of them answer.
 
-Over the cloud only LOCK, UNLOCK and COLLECT work. Calibration and simulation need the bins' Wi-Fi.
+Over Firebase and ThingSpeak only LOCK, UNLOCK and COLLECT work. Calibration and simulation need the bins' Wi-Fi.
 
 ### Local API the firmware serves
 
@@ -95,6 +101,26 @@ sb.fb.password=...
 
 The account can also be typed in on the Connection page.
 
+### ThingSpeak layout
+
+Each bin has its own channel. The firmware writes it with the channel's write API key, at most every 15 s (the free licence's limit, and 3 million messages a year across all channels). The app reads the newest entry with the read API key.
+
+| Field | Contents |
+|---|---|
+| field1 | Fill % |
+| field2 | Weight g |
+| field3 | Temperature C |
+| field4 | Humidity % |
+| field5 | Air quality (IAQ) |
+| field6 | Pressure hPa |
+| field7 | Tilt deg |
+| field8 | motion + 2 × lid open + 4 × status (0 OK, 1 LOCKED, 2 TAMPER, 3 COLLECTING, 4 CALIBRATING) |
+| status | The bin's local IP address |
+
+Commands go through the bin's TalkBack queue: the app adds `LOCK`, `UNLOCK` or `COLLECT`, and the bin takes the next command each time it polls. In the app, put the channel ID, read API key, TalkBack ID and TalkBack API key in the bin's SET sheet. The server is `https://api.thingspeak.com` unless you change it on the Connection page.
+
+ThingSpeak has no call that reports how many messages an account has used; the count is on the account page of its website. So the Connection page estimates it: it watches how fast each channel's entry numbers rise and projects the year against the 3 million limit. One bin writing every 20 s uses about 1.58 million a year, so two bins should write every 30 s or slower.
+
 ## Testing without the bins
 
 `tools/smartbin_mock_server.py` plays the bins on a computer. It needs Python 3.9 or newer and no packages.
@@ -103,11 +129,14 @@ The account can also be typed in on the Connection page.
 python tools/smartbin_mock_server.py              two bins on ports 8081 and 8082
 python tools/smartbin_mock_server.py --bins 3     three bins
 python tools/smartbin_mock_server.py --cloud 8090 also a fake Firebase on port 8090
+python tools/smartbin_mock_server.py --ts 8095    also a fake ThingSpeak on port 8095
 ```
 
 Put the phone and the computer on the same Wi-Fi. In the app, open a bin with SET and type the address the script prints, such as `192.168.1.20:8081`. The link chip turns to Local Wi-Fi and the commands show up in the script's window.
 
 For cloud mode, enter `http://<computer address>:8090` as the database URL on the Connection page, any API key, any email and a password of six or more characters, then TEST AND SAVE. Restart the script with `--cloud 8090 --no-local` and the app moves to Cloud after the bins stop answering.
+
+For ThingSpeak, enter `http://<computer address>:8095` as the server on the Connection page and press TEST AND SAVE. In bin 1's SET sheet use channel `1001` and TalkBack `2001` (bin 2 is 1002 and 2002), with any keys.
 
 ## Folder layout
 
