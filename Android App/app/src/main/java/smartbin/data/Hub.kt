@@ -63,6 +63,14 @@ object Hub {
     /** True while the app is on screen. Off screen the bins are read less often. */
     @Volatile var foreground = true
 
+    /**
+     * True once the user is past the start page and the role picker in this
+     * run of the app. Alerts reach the notification shade only then, and only
+     * while the app is in the background: never from the start page, and
+     * never after the app is swiped away or closed.
+     */
+    @Volatile var inMain = false
+
     private val nextLocal = HashMap<String, Long>()
     private val localFails = HashMap<String, Int>()
     private val nextCloud = HashMap<String, Long>()

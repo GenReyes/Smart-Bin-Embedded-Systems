@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import smartbin.data.HubState
+import smartbin.data.OperatorLock
 import smartbin.notify.Sfx
 
 /** Every sheet, drawn over the page. Only one is open at a time. */
@@ -114,6 +116,32 @@ fun Overlays(vm: AppViewModel, hub: HubState, allowAlerts: () -> Unit) {
                 }
             }
         }
+        is Overlay.PinUnlock -> Sheet(close) {
+            OpPad(vm, Ic.lock(true), "Operator PIN", "Collector is the default. Enter the operator PIN to calibrate, simulate and edit bins.", "UNLOCK") { vm.pinUnlock(o.first) }
+        }
+        is Overlay.PinSet -> Sheet(close) {
+            val again = vm.pinNew.isNotEmpty()
+            OpPad(
+                vm, Ic.key, if (o.change) "New operator PIN" else "Create the operator PIN",
+                if (again) "Type it once more to be sure."
+                else "${OperatorLock.MIN} to ${OperatorLock.MAX} digits. Anyone without it stays a collector. Only an operator can change it later.",
+                if (again) "SAVE" else "NEXT",
+            ) { vm.pinSave(o.first, o.change) }
+        }
+        Overlay.PinChange -> Sheet(close) {
+            OpPad(vm, Ic.lock(true), "Change operator PIN", "Enter the current PIN first.", "NEXT") { vm.pinChangeCheck() }
+        }
+        is Overlay.BtCode -> {
+            val b = hub.bins.firstOrNull { it.id == o.id } ?: return Gone(vm)
+            Sheet({ vm.btCancel() }) {
+                BinScreenCode(vm, b.name)
+                PinPad(
+                    Ic.bluetooth, "Type the pairing code", "Tap Pair phone on ${b.name}'s touchscreen, then type the 6 digits it shows. The code changes every time.",
+                    "PAIR", vm.btEntry, AppViewModel.BT_CODE_LEN, AppViewModel.BT_CODE_LEN, vm.btMsg,
+                    { vm.btKey(it) }, { vm.btBack() }, { vm.btCheck(b) },
+                )
+            }
+        }
         Overlay.NotifPre -> Sheet({ vm.notNow() }) {
             val c = Sb.c
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Ico(Ic.bell, 40.dp, c.tamper) }
@@ -146,6 +174,86 @@ private fun RoundKey(label: String, enabled: Boolean, sound: Sfx, onClick: () ->
             .press(enabled, sound, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { T(label, size = 1.3f, color = if (enabled) c.ink2 else c.ink2.soft(0.35f), lineHeight = 1f) }
+}
+
+/** The operator PIN sheet. */
+@Composable
+private fun OpPad(vm: AppViewModel, icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, text: String, go: String, onGo: () -> Unit) =
+    PinPad(icon, title, text, go, vm.opPin, OperatorLock.MIN, OperatorLock.MAX, vm.pinMsg, { vm.pinKey(it) }, { vm.pinBack() }, onGo)
+
+/** A code sheet: dots for the digits, a line for what went wrong, and a keypad. */
+@Composable
+private fun PinPad(
+    icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, text: String, go: String,
+    value: String, min: Int, max: Int, msg: Pair<Boolean, String>?,
+    onKey: (Char) -> Unit, onBack: () -> Unit, onGo: () -> Unit,
+) {
+    val c = Sb.c
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { Ico(icon, 38.dp, c.accent) }
+    SheetTitle(null, title, center = true)
+    SheetText(text, center = true)
+    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally)) {
+        repeat(maxOf(min, value.length)) { i ->
+            Box(Modifier.size(14.dp).clip(RoundedCornerShape(7.dp)).background(if (i < value.length) c.accent else c.ink2.soft(0.25f)))
+        }
+    }
+    msg?.let { (ok, m) -> T(m, Modifier.fillMaxWidth(), size = 0.82f, weight = FontWeight.Bold, color = if (ok) c.ok else c.bad, align = androidx.compose.ui.text.style.TextAlign.Center) }
+    val rows = listOf("123", "456", "789")
+    Column(Modifier.fillMaxWidth().padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        rows.forEach { r ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                r.forEach { d -> PinKey(d.toString(), Modifier.weight(1f), value.length < max) { onKey(d) } }
+            }
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            PinKey("⌫", Modifier.weight(1f), value.isNotEmpty(), Sfx.STEP_DOWN, onClick = onBack)
+            PinKey("0", Modifier.weight(1f), value.length < max) { onKey('0') }
+            PinKey(go, Modifier.weight(1f), value.length >= min, Sfx.CONFIRM, accent = true, onClick = onGo)
+        }
+    }
+}
+
+/**
+ * The stand-in for the bin's touchscreen while it pairs: the dark ILI9341
+ * panel with the code in big digits and how long it lasts. A real bin shows
+ * this on its own screen, never on the phone.
+ */
+@Composable
+private fun BinScreenCode(vm: AppViewModel, name: String) {
+    var left by remember { mutableStateOf(60) }
+    LaunchedEffect(vm.btCodeAt) {
+        while (true) {
+            left = ((AppViewModel.BT_CODE_LIFE - (System.currentTimeMillis() - vm.btCodeAt)) / 1000).toInt().coerceAtLeast(0)
+            if (left == 0) {
+                vm.btNewCode()
+                break
+            }
+            kotlinx.coroutines.delay(250)
+        }
+    }
+    val dim = androidx.compose.ui.graphics.Color(0xFF8A96A3)
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(androidx.compose.ui.graphics.Color(0xFF14181C)).padding(horizontal = 14.dp, vertical = 12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        T("STAND-IN FOR ${name.uppercase()}'S SCREEN", size = 0.6f, spacing = 0.08f, color = dim)
+        T("PAIRING CODE", size = 0.72f, spacing = 0.12f, color = androidx.compose.ui.graphics.Color(0xFF5FD0E8))
+        T(vm.btCode.chunked(3).joinToString(" "), size = 2.1f, spacing = 0.08f, color = androidx.compose.ui.graphics.Color.White, tnum = true, maxLines = 1)
+        T("Expires in $left s", size = 0.72f, weight = FontWeight.Bold, color = if (left <= 10) androidx.compose.ui.graphics.Color(0xFFFF8A7A) else dim, tnum = true)
+    }
+}
+
+@Composable
+private fun PinKey(label: String, modifier: Modifier, enabled: Boolean = true, sound: Sfx = Sfx.PIN_KEY, accent: Boolean = false, onClick: () -> Unit) {
+    val c = Sb.c
+    Box(
+        modifier.height(54.dp).bump(c, 14.dp).press(enabled, sound, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        val ink = when { !enabled -> c.ink2.soft(0.35f); accent -> c.accent; else -> c.ink }
+        T(label, size = if (label.length > 1 && label != "⌫") 0.86f else 1.35f, spacing = if (label.length > 1) 0.05f else 0f, color = ink, tnum = true, maxLines = 1)
+    }
 }
 
 /** The Needs attention sheet: unread alerts first, then what is going on right now. */

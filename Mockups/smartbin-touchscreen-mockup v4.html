@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Smart Bin Touchscreen Mockup v4</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:#22201E;color:#EFE7DC;font-family:Inter,"Segoe UI",Arial,Helvetica,sans-serif;
+  display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:14px 12px 18px;gap:12px;
+  -webkit-user-select:none;user-select:none}
+.head{width:100%;max-width:760px;display:flex;align-items:flex-start;justify-content:space-between;gap:14px}
+.head h1{margin:0;font-size:18px;font-weight:800;letter-spacing:.3px}
+.head .tag{display:inline-block;margin-right:8px;padding:2px 8px;border:2px solid #EFE7DC;font-size:12px;font-weight:800;letter-spacing:.6px}
+.head p{margin:6px 0 0;font-size:13px;line-height:1.45;color:#BDB3A7;max-width:560px}
+.count{font-size:13px;font-weight:800;color:#BDB3A7;white-space:nowrap;padding-top:3px}
+.stage{display:flex;align-items:center;justify-content:center;gap:14px;width:100%}
+.nav{width:52px;height:52px;border:3px solid #EFE7DC;background:#2E2A27;color:#EFE7DC;
+  box-shadow:4px 4px 0 #EFE7DC;display:grid;place-items:center;cursor:pointer;flex:none;padding:0}
+.nav:active{transform:translate(4px,4px);box-shadow:0 0 0 #EFE7DC}
+.nav svg{width:24px;height:24px}
+.frame{background:#0B0A09;padding:14px;border-radius:14px;box-shadow:0 18px 40px rgba(0,0,0,.55);flex:none}
+.view{position:relative;overflow:hidden;border-radius:2px}
+.view .scale{position:absolute;left:0;top:0;transform-origin:0 0}
+.tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center}
+.pill{border:2px solid #EFE7DC;background:#2E2A27;color:#EFE7DC;padding:7px 12px;font:inherit;font-size:13px;font-weight:800;cursor:pointer}
+.pill:active{background:#3A3530}
+.dots{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;max-width:620px}
+.dots i{width:12px;height:12px;border:2px solid #BDB3A7;background:transparent;cursor:pointer}
+.dots i.on{background:#EFE7DC;border-color:#EFE7DC}
+.hint{font-size:12px;color:#8F867B}
+
+/* ---------- the 240 x 320 screen ---------- */
+.scr{position:relative;width:240px;height:320px;overflow:hidden;font-family:Inter,"Segoe UI",Arial,Helvetica,sans-serif;
+  font-weight:700;line-height:1;color:var(--tx);background:var(--body,var(--bg))}
+.scr[data-th="light"]{--bg:#F5F0EB;--surf:#FFFFFF;--bd:#1A1A1A;--tx:#1A1A1A;--tx2:#6B635B;
+  --g:#1E8E3E;--a:#D98A1F;--r:#D93025;--p:#7A45B5;--t:#0D8A8A;--bl:#1A62C4;--cy:#0E7F9E;
+  --on-g:#FFFFFF;--on-a:#1A1A1A;--on-r:#FFFFFF;--on-p:#FFFFFF;--on-t:#FFFFFF;--on-bl:#FFFFFF;--on-cy:#FFFFFF;
+  --tg:#CADCC8;--ta:#EFDCC2;--tr:#EFCAC3;--tp:#DCCEE0;--tt:#C7DCD8}
+.scr[data-th="dark"]{--bg:#2A2520;--surf:#3A3530;--bd:#E8E0D8;--tx:#EFE7DC;--tx2:#A89E94;
+  --g:#4FBF6E;--a:#E8A94A;--r:#FF6B5E;--p:#B98BE8;--t:#3FC7C2;--bl:#79AEF5;--cy:#5FD0E8;
+  --on-g:#13100D;--on-a:#13100D;--on-r:#13100D;--on-p:#13100D;--on-t:#13100D;--on-bl:#13100D;--on-cy:#13100D;
+  --tg:#324731;--ta:#544229;--tr:#59342E;--tp:#493B4C;--tt:#2F4944}
+.abs{position:absolute}
+.bx{border:3px solid var(--bd)}
+.b2{border:2px solid var(--bd)}
+.sh{box-shadow:4px 4px 0 var(--bd)}
+.sh3{box-shadow:3px 3px 0 var(--bd)}
+.press{cursor:pointer;transition:transform .08s,box-shadow .08s}
+.press:active{transform:translate(4px,4px);box-shadow:0 0 0 var(--bd)}
+.c{text-align:center}
+.r{text-align:right}
+.fl{display:flex;align-items:center;justify-content:center;gap:5px}
+.ico{display:block;width:100%;height:100%}
+.nw{white-space:nowrap}
+
+@keyframes flash{0%,49%{border-color:var(--bd)}50%,100%{border-color:var(--surf)}}
+@keyframes flashR{0%,49%{opacity:1}50%,100%{opacity:.15}}
+@keyframes jig{0%,100%{transform:translateX(-2px)}50%{transform:translateX(2px)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{transform:scale(.9)}50%{transform:scale(1.08)}}
+@keyframes shake{0%,100%{transform:translateX(0)}12%{transform:translateX(-6px)}25%{transform:translateX(6px)}37%{transform:translateX(-6px)}50%{transform:translateX(6px)}62%{transform:translateX(-6px)}75%{transform:translateX(6px)}87%{transform:translateX(0)}}
+@keyframes wave{0%{opacity:.2}50%{opacity:1}100%{opacity:.2}}
+@keyframes load{0%{width:0}85%,100%{width:100%}}
+@keyframes dots{0%{content:""}25%{content:"."}50%{content:".."}75%,100%{content:"..."}}
+@keyframes sweep{0%{transform:translateX(-120%)}100%{transform:translateX(320%)}}
+@keyframes appear{0%,var(--d){opacity:0}100%{opacity:1}}
+.flashb{animation:flash 1s steps(1) infinite}
+.jig{animation:jig .25s linear infinite}
+.spin{animation:spin 1.6s linear infinite}
+.pul{animation:pulse 1.4s ease-in-out infinite}
+.wv{animation:wave 1s ease-in-out infinite}
+.wv2{animation-delay:.25s}
+.shk{animation:shake 2.2s ease-in-out infinite}
+.ld{animation:load 4s ease-out infinite}
+.dts:after{content:"";animation:dots 1.2s steps(1) infinite}
+.urg{animation:flashR 1s steps(1) infinite}
+
+/* theme symbol swap (sun and moon) */
+.sm{position:absolute;inset:0;transition:transform .25s ease,opacity .25s ease}
+.scr[data-th="light"] .sm.moon{opacity:0;transform:rotate(-90deg) scale(.3)}
+.scr[data-th="dark"] .sm.sun{opacity:0;transform:rotate(90deg) scale(.3)}
+
+.panel{display:none;width:100%;max-width:880px;background:#2E2A27;border:3px solid #EFE7DC;box-shadow:4px 4px 0 #EFE7DC;padding:12px 14px;font-size:13px}
+.panel.on{display:block}
+.pg{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px 18px}
+.pg h3{grid-column:1/-1;margin:6px 0 0;font-size:12px;letter-spacing:.8px;color:#BDB3A7;border-bottom:2px solid #5a524a;padding-bottom:3px}
+.pg label{display:flex;align-items:center;justify-content:space-between;gap:8px;font-weight:700}
+.pg input[type=number],.pg input[type=text],.pg select{width:92px;background:#1B1917;color:#EFE7DC;border:2px solid #EFE7DC;padding:4px 6px;font:inherit;font-weight:700}
+.pg input[type=text]{width:120px}
+.pg select{width:140px}
+.pg input[type=range]{width:100%}
+.pg .full{grid-column:1/-1;flex-direction:column;align-items:stretch}
+.pg input[type=checkbox]{width:18px;height:18px;accent-color:#EFE7DC}
+.reset{margin-top:10px}
+@media (min-width:1150px){
+ body.wp{padding-right:420px}
+ .panel.on{position:fixed;right:12px;top:12px;width:400px;box-sizing:border-box;max-height:calc(100vh - 24px);overflow:auto}
+ .panel .pg{grid-template-columns:1fr 1fr;gap:8px 14px}
+ .panel .pg input[type=number]{width:64px}
+ .panel .pg input[type=text]{width:84px}
+ .panel .pg select{width:96px;font-size:12px}
+ .panel .pg label{font-size:12px}
+}
+</style>
+</head>
+<body>
+
+<div class="head">
+  <div>
+    <h1><span class="tag" id="tag">A1</span><span id="title">Title</span></h1>
+    <p id="note"></p>
+  </div>
+  <div class="count" id="count">1 / 1</div>
+</div>
+
+<div class="stage">
+  <button class="nav" id="prev" aria-label="Previous screen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="square"><path d="M15 4L7 12l8 8"/></svg></button>
+  <div class="frame"><div class="view" id="view"><div class="scale" id="scale"></div></div></div>
+  <button class="nav" id="next" aria-label="Next screen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="square"><path d="M9 4l8 8-8 8"/></svg></button>
+</div>
+
+<div class="tools">
+  <button class="pill" id="themeBtn">Light mode</button>
+  <button class="pill" id="sizeBtn">Zoom</button>
+</div>
+<div class="dots" id="dots"></div>
+
+<div class="panel" id="panel">
+ <div class="pg" id="pg">
+  <h3>SCREEN</h3>
+  <label>Screen<select data-k="screen"><option value="auto">Auto</option><option value="boot">Boot</option><option value="cal">Calibrating</option><option value="info">Info</option><option value="btwait">Wi-Fi setup (waiting)</option><option value="collect">Collecting</option><option value="done">Collection done</option></select></label>
+  <label>Tamper<select data-k="tamper"><option value="off">Off</option><option value="countdown">Countdown</option><option value="latched">Latched</option></select></label>
+  <label>Locked<input type="checkbox" data-k="locked"></label>
+  <label>Collecting<input type="checkbox" data-k="collecting"></label>
+  <h3>READINGS</h3>
+  <label class="full">Fill level <span id="fillv"></span><input type="range" min="0" max="100" step="1" data-k="fill"></label>
+  <label>Weight kg<input type="number" step="0.1" data-k="weight"></label>
+  <label>Temp C<input type="number" step="0.1" data-k="temp"></label>
+  <label>Humidity %<input type="number" step="1" data-k="hum"></label>
+  <label>Air (IAQ 0-500)<input type="number" min="0" max="500" step="5" data-k="gas"></label>
+  <h3>LIMITS</h3>
+  <label>Fill limit %<input type="number" data-k="fillTh"></label>
+  <label>Air limit (IAQ)<input type="number" min="50" max="500" step="5" data-k="gasTh"></label>
+  <label>Temp limit C<input type="number" max="85" data-k="tempLim"></label>
+  <label>Humidity limit %<input type="number" data-k="humLim"></label>
+  <label>Weight limit kg<input type="number" data-k="wgtLim"></label>
+  <h3>CHIPS AND LID</h3>
+  <label>Wi-Fi offline<input type="checkbox" data-k="wifiOff"></label>
+  <label>Motion<input type="checkbox" data-k="motion"></label>
+  <label>SIM<input type="checkbox" data-k="sim"></label>
+  <label>CAL<input type="checkbox" data-k="cal"></label>
+  <label>Lid open<input type="checkbox" data-k="lidOpen"></label>
+  <label>Time to full line<input type="checkbox" data-k="ttf"></label>
+  <label>Bin name<input type="text" maxlength="40" data-k="name"></label>
+  <h3>TIMERS</h3>
+  <label>Timer rows<select data-k="timer"><option value="none">None</option><option value="hold">Lid holding (PIR high)</option><option value="lid">Lid countdown</option><option value="buzz">Buzzer minimum</option><option value="buzzon">Buzzer on</option><option value="both">Lid and buzzer</option></select></label>
+  <h3>SENSOR FAULTS</h3>
+  <label>HC-SR04 (fill)<input type="checkbox" data-k="fHC"></label>
+  <label>HX711 (weight)<input type="checkbox" data-k="fHX"></label>
+  <label>BME680 (temp, humidity, air)<input type="checkbox" data-k="fBME"></label>
+  <label>Air stabilizing (IAQ accuracy 0)<input type="checkbox" data-k="fWarm"></label>
+ </div>
+ <button class="pill reset" id="simReset">Reset all</button>
+</div>
+
+<div class="hint">Left and right arrow keys change the screen. T switches light and dark. Buttons on the screen press like the real ones, and some of them jump to the next screen.</div>
+
+<script>
+/* ---------- tiny drawing helpers (everything is placed in screen pixels) ---------- */
+const E=(x,y,w,h,cls,style,inner)=>'<div class="abs '+(cls||'')+'" style="left:'+x+'px;top:'+y+'px;width:'+w+'px;height:'+h+'px;'+(style||'')+'">'+(inner||'')+'</div>';
+const T=(x,y,w,txt,size,o)=>{o=o||{};
+  return '<div class="abs '+(o.cls||'')+(o.align==='c'?' c':o.align==='r'?' r':'')+'" style="left:'+x+'px;top:'+y+'px;width:'+w+'px;font-size:'+size+'px;line-height:'+(o.lh||size)+'px;'+
+  (o.color?'color:'+o.color+';':'')+(o.weight?'font-weight:'+o.weight+';':'')+(o.ls?'letter-spacing:'+o.ls+'px;':'')+(o.style||'')+'">'+txt+'</div>'};
+const SV=(d,sw)=>'<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+(sw||2.6)+'" stroke-linecap="square" stroke-linejoin="miter">'+d+'</svg>';
+const IC={
+  bin:()=>SV('<path d="M5 8h14l-1.4 12H6.4z"/><path d="M3 8h18M9 4.5h6"/>'),
+  lidopen:()=>SV('<path d="M6 11h12l-1.2 9H7.2z"/><path d="M3.5 8.5l13-4.2"/>'),
+  speaker:(w)=>SV('<path d="M3 9.5h4l5-4v13l-5-4H3z"/><path class="'+(w?'wv':'')+'" d="M16 9.5a4 4 0 0 1 0 5"/><path class="'+(w?'wv wv2':'')+'" d="M19 6.5a8 8 0 0 1 0 11"/>'),
+  wifi:()=>SV('<path d="M8.5 15.5a5 5 0 0 1 7 0M5 12a10 10 0 0 1 14 0M2 8.5a15 15 0 0 1 20 0"/><path d="M12 19.2h.01" stroke-width="3.6"/>'),
+  lock:()=>SV('<rect x="4.5" y="10.5" width="15" height="10.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/><path d="M12 14.5v3"/>'),
+  tri:()=>SV('<path d="M12 3.2L22 20.5H2z"/><path d="M12 9.5v5M12 17.3h.01" stroke-width="3"/>',2.4),
+  check:()=>SV('<path d="M4 12.5l5 5L20 6.5"/>',3.2),
+  x:()=>SV('<path d="M6 6l12 12M18 6L6 18"/>',3.2),
+  bt:()=>SV('<path d="M7 7.5l10 9-5 4.5V3l5 4.5-10 9"/>'),
+  truck:()=>SV('<path d="M2 7h11v9H2zM13 10h5l3.5 3v3H13z"/><circle cx="6.5" cy="18.5" r="1.7"/><circle cx="17" cy="18.5" r="1.7"/>',2.2),
+  sun:()=>SV('<circle cx="12" cy="12" r="4"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2 2M16.7 16.7l2 2M18.7 5.3l-2 2M7.3 16.7l-2 2"/>',2.4),
+  moon:()=>SV('<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.8 6.8 0 0 0 10.5 10.5z"/>',2.4),
+  ring:()=>SV('<circle cx="12" cy="12" r="9" stroke-dasharray="6 4.5"/>',3),
+  motion:()=>SV('<path d="M5.5 12h.01" stroke-width="4"/><path d="M10 8a6 6 0 0 1 0 8M14 5a10 10 0 0 1 0 14"/>',2.4)
+};
+const ic=(name,arg)=>IC[name](arg);
+const LV={g:['--g','--on-g','--tg'],a:['--a','--on-a','--ta'],r:['--r','--on-r','--tr'],p:['--p','--on-p','--tp'],t:['--t','--on-t','--tt']};
+const fillv=k=>'var('+LV[k][0]+')', onv=k=>'var('+LV[k][1]+')', tintv=k=>'var('+LV[k][2]+')';
+
+let BIN_NAME='BIN 01', FILL_TH=80;
+/* top bar: neutral surface, 3px line under it */
+function topBar(o){o=o||{};
+  let h=E(0,0,240,34,'', 'background:var(--surf)')+E(0,34,240,3,'','background:var(--bd)');
+  if(o.name!==false) h+=(o.icons?'<div class="abs press" data-go="info" style="left:0;top:0;width:70px;height:34px;box-shadow:none"></div>':'')+T(8,9,(o.badges&&o.badges.length)?56:(o.icons?60:(o.lid?130:224)),o.name||BIN_NAME,16,{style:'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;'});
+  let bx=o.badgeX||68;
+  (o.badges||[]).forEach(b=>{
+    const k=b==='SIM'?['--p','--on-p',32]:['--bl','--on-bl',28];
+    h+=E(bx,8,k[2],18,'b2','background:var('+k[0]+');color:var('+k[1]+');font-size:12px;line-height:14px;text-align:center;font-weight:800',b); bx+=k[2]+5;
+  });
+  if(o.icons&&!(o.badges||[]).length){
+    const ix=74;
+    h+='<div class="abs bx press fl" data-go="info" style="left:'+ix+'px;top:4px;width:26px;height:26px;background:var(--bg);color:var(--tx);border-width:2px;box-shadow:2px 2px 0 var(--bd);font-size:14px;font-weight:800">i</div>';
+    h+='<div class="abs bx press themeTap" style="left:'+(ix+30)+'px;top:4px;width:26px;height:26px;background:var(--bg);color:var(--tx);border-width:2px;box-shadow:2px 2px 0 var(--bd)"><div class="abs" style="left:3px;top:3px;width:16px;height:16px"><div class="sm sun">'+ic('sun')+'</div><div class="sm moon">'+ic('moon')+'</div></div></div>';
+  }
+  if(o.lid){
+    const open=o.lid==='OPEN';
+    h+=E(142,6,90,22,'b2','background:'+(open?'var(--a)':'var(--bg)')+';color:'+(open?'var(--on-a)':'var(--tx)')+';font-size:12px;white-space:nowrap;line-height:18px;text-align:center;font-weight:800;'+(open?'':'opacity:.9'),'LID: '+o.lid);
+  }
+  return h+(o.extra||'');
+}
+function srow(y,icon,label,color,pct){
+  return '<div class="abs b2" style="left:8px;top:'+y+'px;width:224px;height:20px;background:var(--surf)"><div class="abs" style="left:3px;top:0;width:14px;height:14px">'+icon+'</div><div class="abs nw" style="left:21px;top:0;font-size:12px;line-height:14px;font-weight:800">'+label+'</div><div class="abs" style="left:2px;right:2px;bottom:1px;height:3px;background:var(--bg)"><i style="display:block;height:100%;width:'+pct+'%;background:'+color+'"></i></div></div>';
+}
+function chip(x,y,w,h,label,fill,on,o){o=o||{};
+  return E(x,y,w,h,(o.cls||'')+' b2'+(o.sh?' sh3':''),'background:'+fill+';color:'+on+';font-size:'+(o.size||12)+'px;line-height:'+(h-4)+'px;text-align:center;font-weight:800;'+(o.style||''),label);
+}
+function btn(x,y,w,h,label,fill,on,o){o=o||{};
+  const goto=o.go!=null?' data-go="'+o.go+'"':'';
+  return '<div class="abs bx sh press fl'+(o.cls?' '+o.cls:'')+'" style="left:'+x+'px;top:'+y+'px;width:'+w+'px;height:'+h+'px;background:'+fill+';color:'+on+';font-size:'+(o.size||16)+'px;font-weight:800;'+(o.style||'')+'"'+goto+'>'+(o.icon?'<span style="width:'+(o.isz||20)+'px;height:'+(o.isz||20)+'px;display:block">'+o.icon+'</span>':'')+'<span>'+label+'</span></div>';
+}
+/* timer row: icon, text with live seconds, shrinking bar */
+function trow(y,icon,label,start,total,color,kind){
+  return '<div class="abs b2 cdrow" data-start="'+start+'" data-total="'+total+'" data-kind="'+(kind||'s')+'" style="left:8px;top:'+y+'px;width:224px;height:20px;background:var(--surf)">'+
+    '<div class="abs" style="left:3px;top:0;width:14px;height:14px">'+icon+'</div>'+
+    '<div class="abs nw cdt" style="left:21px;top:0;font-size:12px;line-height:14px;font-weight:800">'+label+'</div>'+
+    '<div class="abs" style="left:2px;right:2px;bottom:1px;height:3px;background:var(--bg)"><i class="cdb" style="display:block;height:100%;background:'+color+'"></i></div></div>';
+}
+/* vertical bin shaped fill bar with 50% and 80% ticks */
+function fillbar(x,y,w,h,pct,color){
+  const inner=h-6, fh=Math.round(inner*pct/100);
+  let s=E(x,y,w,h,'bx','background:var(--surf);overflow:hidden',E(0,inner-fh,w-6,fh,'','background:'+color+';border-top:2px solid var(--bd)'));
+  [50,FILL_TH].forEach(t=>{const ty=y+3+Math.round(inner*(1-t/100));s+=E(x,ty-1,w,2,'','background:var(--bd)');});
+  return s;
+}
+function reading(y,label,value,o){o=o||{};
+  if(o.fault) return T(56,y+2,90,label,13,{color:'var(--tx2)'})+T(110,y+1,122,'<span style="font-size:12px;border:2px solid var(--tx2);padding:0 4px;margin-right:6px;color:var(--tx2)">!</span>--',15,{align:'r',color:'var(--tx2)'});
+  if(o.alarm) return E(54,y-1,180,18,'b2 sh3','background:var(--r);color:var(--on-r)')+T(60,y+2,90,label,13,{color:'var(--on-r)'})+T(120,y+1,106,value,15,{align:'r',color:'var(--on-r)',weight:800});
+  const sq=o.dot?'<span style="display:inline-block;width:9px;height:9px;margin-right:6px;background:'+o.dot+'"></span>':'';
+  return T(56,y+2,90,label,13,{color:'var(--tx2)'})+T(110,y+1,122,sq+value,15,{align:'r',style:'white-space:nowrap;overflow:hidden;'});
+}
+function chipsStrip(o){o=o||{};
+  let wifi=o.wifi===false?chip(8,42,70,20,'OFFLINE','var(--r)','var(--on-r)',{cls:'press'}):chip(8,42,52,20,'WI-FI','var(--g)','var(--on-g)',{cls:'press'});
+  wifi=wifi.replace('<div class="abs ','<div data-go="info" class="abs ');
+  const wx=o.wifi===false?84:66;
+  const off='background:var(--surf);color:var(--tx2);opacity:.5';
+  const m=o.motion?chip(wx,42,62,20,'MOTION','var(--cy)','var(--on-cy)'):E(wx,42,62,20,'b2',off+';font-size:12px;line-height:16px;text-align:center;font-weight:800','MOTION');
+  const sx=wx+68;
+  const s=o.sim?chip(sx,42,40,20,'SIM','var(--p)','var(--on-p)'):E(sx,42,40,20,'b2',off+';font-size:12px;line-height:16px;text-align:center;font-weight:800','SIM');
+  const c=o.cal?chip(sx+46,42,40,20,'CAL','var(--t)','var(--on-t)'):E(sx+46,42,40,20,'b2',off+';font-size:12px;line-height:16px;text-align:center;font-weight:800','CAL');
+  return wifi+m+s+c;
+}
+function bottomRow(statusLabel,k,goto){
+  return chip(8,274,112,36,statusLabel,fillv(k),onv(k),{sh:true,size:14,style:'border-width:3px;box-shadow:4px 4px 0 var(--bd)'})+
+    btn(128,270,104,44,'COLLECT','var(--surf)','var(--tx)',{size:15,icon:ic('truck'),isz:20,go:goto});
+}
+
+/* ---------- screens ---------- */
+function A1(o){
+  const lvl=o.fill>=FILL_TH?'r':o.fill>=50?'a':'g';
+  const badge=o.fill>=FILL_TH?'FULL':o.fill>=50?'FILLING':'OK';
+  const status=o.status||('BIN: '+(o.fill>=FILL_TH?'FULL':'OK'));
+  let h=topBar({lid:o.lid,badges:o.badges,icons:true});
+  h+=chipsStrip({motion:o.motion,sim:o.sim,cal:o.cal,wifi:o.wifi});
+  h+=fillbar(10,68,36,150,o.fill,fillv(lvl));
+  h+=T(56,68,100,'FILL LEVEL',12,{color:'var(--tx2)',ls:.5});
+  h+=o.fillFault?chip(150,64,82,20,'NO READING','var(--surf)','var(--tx2)',{size:11}):chip(172,64,60,20,badge,fillv(lvl),onv(lvl),{});
+  h+=o.fillFault?T(56,82,176,'--',56,{weight:800,lh:58}):T(56,82,176,o.fill+'<span style="font-size:26px">%</span>',56,{weight:800,lh:58});
+  h+=reading(146,'Weight',o.weight||'2.30 kg',{alarm:o.alarmW,fault:o.faultW});
+  h+=reading(164,'Temperature',o.temp||'28.4 C',{alarm:o.alarmT,fault:o.faultT});
+  h+=reading(182,'Humidity',o.hum||'62%',{alarm:o.alarmH,fault:o.faultH});
+  h+=reading(200,'Air',o.air||'Good 340',{alarm:o.alarmG,fault:o.faultG,dot:o.airDot||'var(--g)'});
+  if(o.rows) h+=o.rows; else if(o.ttf) h+=T(8,230,224,o.ttf,13,{color:'var(--tx)',weight:700,style:'font-style:normal'});
+  h+=o.fillFault?(chip(8,274,112,36,'BIN: ?','var(--surf)','var(--tx2)',{sh:true,size:14,style:'border-width:3px;box-shadow:4px 4px 0 var(--bd)'})+btn(128,270,104,44,'COLLECT','var(--surf)','var(--tx)',{size:15,icon:ic('truck'),isz:20,go:'pin'})):bottomRow(status,lvl,'pin');
+  return E(0,0,240,320,'','background:'+tintv(lvl),h);
+}
+function A2(o){o=o||{};
+  let h=topBar({lid:o.lid||'CLOSED',icons:true});
+  if(o.sim) h+=chip(188,96,44,20,'SIM','var(--p)','var(--on-p)',{});
+  h+=T(12,46,150,'URGENT',40,{color:'var(--on-r)',weight:800,lh:42});
+  h+=E(190,46,38,38,'urg','color:var(--on-r)',ic('speaker',true));
+  h+=T(12,98,200,'FILL LEVEL',12,{color:'var(--on-r)',ls:.5});
+  h+=T(12,110,216,'92<span style="font-size:36px">%</span>',80,{color:'var(--on-r)',weight:800,lh:82});
+  h+=T(12,196,216,'Bin is almost full.',16,{color:'var(--on-r)'});
+  h+=T(12,216,216,'Collect it now!',20,{color:'var(--on-r)',weight:800});
+  if(o.row) h+=o.row;
+  h+=chip(8,274,112,36,'BIN: FULL','var(--surf)','var(--tx)',{sh:true,size:14,style:'border-width:3px;box-shadow:4px 4px 0 var(--bd)'});
+  h+=btn(128,270,104,44,'COLLECT','var(--surf)','var(--tx)',{size:15,icon:ic('truck'),isz:20,go:'pin'});
+  return E(0,0,240,320,'','background:var(--r)',h)+E(0,37,240,283,'urg','border:5px solid var(--bd);pointer-events:none');
+}
+function PIN(o){o=o||{};
+  const n=o.digits||0;
+  let h=E(0,0,240,34,'','background:var(--surf)')+E(0,34,240,3,'','background:var(--bd)');
+  h+='<div class="abs b2 press fl" data-go="main" style="left:6px;top:4px;width:84px;height:26px;background:var(--r);color:var(--on-r);font-size:12px;font-weight:800"><span style="width:12px;height:12px;display:block">'+ic('x')+'</span><span>CANCEL</span></div>';
+  h+=T(98,9,134,'ENTER PIN',16,{align:'r'});
+  let boxes='';
+  for(let i=0;i<4;i++){boxes+=E(20+i*52,46,44,40,'bx sh3','background:var(--surf)',i<n?E(13,11,12,12,'','background:var(--tx);border-radius:50%'):'')}
+  h+=E(0,0,240,100,o.wrong?'shk':'','',boxes);
+  const keys=['1','2','3','4','5','6','7','8','9','&lt;','0','OK'];
+  keys.forEach((k,i)=>{
+    const r=Math.floor(i/3),c=i%3,x=8+c*76,y=98+r*46;
+    const fill=k==='OK'?'var(--g)':'var(--surf)', on=k==='OK'?'var(--on-g)':'var(--tx)';
+    h+='<div class="abs bx press fl" data-key="'+k+'" style="left:'+x+'px;top:'+y+'px;width:68px;height:42px;background:'+fill+';color:'+on+';font-size:22px;font-weight:800;box-shadow:4px 4px 0 var(--bd)">'+k+'</div>';
+  });
+  h+=o.wrong? E(8,288,224,26,'bx','background:var(--r);color:var(--on-r);font-size:14px;line-height:20px;text-align:center;font-weight:800','WRONG PIN. Try again.')
+            : T(8,296,224,'4 digits, then OK',13,{align:'c',color:'var(--tx2)'});
+  return E(0,0,240,320,'','background:var(--bg)',h)+(o.wrong?E(0,37,240,283,'flashb','border:5px solid var(--r);pointer-events:none;animation:flashR 1s steps(1) infinite'):'');
+}
+function A4(){
+  let h=topBar({lid:'OPEN'});
+  h+=T(8,48,224,'COLLECTING<span class="dts"></span>',26,{align:'c',color:'var(--on-g)',weight:800});
+  h+=E(88,84,64,64,'','color:var(--on-g)',ic('lidopen'));
+  [['Lid','open'],['Motion','ignored'],['Tamper','paused'],['Alerts','muted']].forEach((r,i)=>{
+    h+=E(28,168+i*22,9,9,'','background:var(--on-g)')+T(44,164+i*22,180,r[0]+': '+r[1],16,{color:'var(--on-g)'});
+  });
+  h+=btn(8,262,224,48,'DONE','var(--surf)','var(--tx)',{size:22,icon:ic('check'),isz:24,go:'done'});
+  return E(0,0,240,320,'','background:var(--g)',h);
+}
+function A5(){
+  let h=topBar({lid:'CLOSED'});
+  h+=T(8,50,224,'COLLECTION<br>COMPLETE',22,{align:'c',weight:800,lh:26});
+  h+=E(84,108,72,72,'bx sh','background:var(--g);color:var(--on-g);padding:10px',ic('check'));
+  h+=btn(8,198,224,56,'DONE','var(--g)','var(--on-g)',{size:26,go:'main'});
+  h+=T(8,266,224,'Back to the main screen in <span class="cdn" data-start="24" data-total="30">24</span> s',13,{align:'c',color:'var(--tx)'});
+  h+='<div class="abs cdrow b2" data-start="24" data-total="30" data-kind="bar" style="left:8px;top:286px;width:224px;height:16px;background:var(--surf)"><i class="cdb abs" style="left:0;top:0;bottom:0;background:var(--g);border-right:2px solid var(--bd)"></i></div>';
+  return E(0,0,240,320,'','background:var(--tg)',h);
+}
+function A6(latched){
+  let h=E(0,0,240,320,'','background:var(--r)');
+  h+=E(88,16,64,58,'jig','color:var(--on-r)',ic('tri'));
+  h+=T(8,82,224,latched?'TAMPER LATCHED':'TAMPER DETECTED',22,{align:'c',color:'var(--on-r)',weight:800});
+  h+=T(8,112,224,'Bin moved or tilted',15,{align:'c',color:'var(--on-r)'});
+  h+=T(8,132,224,'Tilt: 38 deg',15,{align:'c',color:'var(--on-r)'});
+  if(!latched){
+    h+='<div class="abs c cdbig" style="left:8px;top:152px;width:224px;font-size:84px;line-height:84px;font-weight:800;color:var(--on-r)">10</div>';
+    h+=T(8,236,224,'SECONDS, CLEARS IF STABLE',12,{align:'c',color:'var(--on-r)',ls:0});
+    h+='<div class="abs cdrow b2" data-start="10" data-total="10" data-kind="bar10" style="left:16px;top:254px;width:208px;height:14px;background:var(--surf)"><i class="cdb abs" style="left:0;top:0;bottom:0;background:var(--bd)"></i></div>';
+  }else{
+    h+=E(16,160,208,84,'bx sh','background:var(--surf);color:var(--tx);font-size:22px;line-height:28px;text-align:center;font-weight:800;padding-top:12px','RESET ON<br>DASHBOARD');
+    h+=T(8,252,224,'Stays on until it is cleared',13,{align:'c',color:'var(--on-r)'});
+  }
+  h+=E(50,276,140,32,'bx sh3 fl','background:var(--surf);color:var(--tx);font-size:15px;font-weight:800;gap:8px',
+     '<span style="width:22px;height:22px;display:block">'+ic('speaker',true)+'</span><span>'+(latched?'ALARM ON':'ALARM')+'</span>');
+  return h+E(0,0,240,320,'flashb','border:8px solid var(--bd);pointer-events:none');
+}
+function A7(){
+  let h=topBar({lid:'CLOSED',icons:true});
+  h+=E(80,46,80,82,'','color:var(--on-p)',ic('lock'));
+  h+=T(8,134,224,'LOCKED',40,{align:'c',color:'var(--on-p)',weight:800,lh:42});
+  h+=T(8,184,224,'Lid stays closed.',15,{align:'c',color:'var(--on-p)'});
+  h+=T(8,204,224,'Motion is ignored.',15,{align:'c',color:'var(--on-p)'});
+  h+=E(8,228,224,34,'bx','background:var(--surf);color:var(--tx);font-size:13px;line-height:28px;text-align:center;font-weight:800','Unlock on the app or dashboard.');
+  h+=chip(8,274,112,36,'BIN: LOCKED','var(--surf)','var(--tx)',{sh:true,size:13,style:'border-width:3px;box-shadow:4px 4px 0 var(--bd)'});
+  h+=btn(128,270,104,44,'COLLECT','var(--surf)','var(--tx)',{size:15,icon:ic('truck'),isz:20,go:'pin'});
+  return E(0,0,240,320,'','background:var(--p)',h);
+}
+function A8boot(){
+  let h=E(16,18,208,66,'bx sh','background:var(--surf);color:var(--tx)',E(12,12,38,38,'','',ic('bin'))+T(60,16,140,'SMART<br>BIN',20,{weight:800,lh:22}));
+  h+=E(16,100,208,18,'bx','background:var(--surf)','<i class="ld abs" style="left:0;top:0;bottom:0;background:var(--bd)"></i>');
+  const items=[['HC-SR04','OK'],['BME680','OK'],['HX711','OK'],['BMI160','...']];
+  items.forEach((r,i)=>{
+    const y=136+i*26;
+    h+=T(20,y+3,120,r[0],14,{color:'var(--on-t)'});
+    h+=r[1]==='OK'?chip(168,y,52,18,'OK','var(--surf)','var(--tx)',{size:12})
+                  :chip(168,y,52,18,'<span class="dts"></span>','var(--surf)','var(--tx)',{size:12});
+  });
+  h+=E(16,252,208,56,'bx sh','background:var(--surf);color:var(--tx)',T(10,9,190,'IP: 192.168.1.101',16,{weight:800})+T(10,32,190,'Firmware v1.0',13,{color:'var(--tx2)'}));
+  return E(0,0,240,320,'','background:var(--t)',h);
+}
+function A8cal(){
+  let h=topBar({lid:'CLOSED',badges:[]});
+  h+=T(8,48,224,'CALIBRATING',26,{align:'c',color:'var(--on-t)',weight:800});
+  h+=E(92,82,56,56,'spin','color:var(--on-t)',ic('ring'));
+  [['Weight zero','OK'],['Empty: 30 cm','OK'],['Full: 5 cm','...']].forEach((r,i)=>{
+    const y=150+i*24;
+    h+=T(20,y+4,150,r[0],15,{color:'var(--on-t)'});
+    h+=r[1]==='OK'?chip(168,y,52,20,'OK','var(--surf)','var(--tx)'):chip(168,y,52,20,'<span class="dts"></span>','var(--surf)','var(--tx)');
+  });
+  h+=E(8,222,224,44,'bx','background:var(--surf);color:var(--tx);font-size:13px;line-height:16px;text-align:center;font-weight:800;padding-top:6px;box-sizing:border-box','Keep the bin empty and<br>do not touch it.');
+  h+=btn(60,268,120,42,'CANCEL','var(--r)','var(--on-r)',{size:15,go:'main'});
+  return E(0,0,240,320,'','background:var(--t)',h);
+}
+function A9(o){
+  let h=topBar({lid:false,extra:'<div class="abs b2 press fl" data-go="main" style="left:168px;top:4px;width:64px;height:26px;background:var(--bg);font-size:12px;font-weight:800">BACK</div>'});
+  h+=E(8,46,224,66,'bx sh','background:var(--surf)',T(10,8,200,'IP ADDRESS',12,{color:'var(--tx2)',ls:.5})+T(10,26,204,'192.168.1.101',27,{weight:800,lh:30}));
+  const rows=[['Wi-Fi','HomeWiFi-2G'],['Signal','-58 dBm'],['Cloud',o&&o.cloudOff?'NOT SENDING':'Firebase OK'],['Bluetooth','OFF'],['Firmware','v1.1'],['Uptime','3 h 12 m']];
+  rows.forEach((r,i)=>{
+    const y=124+i*23;
+    h+=T(10,y+3,100,r[0],13,{color:'var(--tx2)'})+T(100,y+2,130,r[1],15,{align:'r'});
+    h+=E(8,y+20,224,1,'','background:var(--bd);opacity:.28');
+  });
+  h+=btn(8,266,164,44,'WI-FI SETUP','var(--bl)','var(--on-bl)',{size:15,icon:ic('bt'),isz:20,go:'pinwifi'});
+  h+='<div class="abs bx sh press" id="themeSym" style="left:180px;top:266px;width:52px;height:44px;background:var(--surf);color:var(--tx)"><div class="abs" style="left:11px;top:9px;width:24px;height:24px"><div class="sm sun">'+ic('sun')+'</div><div class="sm moon">'+ic('moon')+'</div></div></div>';
+  return E(0,0,240,320,'','background:var(--bg)',h);
+}
+function BTtop(){return E(0,0,240,34,'','background:var(--bl)')+E(0,34,240,3,'','background:var(--bd)')+T(8,9,160,'WI-FI SETUP',16,{color:'var(--on-bl)',weight:800})+
+  E(190,8,42,18,'b2','background:var(--surf);color:var(--tx);font-size:12px;line-height:14px;text-align:center;font-weight:800','BT')}
+function BT(state){
+  let h=BTtop();
+  const cancel=btn(8,266,224,44,'CANCEL','var(--r)','var(--on-r)',{size:15,go:'main'});
+  if(state==='wait'){
+    h+=E(88,48,64,64,'bx sh pul','background:var(--surf);color:var(--bl);padding:8px',ic('bt'));
+    h+=T(8,124,224,'SmartBin-01',22,{align:'c',weight:800});
+    h+=T(20,154,200,'On the app or dashboard press PAIR A BIN and choose this name. A pairing code shows next.',14,{align:'c',color:'var(--tx2)',lh:18});
+    h+=E(40,214,160,30,'bx sh3 fl','background:var(--surf);font-size:14px;font-weight:800','BT OFF IN <span class="cdm" data-start="272" style="margin-left:5px">4:32</span>');
+    h+=cancel;
+  }else if(state==='code'){
+    h+=T(8,46,224,'PAIRING CODE',14,{align:'c',weight:800,color:'var(--tx2)',ls:1});
+    h+=E(8,66,224,72,'bx sh','background:var(--surf)',T(0,9,218,'528 215',46,{align:'c',weight:800,lh:50}));
+    h+=T(16,148,208,'Type this code on the phone or the dashboard when it asks.',14,{align:'c',color:'var(--tx2)',lh:18});
+    h+=E(36,192,168,30,'bx sh3 fl','background:var(--surf);font-size:14px;font-weight:800','NEW CODE IN <span class="cdm" data-start="58" style="margin-left:5px">0:58</span>');
+    h+=T(8,232,224,'3 wrong codes stop pairing for 60 s.',12,{align:'c',color:'var(--tx2)'});
+    h+=cancel;
+  }else if(state==='nocode'){
+    h+=E(8,48,224,130,'bx sh','background:var(--r);color:var(--on-r)',
+      T(0,14,218,'PAIRING STOPPED',22,{align:'c',color:'var(--on-r)',weight:800})+
+      T(0,50,218,'3 wrong codes',20,{align:'c',color:'var(--on-r)',weight:800})+
+      T(0,84,218,'Try again in <span class="cdm" data-start="60">1:00</span>',16,{align:'c',color:'var(--on-r)'}));
+    h+=T(16,192,208,'Only someone who can see this screen can pair. The phone that tried was turned away.',13,{align:'c',color:'var(--tx2)',lh:17});
+    h+=cancel;
+  }else if(state==='paired'){
+    h+=E(88,46,64,64,'bx sh','background:var(--g);color:var(--on-g);padding:10px',ic('check'));
+    h+=T(8,120,224,'PAIRED',24,{align:'c',weight:800});
+    h+=T(20,150,200,'Choose the Wi-Fi network on the dashboard.',14,{align:'c',color:'var(--tx2)',lh:18});
+    [['HomeWiFi-2G','-52'],['TUP-Manila','-67'],['Smart_Bin_Lab','-71']].forEach((r,i)=>{
+      h+=E(8,192+i*24,224,21,'b2 press','background:var(--surf);cursor:pointer',T(6,3,150,r[0],13,{})+T(150,3,66,r[1]+' dBm',12,{align:'r',color:'var(--tx2)'}));
+    });
+    h+=cancel;
+  }else if(state==='conn'){
+    h+=E(88,50,64,64,'spin','color:var(--bl)',ic('ring'));
+    h+=T(8,128,224,'CONNECTING<span class="dts"></span>',22,{align:'c',weight:800});
+    h+=E(24,166,192,34,'bx sh3 fl','background:var(--surf);font-size:16px;font-weight:800','HomeWiFi-2G');
+    h+=T(20,214,200,'Password received.',13,{align:'c',color:'var(--tx2)'});
+    h+=cancel;
+  }else if(state==='ok'){
+    h+=E(8,48,224,152,'bx sh','background:var(--g);color:var(--on-g)',
+      T(0,12,218,'CONNECTED',22,{align:'c',color:'var(--on-g)',weight:800})+
+      T(0,46,218,'IP ADDRESS',12,{align:'c',color:'var(--on-g)',ls:.5})+
+      T(0,62,218,'192.168.1.101',28,{align:'c',color:'var(--on-g)',weight:800,lh:32})+
+      T(0,104,218,'HomeWiFi-2G',14,{align:'c',color:'var(--on-g)'})+
+      T(0,124,218,'Enter this in the dashboard.',13,{align:'c',color:'var(--on-g)'}));
+    h+=T(16,214,208,'Bluetooth stays on until you turn it off on the dashboard, or in 5 minutes.',13,{align:'c',color:'var(--tx2)',lh:17,weight:700});
+    h+=btn(8,266,224,44,'DONE','var(--surf)','var(--tx)',{size:18,icon:ic('check'),isz:20,go:'main'});
+  }else if(state==='fail'){
+    h+=E(8,48,224,126,'bx sh','background:var(--r);color:var(--on-r)',
+      T(0,14,218,'FAILED',28,{align:'c',color:'var(--on-r)',weight:800})+
+      T(0,54,218,'Wrong password',20,{align:'c',color:'var(--on-r)',weight:800})+
+      T(0,84,218,'Check it and try again.',14,{align:'c',color:'var(--on-r)'}));
+    h+=T(16,190,208,'Other reasons: network not found, or a 5 GHz network.',13,{align:'c',color:'var(--tx2)',lh:17});
+    h+=btn(8,266,108,44,'RETRY','var(--bl)','var(--on-bl)',{size:16,go:'bt1'})+btn(124,266,108,44,'CANCEL','var(--surf)','var(--tx)',{size:16,go:'main'});
+  }else{
+    h+=E(84,60,72,72,'bx sh','background:var(--surf);color:var(--tx);padding:10px',ic('check'));
+    h+=T(8,150,224,'BLUETOOTH OFF',24,{align:'c',weight:800});
+    h+=T(20,184,200,'Setup finished. Wi-Fi stays on.',14,{align:'c',color:'var(--tx2)'});
+    h+=T(8,262,224,'Back to the main screen',12,{align:'c',color:'var(--tx2)'});
+    h+='<div class="abs cdrow b2" data-start="1.5" data-total="1.5" data-kind="bar" style="left:60px;top:282px;width:120px;height:12px;background:var(--surf)"><i class="cdb abs" style="left:0;top:0;bottom:0;background:var(--bd)"></i></div>';
+  }
+  return E(0,0,240,320,'','background:var(--bg)',h);
+}
+
+
+/* ---------- live sandbox ---------- */
+const S={fill:48,weight:2.3,temp:28.4,hum:62,gas:78,gasTh:200,tempLim:40,humLim:85,wgtLim:4.5,fillTh:80,
+  name:'BIN 01',screen:'auto',wifiOff:false,motion:false,sim:false,cal:false,lidOpen:false,locked:false,collecting:false,tamper:'off',
+  fHC:false,fHX:false,fBME:false,fWarm:false,timer:'none',ttf:true};
+function SIMB(){
+  BIN_NAME=S.name||'BIN 01';FILL_TH=+S.fillTh||80;
+  let out;
+  const sc=S.screen;
+  if(sc==='boot')out=A8boot();
+  else if(sc==='cal')out=A8cal();
+  else if(sc==='info')out=A9();
+  else if(sc==='btwait')out=BT('wait');
+  else if(sc==='done')out=A5();
+  else if(S.tamper==='countdown')out=A6(false);
+  else if(S.tamper==='latched')out=A6(true);
+  else if(S.collecting||sc==='collect')out=A4();
+  else if(S.locked)out=A7();
+  else{
+    const fill=Math.max(0,Math.min(100,+S.fill||0));
+    const urgent=!S.fHC&&fill>=FILL_TH;
+    const buzzer=['buzz','buzzon','both'].includes(S.timer), lidT=['hold','lid','both'].includes(S.timer);
+    const buzRow2=S.timer==='buzzon'?srow(0,ic('speaker',true),'BUZZER ON','var(--r)',100):trow(0,ic('speaker',true),'BUZZER <b class="cdv">1.4</b> s',1.4,2,'var(--r)');
+    const lidRow2=S.timer==='hold'?srow(0,ic('lidopen'),'LID HOLDING (motion)','var(--cy)',100):trow(0,ic('lidopen'),'LID CLOSES IN <b class="cdv">4.2</b> s',4.2,5,'var(--cy)');
+    const at=(row,y)=>row.replace(/top:0px/,'top:'+y+'px');
+    if(urgent){
+      const row=buzzer?at(buzRow2,244):lidT?at(lidRow2,244):'';
+      out=A2({row:row,sim:S.sim,lid:S.lidOpen?'OPEN':'CLOSED'});
+    }else{
+      const gp=S.gas/S.gasTh*100;
+      const lvl=gp>=80?'r':gp>=50?'a':'g';
+      const lab=gp>=80?'Poor':gp>=50?'Moderate':'Good';
+      let rows='';
+      if(buzzer&&lidT){rows=at(lidRow2,222)+at(buzRow2,244)}
+      else if(buzzer)rows=at(buzRow2,224);else if(lidT)rows=at(lidRow2,224);
+      const hasF=S.fHC;
+      out=A1({fill:hasF?0:fill,lid:S.lidOpen?'OPEN':'CLOSED',motion:S.motion,sim:S.sim,cal:S.cal,wifi:!S.wifiOff,
+        rows:rows||null,ttf:(S.ttf&&!rows&&!hasF&&fill<FILL_TH)?'Full in ~2.4 h':'',
+        status:null,
+        weight:S.fHX?'--':(+S.weight).toFixed(2)+' kg',temp:S.fBME?'--':(+S.temp).toFixed(1)+' C',hum:S.fBME?'--':Math.round(S.hum)+'%',
+        air:(S.fBME||S.fWarm)?'--':lab+' '+Math.round(S.gas),airDot:fillv(lvl),
+        alarmW:!S.fHX&&S.weight>=S.wgtLim,alarmT:!S.fBME&&S.temp>=S.tempLim,alarmH:!S.fBME&&S.hum>=S.humLim,alarmG:!S.fBME&&!S.fWarm&&gp>=100,
+        faultW:S.fHX,faultT:S.fBME,faultH:S.fBME,faultG:S.fBME||S.fWarm,fillFault:hasF});
+    }
+  }
+  BIN_NAME='BIN 01';FILL_TH=80;
+  return out;
+}
+
+/* ---------- the slide list ---------- */
+const lidRow=trow(224,ic('lidopen'),'LID CLOSES IN <b class="cdv">4.2</b> s',4.2,5,'var(--cy)');
+const buzRow=trow(244,ic('speaker',true),'BUZZER <b class="cdv">1.4</b> s',1.4,2,'var(--r)');
+const SL=[
+ {id:'boot',tag:'A8',title:'Boot',note:'Teal screen with the logo, a loading bar, the sensor check list, the IP address and the firmware version. The last check is still running.',b:()=>A8boot()},
+ {id:'cal',tag:'A8',title:'Calibrating',note:'Shown while the operator calibrates from the dashboard. The ring spins, finished steps show OK, and CANCEL stops it.',b:()=>A8cal()},
+ {id:'main',tag:'A1',title:'Main status, normal',note:'Green tint at 34%. The bar fills from the bottom with black marks at 50 and 80. The optional "Full in" line fits under the readings. Wi-Fi is on, the other three chips are faded.',
+  b:()=>A1({fill:34,lid:'CLOSED',ttf:'Full in ~2.4 h',weight:'0.82 kg',temp:'27.6 C',hum:'58%',air:'Good 78'})},
+ {id:'fill',tag:'A1',title:'Filling, lid open, lid timer',note:'Amber tint at 62%. Motion opened the lid, so the MOTION chip is on and a timer row counts down to the lid closing. The seconds and the bar are live.',
+  b:()=>A1({fill:62,lid:'OPEN',motion:true,rows:lidRow,weight:'2.30 kg',temp:'28.4 C',hum:'62%',air:'Moderate 130',airDot:'var(--a)'})},
+ {id:'alarm',tag:'A1',title:'A reading in alarm, simulation on',note:'Temperature passed its limit, so that line becomes a solid red box. The SIM chip is on because a value is being set by hand. Air shows the label and the air quality index (IAQ), 0 to 500, where lower is cleaner. The alarm box is at the air limit, 200 by default.',
+  b:()=>A1({fill:48,lid:'CLOSED',sim:true,alarmT:true,temp:'41.2 C',weight:'1.95 kg',hum:'71%',air:'Poor 170',airDot:'var(--r)'})},
+ {id:'warm',tag:'A1',title:'Air sensor stabilizing',note:'The BME680 gas sensor needs a few minutes after power-on, and longer the first time it is used. While its accuracy is 0 the air line shows the grey -- with the ! mark, the same look as a failed sensor, so a number nobody can trust is never shown.',
+  b:()=>A1({fill:34,lid:'CLOSED',ttf:'Full in ~2.4 h',weight:'0.82 kg',temp:'27.6 C',hum:'58%',air:'--',faultG:true})},
+ {id:'bmefail',tag:'A1',title:'BME680 not answering',note:'One chip gives temperature, humidity and air, so when it stops answering all three lines go grey together. Fill and weight keep working.',
+  b:()=>A1({fill:34,lid:'CLOSED',ttf:'Full in ~2.4 h',weight:'0.82 kg',temp:'--',hum:'--',air:'--',faultT:true,faultH:true,faultG:true})},
+ {id:'urgent',tag:'A2',title:'Urgent, bin is full',note:'Full red screen at or above the fill limit. The speaker waves and the border pulse. COLLECT is still available.',b:()=>A2()},
+ {id:'urgentb',tag:'A2',title:'Urgent with buzzer timer and SIM badge',note:'The buzzer minimum counts down. If the cause is still there at 0, the row changes to BUZZER ON. The small purple SIM badge sits beside FILL LEVEL.',b:()=>A2({row:buzRow,sim:true})},
+ {id:'pin',tag:'A3',title:'COLLECT, enter PIN',note:'Keys are 42 px high with gaps. WI-FI SETUP on the info screen also lands here before Bluetooth opens. CANCEL moved to the top bar so every key can stay large. Press a key to feel the hard shadow collapse.',b:()=>PIN({digits:0})},
+ {id:'pin2',tag:'A3',title:'PIN, typing',note:'Each digit fills a dot. The PIN is never shown as numbers.',b:()=>PIN({digits:2})},
+ {id:'pin3',tag:'A3',title:'PIN, wrong code',note:'Red border flash, the boxes shake, the entry clears and the keypad stays ready for another try. There is no lockout.',b:()=>PIN({digits:4,wrong:true})},
+ {id:'collect',tag:'A4',title:'Collecting',note:'Green screen while a pickup is running. The lid is open, motion and tamper are paused, alerts are muted. DONE needs no PIN.',b:()=>A4()},
+ {id:'done',tag:'A5',title:'Collection complete',note:'Large green DONE button and a bar that counts down the 30 second auto return.',b:()=>A5()},
+ {id:'tamper',tag:'A6',title:'Tamper, countdown',note:'Red screen with a flashing border and a shaking warning sign. The big number counts down from 10. If the bin settles, it clears by itself.',b:()=>A6(false)},
+ {id:'tamper2',tag:'A6',title:'Tamper, latched',note:'Still unstable at 15 seconds. The alarm stays on until the dashboard clears it. There is no reset button on the bin.',b:()=>A6(true)},
+ {id:'locked',tag:'A7',title:'Locked',note:'Full purple screen. COLLECT still works with the PIN. Collectors can unlock from the app or dashboard.',b:()=>A7()},
+ {id:'info',tag:'A9',title:'Info',note:'The IP address in large text, then Wi-Fi, signal, the Firebase cloud link the phone app falls back to, Bluetooth, firmware and uptime. The bin name is already in the top bar, so its row made room for Cloud. The sun and moon button switches the theme and the choice is kept after a reboot. WI-FI SETUP asks for the PIN first. This screen opens from the i button, the WI-FI chip or the bin name on the main screen.',b:()=>A9()},
+ {id:'info2',tag:'A9',title:'Info, cloud not sending',note:'Wi-Fi works but the bin cannot reach Firebase, for example when the router has no internet. Local control from the dashboard and the app on the same Wi-Fi is not affected.',b:()=>A9({cloudOff:true})},
+ {id:'bt1',tag:'A10',title:'Wi-Fi setup, waiting for the dashboard',note:'Blue header and a BT badge while Bluetooth is on. The bin shows its Bluetooth name and a 5 minute countdown to switching itself off.',b:()=>BT('wait')},
+ {id:'bt1b',tag:'A10',title:'Wi-Fi setup, pairing code',note:'Once the phone or dashboard picks this bin, the bin makes up a random 6-digit code and shows it in big digits. The person types it there. This is Bluetooth passkey pairing: only someone who can see this screen can pair, and the link is encrypted, so the Wi-Fi password cannot be overheard. A new code comes every 60 s and on every new try. It is never sent anywhere or shown anywhere else.',b:()=>BT('code')},
+ {id:'bt1c',tag:'A10',title:'Wi-Fi setup, wrong codes',note:'After 3 wrong codes the bin stops pairing for 60 s, with a red block and a live countdown, and turns that phone away. CANCEL returns to the main screen.',b:()=>BT('nocode')},
+ {id:'bt2',tag:'A10',title:'Wi-Fi setup, paired',note:'The code matched, so the phone or dashboard is paired over an encrypted link. The bin keeps the list of 2.4 GHz networks it can see ready.',b:()=>BT('paired')},
+ {id:'bt3',tag:'A10',title:'Wi-Fi setup, connecting',note:'Credentials received. The password is never drawn on the screen.',b:()=>BT('conn')},
+ {id:'bt4',tag:'A10',title:'Wi-Fi setup, connected',note:'The IP address in large text to type into the dashboard. DONE returns to the main screen.',b:()=>BT('ok')},
+ {id:'bt5',tag:'A10',title:'Wi-Fi setup, failed',note:'Red block with the reason, plus RETRY and CANCEL.',b:()=>BT('fail')},
+ {id:'bt6',tag:'A10',title:'Bluetooth off',note:'A short confirmation, then back to the main screen.',b:()=>BT('off')},
+ {id:'sim',tag:'LIVE',title:'Live sandbox',note:'Change any value in the panel under the screen. The screen redraws at once. Air bands (a share of the air limit), alarm boxes, BME680 faults and stabilizing, chips, timers, long names and screen priority all follow the rules in the prompt.',b:()=>SIMB(),panel:true}
+];
+
+/* ---------- the viewer ---------- */
+const $=s=>document.querySelector(s);
+let idx=0, theme=(function(){try{return localStorage.getItem('sbTheme')==='dark'?'dark':'light'}catch(e){return 'light'}})(), zoom=0, raf=0;
+const zoomLevels=[0,2,2.5,3,1.5];     // 0 means fit to the window
+function scaleNow(){
+  if(SL[idx]&&SL[idx].panel&&!zoom)return 2;
+  if(zoom)return zoom;
+  const h=window.innerHeight-250-(SL[idx]&&SL[idx].panel?0:0), w=window.innerWidth-180;
+  return Math.max(1.2,Math.min(3,h/320,w/240));
+}
+function layout(){
+  const s=scaleNow();
+  $('#scale').style.transform='scale('+s+')';
+  $('#view').style.width=(240*s)+'px';$('#view').style.height=(320*s)+'px';
+}
+function startLive(){
+  cancelAnimationFrame(raf);
+  const t0=performance.now();
+  const rows=[...document.querySelectorAll('.cdrow')], cdm=document.querySelector('.cdm'), big=document.querySelector('.cdbig'), cdn=document.querySelector('.cdn');
+  const tick=now=>{
+    const el=(now-t0)/1000;
+    rows.forEach(r=>{
+      const start=+r.dataset.start,total=+r.dataset.total,kind=r.dataset.kind;
+      const rem=start-(el%start);
+      const bar=r.querySelector('.cdb');
+      if(bar)bar.style.width=Math.max(0,rem/total*100)+'%';
+      const v=r.querySelector('.cdv'); if(v)v.textContent=rem.toFixed(1);
+    });
+    if(cdn){const st=+cdn.dataset.start;cdn.textContent=Math.ceil(st-(el%st));}
+    if(big){big.textContent=Math.max(0,10-Math.floor(el%11));}
+    if(cdm){const st=+cdm.dataset.start,rem=Math.floor(st-(el%st));cdm.textContent=Math.floor(rem/60)+':'+String(rem%60).padStart(2,'0');}
+    raf=requestAnimationFrame(tick);
+  };
+  raf=requestAnimationFrame(tick);
+}
+function show(i){
+  clearTimeout(autoT);
+  idx=(i+SL.length)%SL.length;
+  const s=SL[idx];
+  $('#scale').innerHTML='<div class="scr" id="scr" data-th="'+theme+'">'+s.b()+'</div>';
+  $('#tag').textContent=s.tag;$('#title').textContent=s.title;$('#note').textContent=s.note;
+  $('#count').textContent=(idx+1)+' / '+SL.length;
+  document.querySelectorAll('.dots i').forEach((d,k)=>d.classList.toggle('on',k===idx));
+  $('#panel').classList.toggle('on',!!s.panel);document.body.classList.toggle('wp',!!s.panel);if(s.panel)syncPanel();
+  layout();startLive();setAuto();
+  try{history.replaceState(null,'','#'+s.id)}catch(e){}
+}
+function setTheme(t){
+  theme=t;try{localStorage.setItem('sbTheme',t)}catch(e){}const scr=$('#scr');if(scr)scr.dataset.th=t;
+  $('#themeBtn').textContent=t==='light'?'Light mode':'Dark mode';
+}
+$('#dots').innerHTML=SL.map((s,k)=>'<i title="'+s.tag+' '+s.title+'" data-i="'+k+'"></i>').join('');
+$('#dots').addEventListener('click',e=>{const d=e.target.closest('i');if(d){tapped=false;pinBuf='';show(+d.dataset.i)}});
+$('#prev').addEventListener('click',()=>{tapped=false;pinBuf='';show(idx-1)});
+$('#next').addEventListener('click',()=>{tapped=false;pinBuf='';show(idx+1)});
+$('#themeBtn').addEventListener('click',()=>setTheme(theme==='light'?'dark':'light'));
+$('#sizeBtn').addEventListener('click',()=>{const k=zoomLevels.indexOf(zoom);zoom=zoomLevels[(k+1)%zoomLevels.length];
+  $('#sizeBtn').textContent=zoom?'Zoom '+zoom+'x':'Zoom: fit';layout();});
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key==='PageDown'){tapped=false;pinBuf='';show(idx+1);e.preventDefault()}
+  else if(e.key==='ArrowLeft'||e.key==='PageUp'){tapped=false;pinBuf='';show(idx-1);e.preventDefault()}
+  else if(e.key==='Home'){show(0)}else if(e.key==='End'){show(SL.length-1)}
+  else if(e.key==='t'||e.key==='T'){setTheme(theme==='light'?'dark':'light')}
+});
+let pinBuf='', autoT=0, tapped=false, pinNext='collect';
+function goTo(id,viaTap){const k=SL.findIndex(s=>s.id===id);if(k>-1){tapped=!!viaTap;show(k);}}
+function setAuto(){
+  clearTimeout(autoT);if(!tapped)return;
+  const id=SL[idx].id, map={boot:['cal',2600],cal:['main',3200],bt3:['bt4',2200],bt6:['main',1800],tamper:['tamper2',11000]};
+  if(map[id])autoT=setTimeout(()=>goTo(map[id][0],true),map[id][1]);
+}
+function drawPin(o){$('#scr').innerHTML=PIN(o);}
+function pinKey(k){
+  if(k==='&lt;'){pinBuf=pinBuf.slice(0,-1);drawPin({digits:pinBuf.length});return}
+  if(k==='OK'){
+    if(pinBuf==='1234'){pinBuf='';const nx=pinNext;pinNext='collect';goTo(nx,true);return}
+    drawPin({digits:4,wrong:true});const keep=pinBuf;pinBuf='';
+    clearTimeout(autoT);autoT=setTimeout(()=>{if(SL[idx].tag==='A3')drawPin({digits:0})},1600);return}
+  if(pinBuf.length<4){pinBuf+=k;drawPin({digits:pinBuf.length});}
+}
+$('#scale').addEventListener('click',e=>{
+  if(e.target.closest('#themeSym,.themeTap')){setTheme(theme==='light'?'dark':'light');return}
+  if(SL[idx].id==='sim'){const g2=e.target.closest('[data-go]');if(g2){const d=g2.dataset.go;
+    if(d==='info')S.screen='info';else if(d==='pinwifi')S.screen='btwait';else if(d==='pin')S.collecting=true;else if(d==='done'){S.collecting=false;S.screen='done'}else{S.screen='auto';S.collecting=false}
+    syncPanel();renderSim();}return}
+  const key=e.target.closest('[data-key]');
+  if(key&&SL[idx].tag==='A3'){pinKey(key.dataset.key);return}
+  if(SL[idx].id==='bt2'&&e.target.closest('.b2.press')){setTimeout(()=>goTo('bt3',true),140);return}
+  if(SL[idx].id==='bt1'&&!e.target.closest('[data-go]')){goTo('bt1b',true);return}
+  if(SL[idx].id==='bt1b'&&!e.target.closest('[data-go]')){goTo('bt2',true);return}
+  if(SL[idx].id==='boot'){goTo('cal',true);return}
+  const g=e.target.closest('[data-go]');
+  if(g){let id=g.dataset.go;setTimeout(()=>{pinBuf='';if(id==='pinwifi'){pinNext='bt1';id='pin'}else if(id==='main'||id==='info'){pinNext='collect'}else if(id==='pin'){pinNext='collect'}goTo(id,true)},140);}
+});
+
+/* sandbox panel wiring */
+const S0=JSON.parse(JSON.stringify(S));
+function syncPanel(){
+  document.querySelectorAll('#pg [data-k]').forEach(el=>{const v=S[el.dataset.k];if(el.type==='checkbox')el.checked=!!v;else el.value=v;});
+  $('#fillv').textContent=S.fill+'%';
+}
+function renderSim(){
+  if(SL[idx].id!=='sim')return;
+  const scr=$('#scr');if(!scr)return;
+  scr.innerHTML=SIMB();startLive();
+}
+/* expected ranges: HX711 + 5 kg load cell, HC-SR04 fill, BME680 datasheet */
+const RANGES={fill:[0,100],weight:[0,5],temp:[-40,85],hum:[0,100],gas:[0,500],fillTh:[10,100],gasTh:[50,500],tempLim:[10,85],humLim:[10,100],wgtLim:[0.5,5]};
+Object.keys(RANGES).forEach(k=>{const el=document.querySelector('#pg [data-k="'+k+'"]');if(el){el.min=RANGES[k][0];el.max=RANGES[k][1];}});
+function clampK(k,v){const r=RANGES[k];return r?Math.min(r[1],Math.max(r[0],v)):v;}
+$('#pg').addEventListener('change',e=>{
+  const el=e.target.closest('[data-k]');if(!el||el.type!=='number'||!RANGES[el.dataset.k])return;
+  S[el.dataset.k]=clampK(el.dataset.k,el.value===''?RANGES[el.dataset.k][0]:+el.value);el.value=S[el.dataset.k];renderSim();
+});
+$('#pg').addEventListener('input',e=>{
+  const el=e.target.closest('[data-k]');if(!el)return;
+  const k=el.dataset.k;
+  S[k]=el.type==='checkbox'?el.checked:(el.type==='number'||el.type==='range')?(el.value===''?0:+el.value):el.value;
+  if(RANGES[k]&&el.type!=='checkbox'&&S[k]>RANGES[k][1]){S[k]=RANGES[k][1];el.value=S[k];}
+  if(k==='fill')$('#fillv').textContent=S.fill+'%';
+  renderSim();
+});
+$('#simReset').addEventListener('click',()=>{Object.assign(S,JSON.parse(JSON.stringify(S0)));syncPanel();renderSim();});
+document.addEventListener('keydown',e=>{
+  if(e.target.closest&&e.target.closest('#panel')&&(e.key.startsWith('Arrow')||e.key==='Home'||e.key==='End'||e.key==='t'||e.key==='T')&&e.target.tagName!=='SELECT'&&e.target.type!=='checkbox'&&e.target.type!=='range'){e.stopPropagation();}
+},true);
+window.addEventListener('resize',layout);
+const h0=location.hash.slice(1),k0=SL.findIndex(s=>s.id===h0);
+$('#sizeBtn').textContent='Zoom: fit';$('#themeBtn').textContent=theme==='light'?'Light mode':'Dark mode';
+show(k0>-1?k0:0);
+</script>
+</body>
+</html>

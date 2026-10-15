@@ -10,6 +10,7 @@ import android.provider.Settings
 import android.provider.MediaStore
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -30,6 +31,7 @@ import smartbin.data.DEFAULT_SIM
 import smartbin.data.FirebaseConfig
 import smartbin.data.Demo
 import smartbin.data.Hub
+import smartbin.data.OperatorLock
 import smartbin.data.HubEvent
 import smartbin.data.Routes
 import smartbin.data.Role
@@ -65,6 +67,10 @@ sealed interface Overlay {
     data object ClearAlerts : Overlay
     data object Wifi : Overlay
     data object NotifPre : Overlay
+    data class PinUnlock(val first: Boolean) : Overlay
+    data class PinSet(val first: Boolean, val change: Boolean) : Overlay
+    data object PinChange : Overlay
+    data class BtCode(val id: String) : Overlay
 }
 
 /**
@@ -97,10 +103,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         if (settled[e.binId] == s) settled.remove(e.binId)
                     }
                     if (e.ok) {
-                        Feel.event(Sfx.SAVED)
+                        Feel.event(Sfx.CMD_OK)
                         say("${e.name} confirmed ${e.cmd}.")
                     } else {
-                        Feel.event(Sfx.DENIED)
+                        Feel.event(Sfx.CMD_FAIL)
                         say("${e.name} did not confirm ${e.cmd}. Check the bin, then try again.")
                     }
                 }
@@ -110,8 +116,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------- whole app ----------
 
-    var role by mutableStateOf(store.string(SmartBinApp.KEY_ROLE, "").let { r -> Role.entries.firstOrNull { it.name == r } })
+    // Operator is never remembered: every start, and every return after a while
+    // away, is as a collector until the operator PIN is entered again.
+    var role by mutableStateOf(store.string(SmartBinApp.KEY_ROLE, "").let { r -> Role.entries.firstOrNull { it.name == r } }?.let { Role.COLLECTOR })
         private set
+    val lock = OperatorLock(store)
     val operator get() = role != Role.COLLECTOR
     var screen by mutableStateOf(Screen.OVERVIEW)
     /** The tab the gear key was pressed on, so back returns there. */
@@ -123,6 +132,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
      * the user left.
      */
     var started by mutableStateOf(false)
+
+    /** Tells [Hub] whether the user is inside the main screens, which is when alerts may be posted. */
+    fun syncInMain() {
+        Hub.inMain = started && role != null
+    }
+
+    override fun onCleared() {
+        // The app was closed for good (back out of it, or the activity finished).
+        Hub.inMain = false
+        super.onCleared()
+    }
     var overlay by mutableStateOf<Overlay?>(null)
     var theme by mutableStateOf(runCatching { ThemeMode.valueOf(store.string(SmartBinApp.KEY_THEME, "AUTO")) }.getOrDefault(ThemeMode.AUTO))
         private set
@@ -140,6 +160,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             delay(2200)
             toast = null
         }
+    }
+
+    /** Any touch on the screen clears the notice, so it never sits over a key. */
+    fun hideToast() {
+        if (toast == null) return
+        toastJob?.cancel()
+        toast = null
     }
 
     fun go(s: Screen) {
@@ -163,11 +190,23 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         store.putString(SmartBinApp.KEY_THEME, m.name)
     }
 
+    /** Asking for operator opens the PIN sheet. Collector needs nothing. */
     fun pickRole(r: Role, first: Boolean = false) {
         if (r == role && !first) return
+        if (r == Role.OPERATOR) {
+            opPin = ""; pinNew = ""; pinMsg = null
+            overlay = if (lock.hasPin) Overlay.PinUnlock(first) else Overlay.PinSet(first, change = false)
+            return
+        }
+        setRole(r, first)
+    }
+
+    private fun setRole(r: Role, first: Boolean) {
         val had = role != null
+        if (role == Role.OPERATOR && r == Role.COLLECTOR) Feel.event(Sfx.OP_OUT)
         role = r
-        store.putString(SmartBinApp.KEY_ROLE, r.name)
+        // Only "a role was picked" is kept; the next start is always collector.
+        store.putString(SmartBinApp.KEY_ROLE, Role.COLLECTOR.name)
         if (r == Role.COLLECTOR) {
             if (editing) viewModelScope.launch { Hub.setCalibration(null) }
             edit = null
@@ -179,6 +218,104 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (notifications != Perm.ON && !store.bool(SmartBinApp.KEY_ASKED, false)) overlay = Overlay.NotifPre
         } else {
             say("Signed in as ${if (r == Role.OPERATOR) "operator" else "collector"}.")
+        }
+    }
+
+    // ---------- operator PIN ----------
+
+    /** The digits typed so far, the first entry of a new PIN, and the line under the dots. */
+    var opPin by mutableStateOf("")
+    var pinNew by mutableStateOf("")
+    var pinMsg by mutableStateOf<Pair<Boolean, String>?>(null)
+    /** Set when the app went to the background, to drop operator after AUTO_LOCK. */
+    private var awaySince = 0L
+
+    fun pinKey(d: Char) {
+        if (opPin.length < OperatorLock.MAX) opPin += d
+    }
+
+    fun pinBack() {
+        opPin = opPin.dropLast(1)
+    }
+
+    fun pinUnlock(first: Boolean) {
+        val wait = lock.waitLeft()
+        if (wait > 0) {
+            pinMsg = false to "Too many wrong PINs. Try again in ${(wait + 999) / 1000} s."
+            return
+        }
+        if (lock.check(opPin)) {
+            overlay = null
+            opPin = ""
+            Feel.event(Sfx.OP_IN)
+            setRole(Role.OPERATOR, first)
+        } else {
+            opPin = ""
+            val left = lock.waitLeft()
+            Feel.event(if (left > 0) Sfx.PIN_LOCKOUT else Sfx.PIN_WRONG)
+            pinMsg = false to if (left > 0) "Wrong PIN. Locked for ${(left + 999) / 1000} s." else "Wrong PIN. ${lock.triesLeft()} tries before a wait."
+        }
+    }
+
+    /** Making or changing the PIN: type it, then type it again. */
+    fun pinSave(first: Boolean, change: Boolean) {
+        if (!OperatorLock.valid(opPin)) {
+            pinMsg = false to "Use ${OperatorLock.MIN} to ${OperatorLock.MAX} digits."
+            return
+        }
+        if (pinNew.isEmpty()) {
+            pinNew = opPin
+            opPin = ""
+            pinMsg = true to "Type the same PIN again."
+            return
+        }
+        if (opPin != pinNew) {
+            opPin = ""; pinNew = ""
+            Feel.event(Sfx.PIN_WRONG)
+            pinMsg = false to "The two PINs differ. Start again."
+            return
+        }
+        lock.set(opPin)
+        opPin = ""; pinNew = ""; pinMsg = null
+        overlay = null
+        Feel.event(if (change) Sfx.PIN_SET else Sfx.OP_IN)
+        if (change) say("Operator PIN changed.") else setRole(Role.OPERATOR, first)
+    }
+
+    /** Changing the PIN asks for the old one first. */
+    fun changePin() {
+        opPin = ""; pinNew = ""; pinMsg = null
+        overlay = Overlay.PinChange
+    }
+
+    fun pinChangeCheck() {
+        val wait = lock.waitLeft()
+        if (wait > 0) {
+            pinMsg = false to "Too many wrong PINs. Try again in ${(wait + 999) / 1000} s."
+            return
+        }
+        if (!lock.check(opPin)) {
+            opPin = ""
+            val left = lock.waitLeft()
+            Feel.event(if (left > 0) Sfx.PIN_LOCKOUT else Sfx.PIN_WRONG)
+            pinMsg = false to if (left > 0) "Wrong PIN. Locked for ${(left + 999) / 1000} s." else "Wrong PIN. ${lock.triesLeft()} tries before a wait."
+            return
+        }
+        opPin = ""; pinMsg = null
+        overlay = Overlay.PinSet(first = false, change = true)
+    }
+
+    fun backgrounded() {
+        awaySince = System.currentTimeMillis()
+    }
+
+    /** Back after more than AUTO_LOCK away, operator drops to collector. */
+    fun foregrounded() {
+        val away = awaySince
+        awaySince = 0L
+        if (away > 0 && role == Role.OPERATOR && System.currentTimeMillis() - away > AUTO_LOCK) {
+            setRole(Role.COLLECTOR, first = false)
+            say("Operator locked after 2 min away. Collector mode.")
         }
     }
 
@@ -310,7 +447,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (waiting != null) {
                 val via = if (waiting.via == Source.THINGSPEAK) "ThingSpeak" else "Firebase"
                 Feel.event(Sfx.CLOUD)
-                say("Sent ${waiting.cmd} to $n through $via. Its key stays locked until the bin confirms.")
+                say("${waiting.cmd} sent to $n via $via. Waiting for the bin.")
             } else say(msg)
         }
     }
@@ -537,10 +674,84 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     var pass by mutableStateOf("")
     var showPass by mutableStateOf(false)
 
+    /**
+     * Pairing needs the 6-digit code the bin shows on its touchscreen, as
+     * Bluetooth passkey pairing does: a fresh random code each time, gone after
+     * 60 s, and 3 wrong codes stop pairing for 60 s. The stand-in bin shows
+     * its code in the sheet until the firmware has Bluetooth.
+     */
+    var btCode by mutableStateOf("")
+        private set
+    var btCodeAt by mutableLongStateOf(0L)
+        private set
+    var btEntry by mutableStateOf("")
+    var btMsg by mutableStateOf<Pair<Boolean, String>?>(null)
+    private var btFails = 0
+    private var btWaitUntil = 0L
+
     fun btPair(b: Bin) {
-        bt = 1
-        Feel.event(Sfx.LINK_UP)
-        say("Paired with ${b.name}.")
+        val wait = btWaitUntil - System.currentTimeMillis()
+        if (wait > 0) {
+            Feel.event(Sfx.DENIED)
+            say("${b.name} stopped pairing after 3 wrong codes. Try again in ${(wait + 999) / 1000} s.")
+            return
+        }
+        btFails = 0
+        btEntry = ""
+        btMsg = null
+        btNewCode()
+        overlay = Overlay.BtCode(b.id)
+    }
+
+    fun btNewCode() {
+        btCode = "%06d".format(java.security.SecureRandom().nextInt(1_000_000))
+        btCodeAt = System.currentTimeMillis()
+    }
+
+    fun btKey(d: Char) {
+        if (btEntry.length < BT_CODE_LEN) btEntry += d
+    }
+
+    fun btBack() {
+        btEntry = btEntry.dropLast(1)
+    }
+
+    fun btCheck(b: Bin) {
+        if (System.currentTimeMillis() - btCodeAt > BT_CODE_LIFE) {
+            btNewCode()
+            btEntry = ""
+            Feel.event(Sfx.BT_WRONG)
+            btMsg = false to "That code expired. The bin shows a new one."
+            return
+        }
+        if (btEntry == btCode) {
+            overlay = null
+            btEntry = ""
+            btCode = ""
+            bt = 1
+            Feel.event(Sfx.BT_PAIRED)
+            say("Paired with ${b.name}. The Bluetooth link is encrypted.")
+            return
+        }
+        btEntry = ""
+        btFails++
+        if (btFails >= 3) {
+            overlay = null
+            btCode = ""
+            btWaitUntil = System.currentTimeMillis() + 60_000L
+            Feel.event(Sfx.BT_BLOCKED)
+            say("3 wrong codes. ${b.name} stops pairing for 60 s.")
+        } else {
+            val left = 3 - btFails
+            Feel.event(Sfx.BT_WRONG)
+            btMsg = false to "Wrong code. $left ${if (left == 1) "try" else "tries"} left."
+        }
+    }
+
+    fun btCancel() {
+        overlay = null
+        btEntry = ""
+        btCode = ""
     }
 
     fun btSend() {
@@ -553,7 +764,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             delay(1600)
             if (bt == 2) {
                 bt = 3
-                Feel.event(Sfx.SAVED)
+                Feel.event(Sfx.WIFI_JOINED)
             }
         }
     }
@@ -807,6 +1018,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     companion object {
         private const val DAY = 24 * 3600_000L
+        private const val AUTO_LOCK = 2 * 60_000L
+        const val BT_CODE_LEN = 6
+        const val BT_CODE_LIFE = 60_000L
         private fun round2(v: Double) = Math.round(v * 100) / 100.0
     }
 }

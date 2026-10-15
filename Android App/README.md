@@ -4,7 +4,7 @@ The phone app for the Smart-Bin system, for both the operator and the collector.
 
 It runs with no hardware. Bins without an address show demo data that fills and drifts the way real bins do, so every screen can be shown in class. Give a bin an IP address and it switches to live readings over Wi-Fi.
 
-Version 1.1. Kotlin and Jetpack Compose, the same stack as Garbage-Guard (AGP 9.4.1, Gradle 9.6.0, compile and target SDK 37, minimum Android 8.0).
+Version 1.2. Kotlin and Jetpack Compose, the same stack as Garbage-Guard (AGP 9.4.1, Gradle 9.6.0, compile and target SDK 37, minimum Android 8.0).
 
 ## Build and run
 
@@ -22,11 +22,13 @@ gradlew :app:assembleDebug
 
 The APK lands in `app/build/outputs/apk/debug/app-debug.apk`. Copy it to a phone to install it there.
 
-A ready-built debug APK, `Smart-Bin v1.1.apk`, sits in this folder for installing on a phone without building.
+A ready-built debug APK, `Smart-Bin v1.2.apk`, sits in this folder for installing on a phone without building.
 
 ## What is in it
 
 **First launch.** Pick Operator or Collector, then the app asks once for permission to send alerts. The role chip in the header switches roles later.
+
+**Operator PIN.** The app always opens as a collector. Operator asks for a 4 to 8 digit PIN; the first time, the PIN is made there (typed twice). Only a salted PBKDF2 hash is kept. After 5 wrong PINs the app waits 30 s, doubling with each further miss, and operator drops back to collector after 2 min in the background. An operator can change the PIN in App settings after typing the current one. The dashboard v12 uses the same rules. A forgotten PIN is reset by clearing the app's data.
 
 **Start page.** When the app opens after it was closed, or after Android ended it, a start page shows the logo and each link (Local Wi-Fi, Firebase, ThingSpeak) while the bins are reached. It moves on by itself once one answers, or at once with demo data. After 10 s with no answer it offers GO IN and CONNECTION. Coming back from the background skips it and returns to the page you left.
 
@@ -50,14 +52,14 @@ A ready-built debug APK, `Smart-Bin v1.1.apk`, sits in this folder for installin
 
 **Connection.** The three routes, each marked IN USE, ANSWERS, NO ANSWER or NOT SET UP, each bin's address and state, the Firebase account form with TEST, TEST AND SAVE and RESTORE WORKING, the ThingSpeak server with TEST AND SAVE, and the data used this month.
 
-**Bluetooth setup.** The four steps from the mockup: pair, pick a network, send, Bluetooth off. It is a walkthrough with a stand-in for the bin until the firmware has Bluetooth provisioning; USE FOR stores the address it shows.
+**Bluetooth setup.** The four steps from the mockup: pair, pick a network, send, Bluetooth off. Pairing asks for the random 6-digit code the bin shows on its touchscreen (a stand-in screen shows it until the firmware has Bluetooth): it lasts 60 s, and 3 wrong codes stop pairing for 60 s. It is a walkthrough with a stand-in for the bin until the firmware has Bluetooth provisioning; USE FOR stores the address it shows.
 
 ## Garbage-Guard features carried over
 
 - **Light and dark home-screen logo.** The app has two launcher entries, one per logo, and switches them as it leaves the screen to match the theme it was left in. Some launchers take a few seconds to redraw the icon.
-- **Sounds.** 34 short sounds made by `tools/make_sounds.py`: taps, choices, switches, steppers, tabs, open and back, confirm and danger, theme changes, the boot chime, saved, lock and unlock, pickup and done, calibration, simulation, the link going up, down or to the cloud, a bin going quiet or coming back, and one per kind of alert. Rising tones mean on, forward or OK; falling tones mean off, back or no. Run `python tools/make_sounds.py` to make them again after changing the table.
+- **Sounds.** 46 short sounds made by `tools/make_sounds.py`: taps, choices, switches, steppers, tabs, open and back, confirm and danger, theme changes, the boot chime, saved, lock and unlock, pickup and done, calibration, simulation, the link going up, down or to the cloud, a bin going quiet or coming back, the PIN keypad (digit, wrong PIN, locked out, operator in, back to collector, PIN changed), a bin confirming a command or not, Bluetooth pairing (paired, wrong code, pairing stopped) and the bin joining Wi-Fi, and one per kind of alert. No two moments share a sound or a vibration. Rising tones mean on, forward or OK; falling tones mean off, back or no. Run `python tools/make_sounds.py` to make them again after changing the table.
 - **Vibration.** Plain keys use Android's own touch clicks. Events and alerts each have their own rhythm, so a full bin, a tamper and a lock feel different in a pocket. The strength setting scales them all.
-- **Notifications.** One Android channel per kind of alert (full, tamper, sensor, lock, pickup, setup), each with its own sound and vibration, so each can be changed or silenced in Android settings. A full-bin alert has a Start pickup button that works without opening the app. While push alerts are on, a quiet foreground service keeps reading the bins every 5 s after the app is closed, so alerts arrive in the background. Unrestricted battery in App settings keeps Android from pausing it.
+- **Notifications.** One Android channel per kind of alert (full, tamper, sensor, lock, pickup, setup), each with its own sound and vibration, so each can be changed or silenced in Android settings. A full-bin alert has a Start pickup button that works without opening the app. While push alerts are on, a quiet foreground service keeps reading the bins every 5 s while the app is in the background, so alerts arrive there. Alerts are posted only after you are past the start page and the role picker. Swiping the app away from recent apps, or backing out of it, stops the service and the alerts. Unrestricted battery in App settings keeps Android from pausing it.
 - **Keep screen on**, and the logo tap chime.
 
 ## Connecting to the bins

@@ -46,6 +46,17 @@ object Haptics {
         CLOUD(50 to 140, 60 to 0, 50 to 140, 60 to 0, 120 to 90),
         BIN_LOST(80 to 150, 80 to 60),
         BIN_BACK(40 to 70, 50 to 0, 50 to 160),
+        PIN_WRONG(70 to 230, 50 to 0, 70 to 230, 50 to 0, 140 to 160),
+        PIN_LOCKOUT(400 to 255, 120 to 0, 250 to 120),
+        OP_IN(30 to 100, 40 to 0, 30 to 160, 40 to 0, 110 to 240),
+        OP_OUT(110 to 200, 40 to 0, 30 to 90),
+        CMD_OK(25 to 140, 40 to 0, 70 to 210),
+        CMD_FAIL(90 to 200, 50 to 0, 90 to 160, 50 to 0, 160 to 90),
+        BT_PAIRED(30 to 110, 40 to 0, 30 to 110, 40 to 0, 100 to 230),
+        BT_WRONG(40 to 220, 40 to 0, 40 to 220, 40 to 0, 40 to 220),
+        BT_BLOCKED(300 to 230, 150 to 0, 300 to 120),
+        WIFI_JOINED(40 to 120, 30 to 0, 40 to 170, 30 to 0, 120 to 240),
+        PIN_SET(20 to 150, 50 to 0, 20 to 150, 50 to 0, 60 to 200),
         ;
 
         /** The same rhythm as a notification channel wants it: a pause first, then buzz and pause in turn. */
@@ -107,6 +118,17 @@ object Haptics {
         Sfx.SIM -> Buzz.SIM
         Sfx.BIN_LOST -> Buzz.BIN_LOST
         Sfx.BIN_BACK -> Buzz.BIN_BACK
+        Sfx.PIN_WRONG -> Buzz.PIN_WRONG
+        Sfx.PIN_LOCKOUT -> Buzz.PIN_LOCKOUT
+        Sfx.OP_IN -> Buzz.OP_IN
+        Sfx.OP_OUT -> Buzz.OP_OUT
+        Sfx.CMD_OK -> Buzz.CMD_OK
+        Sfx.CMD_FAIL -> Buzz.CMD_FAIL
+        Sfx.BT_PAIRED -> Buzz.BT_PAIRED
+        Sfx.BT_WRONG -> Buzz.BT_WRONG
+        Sfx.BT_BLOCKED -> Buzz.BT_BLOCKED
+        Sfx.WIFI_JOINED -> Buzz.WIFI_JOINED
+        Sfx.PIN_SET -> Buzz.PIN_SET
         Sfx.ALERT_FULL -> Buzz.FULL
         Sfx.ALERT_TAMPER -> Buzz.TAMPER
         Sfx.ALERT_SENSOR -> Buzz.SENSOR
