@@ -43,6 +43,10 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -84,6 +88,7 @@ fun SmartBinUi(vm: AppViewModel, setLandscape: (Boolean) -> Unit) {
         ThemeMode.DARK -> true
     }
     val mode = if (vm.role == null || !vm.started) Mode.NORMAL else hub.mode
+    LaunchedEffect(vm.started, vm.role) { vm.syncInMain() }
     val c = animated(sbColors(dark, mode))
     val context = LocalContext.current
 
@@ -114,7 +119,16 @@ fun SmartBinUi(vm: AppViewModel, setLandscape: (Boolean) -> Unit) {
     val scaled = remember(base.density, base.fontScale, fit) { Density(base.density * fit, base.fontScale.coerceIn(0.9f, 1.1f)) }
 
     CompositionLocalProvider(LocalSb provides c, LocalContentColor provides c.ink, LocalDensity provides scaled) {
-        Box(Modifier.fillMaxSize().page(c)) {
+        Box(
+            Modifier.fillMaxSize().page(c).pointerInput(Unit) {
+                // Watches every touch before the keys get it, without taking it:
+                // the notice goes away and the key under the finger still works.
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    vm.hideToast()
+                }
+            },
+        ) {
             when {
                 vm.role == null -> Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) { Gate(vm) }
                 !vm.started -> Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) { StartPage(vm, hub) }
@@ -477,7 +491,7 @@ private fun Gate(vm: AppViewModel) {
                 BinIcon(46.0, c.accent, 76.dp)
             }
             T("Smart Bin", size = 1.65f, spacing = 0.02f)
-            Hint("Pick how you are using the system today. You can switch from the header at any time.", Modifier.widthIn(max = 290.dp), align = androidx.compose.ui.text.style.TextAlign.Center)
+            Hint("Pick how you are using the system today. Operator asks for a PIN. Collector is the default.", Modifier.widthIn(max = 290.dp), align = androidx.compose.ui.text.style.TextAlign.Center)
         }
         RoleCard(Ic.sliders, "Admin / Operator", listOf("Charts and history", "Lock, unlock, reset tamper", "Calibration", "Simulation controls", "Add and edit bins")) {
             vm.pickRole(Role.OPERATOR, first = true)

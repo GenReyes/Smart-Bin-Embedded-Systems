@@ -54,6 +54,22 @@ SOUNDS = {
     "sim":         ("event", [(523, 60), (622, 60), (740, 60), (880, 140)]),
     "bin_lost":    ("event", [(740, 100), (0, 60), (554, 210)]),
     "bin_back":    ("event", [(554, 80), (740, 150)]),
+    # The operator PIN: a dry tick per digit, a key-turn into operator, and a
+    # falling bolt back to collector. A wrong PIN buzzes low; a lockout drops further.
+    "pin_key":     ("ui", [(1660, 14)]),
+    "pin_wrong":   ("event", [(349, 60), (0, 30), (349, 60), (0, 30), (262, 160)]),
+    "pin_lockout": ("event", [(523, 260, 260), (0, 60), (196, 300)]),
+    "op_in":       ("event", [(587, 50), (0, 25), (880, 50), (1175, 60), (1760, 160)]),
+    "op_out":      ("event", [(1175, 50), (880, 50), (0, 25), (587, 140)]),
+    # A bin confirming a command or not, Bluetooth pairing, the bin joining
+    # Wi-Fi, and a new operator PIN: each its own, so none borrows another's.
+    "cmd_ok":      ("event", [(1319, 50), (0, 25), (1760, 110)]),
+    "cmd_fail":    ("event", [(659, 80), (0, 30), (523, 80), (0, 30), (392, 200)]),
+    "bt_paired":   ("event", [(1175, 40), (1568, 40), (1175, 40), (1976, 140)]),
+    "bt_wrong":    ("event", [(466, 50), (0, 25), (466, 50), (370, 140)]),
+    "bt_blocked":  ("event", [(622, 180), (0, 50), (311, 320)]),
+    "wifi_joined": ("event", [(880, 60), (1175, 60), (1480, 60), (1760, 180)]),
+    "pin_set":     ("event", [(1047, 50), (1397, 50), (1047, 50), (1397, 120)]),
     # Notification sounds, one per kind of alert. They also play inside the app.
     "alert_full":   ("alert", [(880, 180), (0, 80), (880, 180), (0, 80), (880, 180), (0, 200), (1175, 420)]),
     "alert_tamper": ("alert", [(700, 1400, 340), (1400, 700, 340), (700, 1400, 340), (1400, 700, 340)]),

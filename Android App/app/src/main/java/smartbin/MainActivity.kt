@@ -64,6 +64,7 @@ class MainActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         Hub.foreground = true
+        vm.foregrounded()
         WatchService.stop(this)
     }
 
@@ -75,8 +76,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onStop() {
         Hub.foreground = false
-        // With push alerts on, the bins keep being read while the app is closed.
-        if (Alerts.allowed(this) && !isChangingConfigurations) WatchService.start(this)
+        if (!isChangingConfigurations) vm.backgrounded()
+        // With push alerts on, the bins keep being read while the app is in the
+        // background, but only once the user is inside the main screens.
+        if (Hub.inMain && Alerts.allowed(this) && !isChangingConfigurations) WatchService.start(this)
         syncIcon()
         super.onStop()
     }

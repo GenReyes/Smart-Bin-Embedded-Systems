@@ -90,6 +90,8 @@ fun AppPage(vm: AppViewModel, hub: HubState) {
                 Tw(!vm.operator, { vm.pickRole(Role.COLLECTOR) }, "Collector", grow = null)
             }
         }
+        if (vm.operator) LRow(Ic.key, "Change operator PIN", "Asks for the current PIN first", onClick = { vm.changePin() })
+        Hint("The app always opens as a collector. Operator needs the PIN, and drops back to collector after 2 min in the background. After 5 wrong PINs it waits 30 s, longer each time.")
 
         Row(Modifier.padding(top = 4.dp)) { Sh(Ic.layers, "Links to the bins") }
         val looks = routeLooks(hub.routes, c)
@@ -146,7 +148,7 @@ fun AppPage(vm: AppViewModel, hub: HubState) {
         }
 
         DemoOptions(vm, hub)
-        Hint("Smart-Bin app ${BuildConfig.VERSION_NAME}, matches dashboard v11", Modifier.fillMaxWidth(), align = TextAlign.Center)
+        Hint("Smart-Bin app ${BuildConfig.VERSION_NAME}, matches dashboard v12", Modifier.fillMaxWidth(), align = TextAlign.Center)
     }
 }
 

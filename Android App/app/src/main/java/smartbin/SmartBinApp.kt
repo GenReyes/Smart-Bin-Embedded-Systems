@@ -39,7 +39,7 @@ class SmartBinApp : Application() {
                 when (e) {
                     is HubEvent.NewAlert ->
                         if (Hub.foreground) Feel.event(Alerts.sfxFor(e.type))
-                        else Alerts.post(this@SmartBinApp, e.row, e.type, e.binId)
+                        else if (Hub.inMain) Alerts.post(this@SmartBinApp, e.row, e.type, e.binId)
                     is HubEvent.LinkChanged -> if (Hub.foreground) when (e.to) {
                         Link.LIVE -> Feel.event(Sfx.LINK_UP)
                         Link.CLOUD, Link.THINGSPEAK -> Feel.event(Sfx.CLOUD)

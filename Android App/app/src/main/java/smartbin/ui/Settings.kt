@@ -433,7 +433,7 @@ fun Bluetooth(vm: AppViewModel, hub: HubState) {
         Card {
             Hint("Hand the Wi-Fi name and password to $name over Bluetooth, read back the address it gets, then switch its Bluetooth off so only Wi-Fi stays on.")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf(Ic.bluetooth to "PAIR", Ic.radar to "PICK NETWORK", Ic.key to "SEND", Ic.power to "BT OFF").forEachIndexed { k, (ic, label) ->
+                listOf(Ic.bluetooth to "PAIR + CODE", Ic.radar to "PICK NETWORK", Ic.key to "SEND", Ic.power to "BT OFF").forEachIndexed { k, (ic, label) ->
                     val done = vm.bt > k
                     val now = vm.bt == k
                     val cc = when { done -> c.ok; now -> c.bt; else -> c.ink2 }
@@ -478,7 +478,7 @@ fun Bluetooth(vm: AppViewModel, hub: HubState) {
             Btn("TURN BT OFF", { vm.btOff() }, Modifier.fillMaxWidth(), Ic.power, Look.TINT, c.warn, enabled = vm.bt == 3 && op, sound = Sfx.SWITCH_OFF)
             Hint(
                 when (vm.bt) {
-                    0 -> "Stand next to the bin and press PAIR A BIN."
+                    0 -> "Stand next to the bin, tap Pair phone on its touchscreen, then press PAIR A BIN and type the 6-digit code it shows."
                     1 -> "Pick the 2.4 GHz network the bin should join, then SEND WI-FI."
                     2 -> "Sending credentials and waiting for the bin to join..."
                     3 -> "Press USE to store this address, then turn Bluetooth off on the bin."
@@ -486,6 +486,7 @@ fun Bluetooth(vm: AppViewModel, hub: HubState) {
                 }
             )
             if (!op) Hint("You are signed in as a collector. You can pair a bin and read its address, but only an operator can send new Wi-Fi details or switch Bluetooth off.")
+            Hint("The code keeps strangers from pairing and encrypts the link, so the Wi-Fi password cannot be overheard. It is new each time, lasts 60 s, and 3 wrong codes stop pairing for 60 s.")
             Hint("This page walks through the steps with a stand-in for the bin. It talks to a real bin once the firmware has Bluetooth setup.")
         }
     }

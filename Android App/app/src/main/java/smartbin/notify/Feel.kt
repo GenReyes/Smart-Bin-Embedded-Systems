@@ -37,7 +37,7 @@ object Feel {
             Sfx.SWITCH_OFF -> if (v >= 34) HapticFeedbackConstants.TOGGLE_OFF else HapticFeedbackConstants.KEYBOARD_TAP
             Sfx.STEP_UP, Sfx.STEP_DOWN, Sfx.CHOICE -> if (v >= 30) HapticFeedbackConstants.SEGMENT_TICK else HapticFeedbackConstants.KEYBOARD_TAP
             Sfx.BACK -> HapticFeedbackConstants.CLOCK_TICK
-            Sfx.TAB, Sfx.THEME_LIGHT, Sfx.THEME_DARK, Sfx.OPEN -> HapticFeedbackConstants.KEYBOARD_TAP
+            Sfx.PIN_KEY, Sfx.TAB, Sfx.THEME_LIGHT, Sfx.THEME_DARK, Sfx.OPEN -> HapticFeedbackConstants.KEYBOARD_TAP
             else -> key
         }
     }
