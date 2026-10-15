@@ -1,0 +1,18 @@
+# Build output and caches
+.gradle/
+build/
+.kotlin/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Machine-specific: the Android SDK path and the Firebase test account
+local.properties
+
+# Android Studio settings
+.idea/
+*.iml
+
+# Signing keys
+*.jks
+*.keystore

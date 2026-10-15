@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The page colours of the mockup's light and dark themes. -->
+    <color name="ic_launcher_bg_light">#FFE4DCD2</color>
+    <color name="ic_launcher_bg_dark">#FF2B2622</color>
+    <color name="splash_light">#FFE4DCD2</color>
+</resources>

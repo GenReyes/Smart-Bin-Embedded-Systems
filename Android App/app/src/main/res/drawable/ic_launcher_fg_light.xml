@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Home-screen logo: the Smart-Bin bin with its fill wave, drawn from the app mockup's bin icon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="1.5"
+        android:scaleY="1.5"
+        android:translateX="18"
+        android:translateY="17">
+        <clip-path android:pathData="M11.5,14h25l-2.6,26.2a2.4,2.4 0,0 1,-2.4 2.1H16.5a2.4,2.4 0,0 1,-2.4 -2.1z" />
+        <path
+            android:fillColor="#FF1E8E3E"
+            android:fillAlpha="0.35"
+            android:pathData="M0,25 q6,-5 12,0 t12,0 t12,0 t12,0 v24 h-48z" />
+        <path
+            android:fillColor="#FF1E8E3E"
+            android:fillAlpha="0.9"
+            android:pathData="M-6,28 q6,-5 12,0 t12,0 t12,0 t12,0 t12,0 v24 h-60z" />
+    </group>
+    <group
+        android:scaleX="1.5"
+        android:scaleY="1.5"
+        android:translateX="18"
+        android:translateY="17">
+        <path
+            android:strokeColor="#FF2A241E"
+            android:strokeWidth="2.6"
+            android:strokeLineJoin="round"
+            android:pathData="M11.5,14h25l-2.6,26.2a2.4,2.4 0,0 1,-2.4 2.1H16.5a2.4,2.4 0,0 1,-2.4 -2.1z" />
+        <path
+            android:strokeColor="#FF2A241E"
+            android:strokeWidth="2.6"
+            android:strokeLineCap="round"
+            android:pathData="M8,13h32M19,9.4h10" />
+    </group>
+</vector>

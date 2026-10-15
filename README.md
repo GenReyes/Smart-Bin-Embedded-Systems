@@ -39,7 +39,7 @@ Collection priority ranks the fullest bin first, with an estimated time to full.
 |---|---|
 | `firmware/` | ESP32 firmware and component test sketches |
 | `dashboard/` | Operator web dashboard (single HTML file) |
-| `android-app/` | Collector Android app |
+| `Android App/` | Android app for operators and collectors (Kotlin, Compose). See its README |
 | `hardware/` | Schematic |
 | `docs/` | Implementation plan, UI mockups, schedule |
 

@@ -1,0 +1,545 @@
+package smartbin.ui
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import smartbin.data.AlertType
+import smartbin.data.Bin
+import smartbin.data.Cal
+import smartbin.data.HubState
+import smartbin.data.Link
+import smartbin.data.Role
+import smartbin.data.Source
+import smartbin.data.v
+import smartbin.notify.Alerts
+import smartbin.notify.Feel
+import smartbin.notify.Haptics
+import smartbin.notify.Sfx
+
+@Composable
+fun SettingsPage(vm: AppViewModel, hub: HubState, allowAlerts: () -> Unit) {
+    val c = Sb.c
+    val context = LocalContext.current
+    val b = vm.binFor(vm.selSet, hub.bins)
+    val scroll = rememberScrollState()
+    val calHere = b != null && hub.calibBin == b.id
+    val on = vm.operator && calHere && vm.edit != null
+    val showSave = on && vm.dirty
+    Box(Modifier.fillMaxSize()) {
+        ScrollPage(state = scroll, bottomExtra = if (showSave) 72.dp else 0.dp) {
+            Sh(Ic.sliders, "Settings", c.cal)
+            if (b == null) {
+                Card { Empty(Ic.bins, "No bins yet.") }
+            } else {
+                // Calibration runs on one bin at a time, so the picker is held while it is on.
+                BinSeg(vm, hub, PickFor.SET, vm.selSet, allowAll = false, locked = hub.calibBin != null) {
+                    vm.selSet = it
+                    vm.pinShown = false
+                }
+                if (vm.operator) CalBar(vm, b, on, hub) else CollectorTop(vm, b)
+                val v: Cal = if (on) vm.edit!! else b.cal
+                Sections(vm, b, v, on)
+            }
+            Row(Modifier.padding(top = 4.dp)) { Sh(Ic.gear, "App and bins") }
+            val linkCc = when (hub.link) { Link.CLOUD -> c.cloud; Link.OFFLINE -> c.bad; else -> c.link }
+            LRow(
+                if (hub.link == Link.CLOUD) Ic.cloud else Ic.wifi(hub.link == Link.LIVE), "Connection",
+                when (hub.link) {
+                    Link.LIVE -> "Local Wi-Fi now. Firebase is the backup."
+                    Link.CLOUD -> "On Firebase now. Wi-Fi is tried again every 30 s."
+                    Link.OFFLINE -> "Nothing answers. Check Wi-Fi and the cloud account."
+                    Link.DEMO -> if (vm.fb.filled) "Demo data. Firebase is set up as the backup." else "Demo data. No Firebase account yet."
+                },
+                linkCc, onClick = { vm.go(Screen.NET) },
+            )
+            LRow(
+                Ic.bluetooth, "Bluetooth setup",
+                when { vm.bt in 1..3 -> "Paired, step ${vm.bt + 1} of 4"; vm.bt >= 4 -> "Done, Bluetooth is off"; else -> "Send Wi-Fi to a bin" },
+                c.bt, onClick = { vm.go(Screen.BT) },
+            )
+            if (b != null) LRow(Ic.reload, "Reload from bin", "Read the values ${b.name} is running on", onClick = { vm.reload(b) }, chevron = false, sound = Sfx.TAP)
+            if (vm.operator) LRow(Ic.download, "Export bin list", "Names, places and addresses as a file", onClick = { vm.exportBins(hub.bins) }, chevron = false, sound = Sfx.SAVED)
+            LRow(Ic.user, "Signed in as", chevron = false) {
+                TwoWay {
+                    Tw(vm.operator, { vm.pickRole(Role.OPERATOR) }, "Operator", grow = null)
+                    Tw(!vm.operator, { vm.pickRole(Role.COLLECTOR) }, "Collector", grow = null)
+                }
+            }
+            LRow(Ic.palette, "Appearance", chevron = false) {
+                TwoWay {
+                    ThemeMode.entries.forEach { m ->
+                        Tw(vm.theme == m, { vm.setThemeMode(m) }, m.name.lowercase().replaceFirstChar { it.uppercase() }, grow = null)
+                    }
+                }
+            }
+            LRow(
+                Ic.bell, "Push alerts",
+                when (vm.notifications) {
+                    Perm.ON -> "On. Alerts arrive with the app closed."
+                    Perm.BLOCKED -> "Blocked in Android settings."
+                    Perm.OFF -> "Not turned on yet."
+                },
+                c.tamper, chevron = false,
+            ) {
+                when (vm.notifications) {
+                    Perm.ON -> Tag("ON", c.ok)
+                    Perm.OFF -> Btn("TURN ON", { vm.overlay = Overlay.NotifPre }, look = Look.TINT, cc = c.tamper, small = true)
+                    Perm.BLOCKED -> Btn("OPEN", { openAlertSettings(context) }, look = Look.TINT, cc = c.tamper, small = true, sound = Sfx.OPEN)
+                }
+            }
+            SoundAndFeel(vm, context)
+            Hint("Smart-Bin app 1.1, matches dashboard v11", Modifier.fillMaxWidth(), align = TextAlign.Center)
+        }
+        if (showSave) {
+            SaveBar(
+                Modifier.align(Alignment.BottomCenter).padding(horizontal = 14.dp, vertical = 8.dp),
+                onCancel = { vm.cancel(b) }, onSave = { vm.save(b) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun SaveBar(modifier: Modifier, onCancel: () -> Unit, onSave: () -> Unit) {
+    val c = Sb.c
+    Row(
+        modifier.widthIn(max = 520.dp).fillMaxWidth().bump(c, 16.dp, Out.O2, ring = c.accentSoft).padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Ico(Ic.save, 18.dp, c.accent)
+            T("Unsaved changes", size = 0.8f, color = c.accent, maxLines = 1)
+        }
+        Btn("CANCEL", onCancel, small = true, sound = Sfx.BACK)
+        Btn("SAVE", onSave, icon = Ic.save, look = Look.ACCENT, small = true, sound = Sfx.CONFIRM)
+    }
+}
+
+@Composable
+private fun CalBar(vm: AppViewModel, b: Bin, on: Boolean, hub: HubState) {
+    val c = Sb.c
+    val cloud = b.source == Source.CLOUD
+    val elsewhere = hub.calibBin != null && hub.calibBin != b.id
+    Column(
+        Modifier.fillMaxWidth().then(if (on) Modifier.ring(c.accentSoft, 16.dp) else Modifier).well(c, 16.dp).padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(42.dp).bump(c, 21.dp), contentAlignment = Alignment.Center) {
+                Ico(if (on) Ic.calib else if (cloud) Ic.cloud else Ic.lock(true), 21.dp, if (on) c.accent else c.ink2, Modifier.spin(on))
+            }
+            Column(Modifier.weight(1f)) {
+                T(if (on) "Calibration mode is on for ${b.name}" else "Settings are locked", size = 0.98f)
+                T(
+                    when {
+                        on -> "Change what you need, then SAVE. Switching off without saving leaves the bin as it was."
+                        cloud -> "Calibration needs live readings, so it only runs on the bins’ Wi-Fi. The app is on cloud now. Every value can still be read."
+                        elsewhere -> "Calibration is on for another bin. Switch it off there first."
+                        else -> "Switch on calibration mode to change anything. The bin shows its teal calibration screen while it is on."
+                    },
+                    Modifier.padding(top = 2.dp), size = 0.8f, weight = FontWeight.Medium, color = c.ink2,
+                )
+            }
+        }
+        Row(
+            Modifier.fillMaxWidth().bump(c, 14.dp).padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            T("Calibration mode", Modifier.weight(1f), size = 0.9f, weight = FontWeight.Bold, color = if (on) c.accent else c.ink)
+            Toggle(on, { vm.setCalibration(it, b) }, enabled = on || (!cloud && !elsewhere && b.source != Source.STALE))
+        }
+    }
+}
+
+@Composable
+private fun CollectorTop(vm: AppViewModel, b: Bin) {
+    val c = Sb.c
+    Row(
+        Modifier.fillMaxWidth().well(c, 16.dp).padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(Modifier.size(44.dp).bump(c, 22.dp), contentAlignment = Alignment.Center) { Ico(Ic.pin, 21.dp, c.cal) }
+        Column(Modifier.weight(1f)) {
+            T("Collect PIN for ${b.name}", size = 0.98f)
+            T("Type this on the bin touchscreen when you tap COLLECT.", size = 0.8f, weight = FontWeight.Medium, color = c.ink2)
+        }
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        T(
+            if (vm.pinShown) "%04d".format(b.cal.v("collect_pin").toInt()) else "••••", Modifier.weight(1f).padding(start = 4.dp),
+            size = 2f, color = c.cal, tnum = true, spacing = if (vm.pinShown) 0.21f else 0.14f, lineHeight = 1.1f,
+        )
+        Btn(if (vm.pinShown) "HIDE" else "SHOW", { vm.pinShown = !vm.pinShown }, icon = if (vm.pinShown) Ic.eyeoff else Ic.eye, look = Look.TINT, cc = c.cal, small = true, sound = Sfx.CHOICE)
+    }
+    Row(
+        Modifier.fillMaxWidth().well(c, 16.dp).padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(Modifier.size(42.dp).bump(c, 21.dp), contentAlignment = Alignment.Center) { Ico(Ic.eye, 21.dp, c.ink2) }
+        Column(Modifier.weight(1f)) {
+            T("These settings are read only", size = 0.98f)
+            T("You can see every value, but only the operator can change them or run a calibration.", size = 0.8f, weight = FontWeight.Medium, color = c.ink2)
+        }
+    }
+}
+
+/** .sect: a fold-out group of settings with its summary on the right. */
+@Composable
+private fun Sect(vm: AppViewModel, key: String, title: String, summary: String, cc: Color, on: Boolean, body: @Composable () -> Unit) {
+    val c = Sb.c
+    val open = key in vm.open
+    val turn by animateFloatAsState(if (open) 180f else 0f, label = "chev")
+    Column(Modifier.fillMaxWidth().bump(c, 16.dp)) {
+        Row(
+            Modifier.fillMaxWidth().defaultMinSize(minHeight = 54.dp).press(true, if (open) Sfx.BACK else Sfx.OPEN) { vm.toggleSection(key) }.padding(horizontal = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(Modifier.size(4.dp, 15.dp).clip(RoundedCornerShape(2.dp)).background(cc))
+            T(title.uppercase(), size = 0.76f, spacing = 0.09f, color = cc, maxLines = 1)
+            T(summary, Modifier.weight(1f), size = 0.76f, weight = FontWeight.Bold, color = c.ink2, maxLines = 1, align = TextAlign.End)
+            Ico(Ic.chev, 18.dp, c.ink2, Modifier.graphicsLayer { rotationZ = turn })
+        }
+        AnimatedVisibility(open) {
+            Column(
+                Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 2.dp, bottom = 16.dp).alpha(if (on) 1f else 0.5f),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) { body() }
+        }
+    }
+}
+
+@Composable
+private fun Fld(vm: AppViewModel, key: String, value: Double, on: Boolean, cc: Color, extra: (@Composable () -> Unit)? = null) {
+    val f = FIELDS.getValue(key)
+    Field("${f.label} (${f.unit})", f.icon(), cc) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Stepper(fmt(value, f.dec), f.unit, { vm.step(key, it) }, Modifier.weight(1f), enabled = on, cc = cc)
+            extra?.invoke()
+        }
+    }
+}
+
+@Composable
+private fun Sections(vm: AppViewModel, b: Bin, v: Cal, on: Boolean) {
+    val c = Sb.c
+    val r = b.reading
+    Sect(vm, "range", "Fill range", "${fmt(v.v("d_empty"), 1)} to ${fmt(v.v("d_full"), 1)} cm", c.cal, on) {
+        Fld(vm, "d_empty", v.v("d_empty"), on, c.cal) { Btn("USE NOW", { vm.useNow("d_empty", b) }, look = Look.TINT, cc = c.cal, small = true, enabled = on, sound = Sfx.CONFIRM) }
+        Fld(vm, "d_full", v.v("d_full"), on, c.cal) { Btn("USE NOW", { vm.useNow("d_full", b) }, look = Look.TINT, cc = c.cal, small = true, enabled = on, sound = Sfx.CONFIRM) }
+        Hint("Empty the bin and press USE NOW for the first one. Hold a board at your full line and press it for the second. Sensor reads **${fmt(r.distance, 1)} cm** right now.")
+    }
+    Sect(
+        vm, "limits", "Alert limits",
+        "${fmt(v.v("fill_th"), 0)}% · ${fmt(v.v("temp_th"), 0)}°C · ${fmt(v.v("hum_th"), 0)}%RH · ${fmt(v.v("gas_th"), 0)} IAQ", c.bad, on,
+    ) {
+        listOf("fill_th", "temp_th", "hum_th", "gas_th", "tilt_th", "weight_cap").forEach { Fld(vm, it, v.v(it), on, c.bad) }
+        Hint("A reading at or above its threshold turns its tile red, raises an alert and sounds the bin buzzer. Humidity uses 85 %RH by default, the same limit as the bin touchscreen.")
+    }
+    Sect(vm, "air", "Air sensor (BME680)", "offset ${fmt(v.v("temp_off"), 1)}°C", c.gas, on) {
+        Field("Temperature raw / corrected", Ic.temp(r.temp), c.gas) { Readout("${fmt(r.tempRaw, 1)} / ${fmt(r.tempRaw + v.v("temp_off"), 1)} °C") }
+        Fld(vm, "tref", vm.tref, on, c.gas) { Btn("SET OFFSET", { vm.setOffset(b) }, look = Look.TINT, cc = c.gas, small = true, enabled = on, sound = Sfx.CONFIRM) }
+        Fld(vm, "temp_off", v.v("temp_off"), on, c.gas)
+        val acc = listOf("Stabilizing", "Low accuracy", "Medium accuracy", "Calibrated")[r.iaqAcc.coerceIn(0, 3)]
+        Field("Gas sensor state", Ic.gas, c.gas) { Readout("$acc, IAQ ${Math.round(r.gas)}") }
+        Fld(vm, "hum_off", v.v("hum_off"), on, c.gas)
+        Fld(vm, "press_off", v.v("press_off"), on, c.gas)
+        Btn(
+            "RESET GAS BASELINE", { vm.binCommand(b, "RESET_GAS", emptyMap(), "Gas baseline cleared. It needs time in normal air to be accurate again.") },
+            Modifier.fillMaxWidth(), Ic.reload, Look.TINT, c.gas, enabled = on, sound = Sfx.CONFIRM,
+        )
+        Hint("The BME680 warms itself, so it reads a little hot and its humidity a little low. Put a reference thermometer next to the bin for a few minutes, enter its reading, press SET OFFSET, then SAVE. The gas reading learns its own baseline in normal air, and RESET GAS BASELINE restarts that.")
+    }
+    Sect(vm, "lid", "Lid and lock", "PIN •••• · ${fmt(v.v("pir_hold_s"), 0)} s", c.sim, on) {
+        Fld(vm, "servo_closed", v.v("servo_closed"), on, c.sim)
+        Fld(vm, "servo_open", v.v("servo_open"), on, c.sim)
+        Field("Collect PIN", Ic.pin, c.sim) {
+            Inp(
+                if (vm.operator) v.v("collect_pin").toInt().takeIf { it > 0 }?.toString().orEmpty() else "••••", vm::setPin,
+                keyboard = KeyboardType.NumberPassword, enabled = on,
+            )
+        }
+        Fld(vm, "pir_hold_s", v.v("pir_hold_s"), on, c.sim)
+        Fld(vm, "buzz_s", v.v("buzz_s"), on, c.sim)
+        Row(
+            Modifier.fillMaxWidth().bump(c, 14.dp).padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            T("Lock the lid when the bin is full", Modifier.weight(1f), size = 0.9f, weight = FontWeight.Bold)
+            Toggle(v.v("auto_lock") > 0, { vm.toggleAutoLock() }, enabled = on)
+        }
+    }
+    Sect(vm, "weight", "Weight", "%.2f kg now".format(r.weight / 1000), c.weight, on) {
+        Field("Reading now", Ic.weight(r.weight / v.v("weight_cap")), c.weight) { Readout("%.2f kg".format(r.weight / 1000)) }
+        Fld(vm, "known", vm.known, on, c.weight)
+        Acts {
+            Btn("TARE / ZERO", { vm.binCommand(b, "TARE", emptyMap(), "Scale zeroed on ${b.name}.") }, Modifier.weight(1f), Ic.undo, Look.TINT, c.weight, enabled = on, sound = Sfx.CONFIRM)
+            Btn(
+                "CALIBRATE", { vm.binCommand(b, "CAL_WEIGHT", mapOf("grams" to vm.known), "Calibrated with ${fmt(vm.known, 0)} g.") },
+                Modifier.weight(1f), Ic.capture, Look.TINT, c.weight, enabled = on, sound = Sfx.CONFIRM,
+            )
+        }
+        Hint("Tare with the bin empty. Then put the known weight in and press CALIBRATE.")
+    }
+}
+
+/** Garbage-Guard's sound and feel settings, with a preview of each alert's own sound and buzz. */
+@Composable
+private fun SoundAndFeel(vm: AppViewModel, context: android.content.Context) {
+    val c = Sb.c
+    Row(Modifier.padding(top = 4.dp)) { Sh(Ic.speaker, "Sound and feel") }
+    LRow(Ic.speaker, "Button sounds", "A soft sound on keys, switches and tabs", chevron = false) {
+        Toggle(vm.sounds, { vm.toggleSounds() })
+    }
+    LRow(Ic.vibrate, "Vibration", "A tick under the finger, and a pattern for each kind of alert", chevron = false) {
+        Toggle(vm.haptics, { vm.toggleHaptics() })
+    }
+    Column(
+        Modifier.fillMaxWidth().bump(c, 14.dp).padding(horizontal = 13.dp, vertical = 11.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp),
+    ) {
+        T("Vibration strength", weight = FontWeight.Bold)
+        TwoWay(full = true) {
+            Haptics.Strength.entries.forEach { s ->
+                Tw(vm.strength == s, { vm.chooseStrength(s) }, s.label, enabled = vm.haptics)
+            }
+        }
+    }
+    LRow(Ic.sun, "Keep screen on", "Stops the phone dimming while the app is open", chevron = false) {
+        Toggle(vm.keepAwake, { vm.toggleAwake() })
+    }
+    Column(
+        Modifier.fillMaxWidth().bump(c, 14.dp).padding(horizontal = 13.dp, vertical = 11.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp),
+    ) {
+        T("Alert sounds", weight = FontWeight.Bold)
+        T("Each kind of alert has its own sound and vibration, so you can tell them apart without looking. Tap one to hear it.", size = 0.8f, weight = FontWeight.SemiBold, color = c.ink2)
+        val kinds: List<Triple<AlertType, String, Pair<ImageVector, Color>>> = listOf(
+            Triple(AlertType.FULL, "Full", Ic.fill to c.bad),
+            Triple(AlertType.TAMPER, "Tamper", Ic.tamper to c.tamper),
+            Triple(AlertType.SENSOR, "Sensor", Ic.temp(41.0) to c.temp),
+            Triple(AlertType.LOCK, "Lock", Ic.lock(true) to c.sim),
+            Triple(AlertType.PICKUP, "Pickup", Ic.truck to c.cal),
+            Triple(AlertType.INFO, "Setup", Ic.calib to c.ink2),
+        )
+        kinds.chunked(3).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                row.forEach { (type, label, ic) ->
+                    Btn(label, { Feel.event(Alerts.sfxFor(type)) }, Modifier.weight(1f), ic.first, Look.TINT, ic.second, small = true, sound = Sfx.TAP)
+                }
+            }
+        }
+    }
+    LRow(Ic.bell, "Android alert settings", "Change or silence each kind of alert while the app is closed", onClick = { openAlertSettings(context) })
+}
+
+// ---------- connection ----------
+
+@Composable
+fun Connection(vm: AppViewModel, hub: HubState) {
+    val c = Sb.c
+    val link = hub.link
+    val (stateText, stateCc) = when (link) {
+        Link.LIVE -> "Local Wi-Fi" to c.link; Link.CLOUD -> "Cloud" to c.cloud; Link.OFFLINE -> "Not connected" to c.bad; Link.DEMO -> "Demo data" to c.warn
+    }
+    ScrollPage {
+        BackBar("Connection", { vm.go(Screen.SETTINGS) }) {
+            StatePill(if (link == Link.CLOUD) Ic.cloud else Ic.wifi(link == Link.LIVE), stateText, stateCc, true)
+        }
+        Card {
+            Sh(Ic.layers, "How the app reaches the bins", c.link)
+            Route(1, Ic.wifi(link == Link.LIVE), c.link, link == Link.LIVE, "Local Wi-Fi", "Always tried first. Readings every second and every control.")
+            Route(2, Ic.cloud, c.cloud, link == Link.CLOUD, "Firebase cloud", "Only when no bin answers on Wi-Fi. Readings every 5 s. LOCK, UNLOCK and COLLECT only.")
+            Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                hub.bins.take(4).forEach { b ->
+                    val (cc, txt) = when (b.source) {
+                        Source.DEMO -> c.warn to "demo data"
+                        Source.STALE -> c.bad to "not answering"
+                        Source.LIVE -> c.link to "answers on Wi-Fi"
+                        Source.CLOUD -> c.cloud to "via cloud"
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                        Box(Modifier.size(10.dp).ring(cc.soft(0.22f), 5.dp, 3.dp).clip(RoundedCornerShape(5.dp)).background(cc))
+                        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            T(b.name, size = 0.84f, weight = FontWeight.Bold, maxLines = 1)
+                            T(b.ip.ifBlank { "no address" }, size = 0.84f, weight = FontWeight.SemiBold, color = c.ink2, maxLines = 1)
+                        }
+                        T(txt, size = 0.72f, weight = FontWeight.Bold, color = cc, maxLines = 1)
+                    }
+                }
+                if (hub.bins.size > 4) T("and ${hub.bins.size - 4} more", size = 0.84f, weight = FontWeight.SemiBold, color = c.ink2)
+            }
+            Hint("The app calls every bin address with a 1.5 s timeout when it opens, when the phone changes network, and every 30 s while it is on cloud, and goes back to Wi-Fi by itself. Each bin also writes its own address to the cloud, so a new address is picked up without typing it.")
+        }
+        Card {
+            Sh(Ic.cloud, "Firebase account", c.cloud)
+            Field("Database URL", Ic.cloud) { Inp(vm.fb.url, { vm.fb = vm.fb.copy(url = it.trim()) }, placeholder = "https://...firebasedatabase.app", keyboard = KeyboardType.Uri) }
+            Field("Web API key", Ic.key) { Inp(vm.fb.key, { vm.fb = vm.fb.copy(key = it.trim()) }, placeholder = "AIza...") }
+            Field("Email", Ic.user) { Inp(vm.fb.email, { vm.fb = vm.fb.copy(email = it.trim()) }, placeholder = "name@example.com", keyboard = KeyboardType.Email) }
+            Field("Password", Ic.key) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Inp(vm.fb.password, { vm.fb = vm.fb.copy(password = it) }, Modifier.weight(1f), password = !vm.fbShow)
+                    Btn(if (vm.fbShow) "HIDE" else "SHOW", { vm.fbShow = !vm.fbShow }, icon = if (vm.fbShow) Ic.eyeoff else Ic.eye, look = Look.TINT, small = true, sound = Sfx.CHOICE)
+                }
+            }
+            vm.fbMsg?.let { (ok, msg) ->
+                Row(
+                    Modifier.fillMaxWidth().brutal(c, 12.dp, if (ok) c.ok else c.bad, off = 3.dp).padding(horizontal = 12.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Ico(if (ok) Ic.check else Ic.tamper, 18.dp, c.onBanner)
+                    T(msg, size = 0.82f, weight = FontWeight.Bold, color = c.onBanner)
+                }
+            }
+            Acts {
+                Btn(if (vm.fbBusy) "TESTING" else "TEST", { vm.fbTest(false) }, Modifier.weight(1f), Ic.radar, Look.TINT, c.cloud, enabled = !vm.fbBusy)
+                Btn("TEST AND SAVE", { vm.fbTest(true) }, Modifier.weight(1f), Ic.save, Look.SOLID, c.cloud, enabled = !vm.fbBusy)
+            }
+            Btn("RESTORE WORKING", { vm.fbRestore() }, Modifier.fillMaxWidth(), Ic.undo, Look.TINT)
+            Hint("TEST signs in and reads the list of bins. TEST AND SAVE keeps the details only when the test passes. RESTORE WORKING puts back the last details that passed. The password is stored encrypted on this phone.")
+        }
+        Card {
+            Sh(Ic.download, "Data use this month", c.cloud)
+            val bytes = hub.cloudBytes
+            val limit = 10L * 1024 * 1024 * 1024
+            val share = ((bytes ?: 0L).toDouble() / limit).coerceIn(0.0, 1.0)
+            Box(
+                Modifier.fillMaxWidth().height(14.dp).well(c, 7.dp).drawBehind {
+                    if (share > 0) drawRoundRect(c.cloud, size = Size((size.width * share).toFloat().coerceAtLeast(size.height), size.height), cornerRadius = CornerRadius(7.dp.toPx()))
+                },
+            )
+            Hint(
+                if (bytes == null) "No figure yet. The bins report how much they sent once the app has used the cloud. The free Firebase plan allows 10 GB each month."
+                else "**${bytes / (1024 * 1024)} MB** of the 10 GB the free Firebase plan allows each month. The bins write every 5 s while a phone watches over cloud and every minute otherwise, and at once when an alert starts."
+            )
+        }
+    }
+}
+
+@Composable
+private fun Route(n: Int, icon: ImageVector, cc: Color, on: Boolean, title: String, sub: String) {
+    val c = Sb.c
+    Row(
+        Modifier.fillMaxWidth().then(if (on) Modifier.bump(c, 14.dp, ring = cc.soft(0.34f)) else Modifier.well(c, 14.dp)).padding(horizontal = 12.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(11.dp),
+    ) {
+        Box(Modifier.size(26.dp).bump(c, 13.dp), contentAlignment = Alignment.Center) { T("$n", size = 0.8f, color = cc) }
+        Ico(icon, 21.dp, cc)
+        Column(Modifier.weight(1f)) {
+            T(title, size = 0.92f)
+            T(sub, Modifier.padding(top = 2.dp), size = 0.77f, weight = FontWeight.SemiBold, color = c.ink2)
+        }
+        if (on) Tag("IN USE", cc)
+    }
+}
+
+// ---------- Bluetooth setup ----------
+
+@Composable
+fun Bluetooth(vm: AppViewModel, hub: HubState) {
+    val c = Sb.c
+    val op = vm.operator
+    val b = vm.binFor(vm.selSet, hub.bins)
+    val paired = vm.bt > 0
+    val name = b?.name ?: "this bin"
+    ScrollPage {
+        BackBar("Bluetooth setup", { vm.go(Screen.SETTINGS) }) {
+            StatePill(Ic.bluetooth, if (vm.bt >= 4) "Off" else if (paired) "Paired" else "Not paired", c.bt, paired && vm.bt < 4)
+        }
+        Card {
+            Hint("Hand the Wi-Fi name and password to $name over Bluetooth, read back the address it gets, then switch its Bluetooth off so only Wi-Fi stays on.")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(Ic.bluetooth to "PAIR", Ic.radar to "PICK NETWORK", Ic.key to "SEND", Ic.power to "BT OFF").forEachIndexed { k, (ic, label) ->
+                    val done = vm.bt > k
+                    val now = vm.bt == k
+                    val cc = when { done -> c.ok; now -> c.bt; else -> c.ink2 }
+                    Column(
+                        Modifier.weight(1f).then(if (now) Modifier.bump(c, 13.dp, ring = c.bt.soft(0.3f)) else Modifier.well(c, 13.dp)).padding(vertical = 11.dp, horizontal = 4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Ico(if (done) Ic.check else ic, 19.dp, cc)
+                        T(label, size = 0.64f, color = cc, align = TextAlign.Center, lineHeight = 1.2f)
+                    }
+                }
+            }
+            val canEdit = paired && op && vm.bt < 3
+            Field("Wi-Fi name (2.4 GHz)", Ic.wifi(false)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Inp(vm.ssid, { vm.ssid = it }, Modifier.weight(1f), placeholder = "HomeWiFi-2G", enabled = canEdit)
+                    Btn("SCAN", { vm.overlay = Overlay.Wifi }, icon = Ic.radar, look = Look.TINT, cc = c.bt, small = true, enabled = paired && vm.bt < 3, sound = Sfx.OPEN)
+                }
+            }
+            Field("Password", Ic.key) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Inp(vm.pass, { vm.pass = it }, Modifier.weight(1f), password = !vm.showPass, enabled = canEdit)
+                    Btn(if (vm.showPass) "HIDE" else "SHOW", { vm.showPass = !vm.showPass }, icon = if (vm.showPass) Ic.eyeoff else Ic.eye, look = Look.TINT, small = true, enabled = paired, sound = Sfx.CHOICE)
+                }
+            }
+            if (vm.bt == 3 && b != null) {
+                Column(Modifier.fillMaxWidth().well(c, 14.dp).padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Ico(Ic.wifi(true), 21.dp, c.ok)
+                        T("Joined the network. Address: ", size = 0.9f, weight = FontWeight.Bold)
+                        T(vm.btAddress(hub.bins, b), size = 1.3f, color = c.ok, tnum = true)
+                    }
+                    Btn("USE FOR ${b.name.uppercase()}", { vm.btUse(hub.bins, b) }, Modifier.fillMaxWidth(), Ic.check, Look.SOLID, c.ok, small = true, sound = Sfx.SAVED)
+                }
+            }
+            Btn("PAIR A BIN", { b?.let { vm.btPair(it) } }, Modifier.fillMaxWidth(), Ic.bluetooth, Look.TINT, c.bt, enabled = vm.bt == 0 && b != null)
+            Btn(
+                "SEND WI-FI", { vm.btSend() }, Modifier.fillMaxWidth(), if (vm.bt == 2) Ic.reload else Ic.key, Look.SOLID, c.bt,
+                enabled = vm.bt == 1 && op, iconMod = Modifier.spin(vm.bt == 2), sound = Sfx.CONFIRM,
+            )
+            Btn("TURN BT OFF", { vm.btOff() }, Modifier.fillMaxWidth(), Ic.power, Look.TINT, c.warn, enabled = vm.bt == 3 && op, sound = Sfx.SWITCH_OFF)
+            Hint(
+                when (vm.bt) {
+                    0 -> "Stand next to the bin and press PAIR A BIN."
+                    1 -> "Pick the 2.4 GHz network the bin should join, then SEND WI-FI."
+                    2 -> "Sending credentials and waiting for the bin to join..."
+                    3 -> "Press USE to store this address, then turn Bluetooth off on the bin."
+                    else -> "Bluetooth is off on the bin. It stays on Wi-Fi until you reset it."
+                }
+            )
+            if (!op) Hint("You are signed in as a collector. You can pair a bin and read its address, but only an operator can send new Wi-Fi details or switch Bluetooth off.")
+            Hint("This page walks through the steps with a stand-in for the bin. It talks to a real bin once the firmware has Bluetooth setup.")
+        }
+    }
+}
