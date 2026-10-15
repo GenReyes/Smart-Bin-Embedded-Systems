@@ -272,17 +272,19 @@ fun liveBanners(hub: HubState): List<Live> {
     if (tam.isNotEmpty()) out += Live(Tone.RED, Ic.tamper, "TAMPER: " + tam.joinToString { it.name }, "Check the bin before resetting the alert.", Ic.tamper to c.tamper)
     if (full.isNotEmpty()) out += Live(Tone.RED, Ic.truck, "COLLECT NOW: " + full.joinToString { "${it.name} at ${Math.round(it.reading.fill)}%" }, null, Ic.truck to c.tamper)
     if (sim.isNotEmpty()) out += Live(Tone.PURPLE, Ic.flask, "SIMULATION MODE", "Some readings are set by hand, not by the sensors.", Ic.flask to c.sim)
+    // Pretend links from the demo options say so, so nobody mistakes them for real ones.
+    val pretend = if (hub.demo) "Pretend link from the demo options. " else ""
     when (hub.link) {
         Link.DEMO -> out += Live(Tone.AMBER, Ic.wifi(false), "Showing demo data", "Open a bin with SET, add its IP address, and it switches to live readings.", Ic.wifi(false) to c.warn)
         Link.OFFLINE -> out += Live(Tone.RED, Ic.wifi(false), "Bins are not answering", "No bin answers on Wi-Fi and the cloud cannot be reached. Check the phone has internet.", Ic.wifi(false) to c.tamper)
         Link.CLOUD -> out += Live(
             Tone.ORANGE, Ic.cloud, "Cloud mode",
-            "No bin answers on this Wi-Fi, so readings come through Firebase every 5 s. LOCK, UNLOCK and COLLECT still work. Calibration and simulation need the bins’ Wi-Fi.",
+            pretend + "No bin answers on this Wi-Fi, so readings come through Firebase every 5 s. LOCK, UNLOCK and COLLECT still work. Calibration and simulation need the bins’ Wi-Fi.",
             Ic.cloud to c.cloud,
         )
         Link.THINGSPEAK -> out += Live(
             Tone.BLUE, Ic.chart, "ThingSpeak mode",
-            "Wi-Fi and Firebase do not answer, so readings come from ThingSpeak every 15 s. LOCK, UNLOCK and COLLECT go through TalkBack.",
+            pretend + "Wi-Fi and Firebase do not answer, so readings come from ThingSpeak every 15 s. LOCK, UNLOCK and COLLECT go through TalkBack.",
             Ic.chart to c.ts,
         )
         Link.LIVE -> {}

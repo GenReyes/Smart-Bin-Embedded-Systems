@@ -96,7 +96,7 @@ fun AppPage(vm: AppViewModel, hub: HubState) {
         LRow(
             looks.firstOrNull()?.icon ?: Ic.wifi(false), "Connection",
             when {
-                looks.isNotEmpty() -> looks.joinToString(" + ") { it.name } + if (hub.link == Link.DEMO) " (demo)" else " answering"
+                looks.isNotEmpty() -> looks.joinToString(" + ") { it.name } + if (hub.demo) " (demo)" else " answering"
                 hub.link == Link.DEMO -> "Demo data. Add an address or channel to a bin to go live."
                 else -> "Nothing answers. Check Wi-Fi and the cloud accounts."
             },
@@ -243,7 +243,15 @@ private fun DemoOptions(vm: AppViewModel, hub: HubState) {
                 Btn("TSPEAK", { vm.toggleDemoLink(2) }, Modifier.weight(1f), Ic.chart, Look.TINT, c.ts, small = true, pressedIn = r.thingspeak, sound = Sfx.CHOICE, textSize = 0.7f)
             }
         }
-        Hint("The link chip in the header shows each mix in its own colours: Wi-Fi green, Firebase orange, ThingSpeak blue.")
+        Hint("The first one on, in the app's order (Wi-Fi, then Firebase, then ThingSpeak), is the one the demo bins answer on. The cards, banners and link chip change to match, in each link's colour: Wi-Fi green, Firebase orange, ThingSpeak blue.")
+
+        Field("Cloud commands", Ic.cloud, c.sim) {
+            TwoWay(full = true) {
+                Tw(!hub.demoNoConfirm, { vm.setDemoNoConfirm(false) }, "Confirm in 4 s", cc = c.ok)
+                Tw(hub.demoNoConfirm, { vm.setDemoNoConfirm(true) }, "Time out at 8 s", cc = c.bad)
+            }
+        }
+        Hint("With Firebase or ThingSpeak on, LOCK, UNLOCK and COLLECT stay locked while the bin is asked. The bin either confirms after 4 s and the key flashes green, or never answers and the key flashes red at 8 s.")
 
         Field("Act out on a bin", Ic.bins, c.sim) {
             BinSeg(vm, hub, PickFor.SET, vm.selSet, allowAll = false) { vm.selSet = it }

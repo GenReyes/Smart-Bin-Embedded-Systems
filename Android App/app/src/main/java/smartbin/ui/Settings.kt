@@ -280,7 +280,7 @@ fun Connection(vm: AppViewModel, hub: HubState) {
         Link.OFFLINE -> "Not connected" to c.bad; Link.DEMO -> "Demo data" to c.warn
     }
     val r = hub.routes
-    val demo = link == Link.DEMO
+    val demo = hub.demo
     ScrollPage {
         BackBar("Connection", { vm.back() }) {
             StatePill(when (link) { Link.CLOUD -> Ic.cloud; Link.THINGSPEAK -> Ic.chart; else -> Ic.wifi(link == Link.LIVE) }, stateText, stateCc, true)

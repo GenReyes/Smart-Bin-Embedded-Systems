@@ -679,6 +679,19 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             else -> r.copy(thingspeak = !r.thingspeak)
         }
         Hub.demoLinks(demoLinks)
+        val main = when {
+            demoLinks.local -> "Demo bins now answer on Wi-Fi."
+            demoLinks.firebase -> "Demo bins now answer through Firebase. LOCK, UNLOCK and COLLECT wait for the bin."
+            demoLinks.thingspeak -> "Demo bins now answer through ThingSpeak. LOCK, UNLOCK and COLLECT wait for the bin."
+            else -> "Demo bins show plain demo data again."
+        }
+        say(main)
+    }
+
+    /** Pretend cloud commands: false confirms them after 4 s, true lets them time out after 8 s. */
+    fun setDemoNoConfirm(no: Boolean) {
+        Hub.setDemoNoConfirm(no)
+        say(if (no) "Cloud commands on demo bins will not be confirmed. Their keys give up after 8 s." else "Cloud commands on demo bins are confirmed after 4 s.")
     }
 
     fun demoEvent(b: Bin, e: Hub.DemoEvent) {

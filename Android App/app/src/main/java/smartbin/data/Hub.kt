@@ -74,6 +74,8 @@ object Hub {
     private val tsSeen = HashMap<String, Pair<Pair<Long, Long>, Pair<Long, Long>>>()
     /** Demo options: bins pretending to have gone quiet. */
     private val demoQuiet = HashSet<String>()
+    /** Demo options: when each pretend cloud command is carried out, by bin. */
+    private val demoAnswer = HashMap<String, Pair<Long, String>>()
     private val simDirty = HashSet<String>()
     private val prev = HashMap<String, Flags>()
     private var lastSample = 0L
@@ -167,9 +169,20 @@ object Hub {
     private suspend fun poll(b: Bin, now: Long): Bin {
         if (b.demo) {
             // Demo options can make a bin go quiet; it keeps its last reading until it comes back.
-            if (b.id in demoQuiet) return b.copy(source = Source.STALE)
-            val r = Demo.step(b, _state.value.calibBin == b.id, now)
-            return b.copy(reading = r, source = Source.DEMO)
+            if (b.id in demoQuiet) {
+                demoAnswer.remove(b.id)
+                return b.copy(source = Source.STALE)
+            }
+            // A pretend cloud command is carried out a few seconds after it was sent, as a real bin would.
+            var from = b
+            demoAnswer[b.id]?.let { (at, cmd) ->
+                if (now >= at) {
+                    demoAnswer.remove(b.id)
+                    from = b.copy(reading = effect(b.reading, cmd))
+                }
+            }
+            val r = Demo.step(from, _state.value.calibBin == b.id, now)
+            return from.copy(reading = r, source = demoSource(_state.value.demoLinks), lastSeen = now)
         }
         // Local Wi-Fi first: every second while it answers. After a miss it is tried
         // again in 2 s, and after three misses in a row every 30 s, as on the dashboard.
@@ -240,8 +253,13 @@ object Hub {
         return b.copy(source = Source.STALE)
     }
 
-    private fun linkOf(bins: List<Bin>): Link = when {
-        bins.all { it.demo } -> Link.DEMO
+    private fun linkOf(bins: List<Bin>, pretend: Routes = _state.value.demoLinks): Link = when {
+        bins.all { it.demo } -> when (demoSource(pretend)) {
+            Source.LIVE -> Link.LIVE
+            Source.CLOUD -> Link.CLOUD
+            Source.THINGSPEAK -> Link.THINGSPEAK
+            else -> Link.DEMO
+        }
         bins.any { it.source == Source.LIVE } -> Link.LIVE
         bins.any { it.source == Source.CLOUD } -> Link.CLOUD
         bins.any { it.source == Source.THINGSPEAK } -> Link.THINGSPEAK
@@ -390,7 +408,18 @@ object Hub {
         var problem: String? = null
         // Set when the command went through Firebase or ThingSpeak, so its key waits for the bin.
         var via: Source? = null
-        when (b.source) {
+        // Demo bins act out the route the demo options pretend to use.
+        if (b.demo) when (b.source) {
+            Source.STALE -> return "${b.name} is not answering."
+            Source.CLOUD, Source.THINGSPEAK -> {
+                if (cmd !in Cloud.CLOUD_COMMANDS) return "That needs the bins' Wi-Fi."
+                val now = System.currentTimeMillis()
+                _state.value = _state.value.copy(pending = _state.value.pending + (id to Pending(cmd, b.source, now, now + DEMO_TIMEOUT)))
+                if (!_state.value.demoNoConfirm) demoAnswer[id] = (now + DEMO_CONFIRM) to cmd
+                return null
+            }
+            else -> {}
+        } else when (b.source) {
             Source.DEMO -> {}
             Source.LIVE -> try {
                 LocalApi.command(b.ip, cmd, extra)
@@ -426,22 +455,24 @@ object Hub {
             return null
         }
         update(id) { x ->
-            val r = x.reading
             x.copy(
-                reading = when (cmd) {
-                    "LOCK" -> r.copy(status = BinStatus.LOCKED, lidOpen = false)
-                    "UNLOCK" -> r.copy(status = BinStatus.OK)
-                    "CLEAR_TAMPER" -> r.copy(status = BinStatus.OK, tilt = 0.0)
-                    "COLLECT" -> r.copy(status = BinStatus.COLLECTING, lidOpen = true)
-                    "COLLECT_DONE" -> r.copy(status = BinStatus.OK, lidOpen = false, fill = 0.0, weight = 0.0, gas = minOf(r.gas, 48.0))
-                    "TARE" -> r.copy(weight = 0.0)
-                    "RESET_GAS" -> r.copy(iaqAcc = 0)
-                    else -> r
-                },
+                reading = effect(x.reading, cmd),
                 sim = if (cmd == "CLEAR_TAMPER") x.sim.copy(values = x.sim.values + ("tamper" to 0.0)) else x.sim,
             )
         }
         return problem
+    }
+
+    /** What a command does to a bin's reading, as the card shows it. */
+    private fun effect(r: Reading, cmd: String): Reading = when (cmd) {
+        "LOCK" -> r.copy(status = BinStatus.LOCKED, lidOpen = false)
+        "UNLOCK" -> r.copy(status = BinStatus.OK)
+        "CLEAR_TAMPER" -> r.copy(status = BinStatus.OK, tilt = 0.0)
+        "COLLECT" -> r.copy(status = BinStatus.COLLECTING, lidOpen = true)
+        "COLLECT_DONE" -> r.copy(status = BinStatus.OK, lidOpen = false, fill = 0.0, weight = 0.0, gas = minOf(r.gas, 48.0))
+        "TARE" -> r.copy(weight = 0.0)
+        "RESET_GAS" -> r.copy(iaqAcc = 0)
+        else -> r
     }
 
     /** Calibration mode, on one bin at a time. The bin shows its teal calibration screen while it is on. */
@@ -449,16 +480,16 @@ object Hub {
         val old = _state.value.calibBin
         if (old == id) return
         _state.value = _state.value.copy(calibBin = id)
-        old?.let { o -> bin(o)?.takeIf { it.source == Source.LIVE }?.let { runCatching { LocalApi.command(it.ip, "CALIBRATE_END") } } }
+        old?.let { o -> bin(o)?.takeIf { it.source == Source.LIVE && !it.demo }?.let { runCatching { LocalApi.command(it.ip, "CALIBRATE_END") } } }
         old?.let { o -> update(o) { b -> if (b.reading.status == BinStatus.CALIBRATING) b.copy(reading = b.reading.copy(status = BinStatus.OK)) else b } }
-        id?.let { n -> bin(n)?.takeIf { it.source == Source.LIVE }?.let { runCatching { LocalApi.command(it.ip, "CALIBRATE_START") } } }
+        id?.let { n -> bin(n)?.takeIf { it.source == Source.LIVE && !it.demo }?.let { runCatching { LocalApi.command(it.ip, "CALIBRATE_START") } } }
         id?.let { n -> update(n) { b -> b.copy(reading = b.reading.copy(status = BinStatus.CALIBRATING)) } }
     }
 
     /** Stores new calibration values on the bin (EEPROM over Wi-Fi) and in the app. */
     suspend fun saveCal(id: String, cal: Cal): String? {
         val b = bin(id) ?: return null
-        if (b.source == Source.LIVE) {
+        if (b.source == Source.LIVE && !b.demo) {
             try {
                 LocalApi.calibrate(b.ip, cal)
             } catch (e: CancellationException) {
@@ -499,7 +530,7 @@ object Hub {
 
     suspend fun applySim(id: String): String? {
         val b = bin(id) ?: return null
-        if (b.source == Source.LIVE) {
+        if (b.source == Source.LIVE && !b.demo) {
             try {
                 LocalApi.simulate(b.ip, b.sim)
             } catch (e: CancellationException) {
@@ -570,15 +601,38 @@ object Hub {
     // ---------- demo options ----------
 
     /** Demo options change only bins with no address. Left alone, the demo runs as normal. */
-    val demoInUse get() = Demo.speed != Demo.NORMAL_SPEED || _state.value.demoLinks.any || demoQuiet.isNotEmpty()
+    val demoInUse get() = Demo.speed != Demo.NORMAL_SPEED || _state.value.demoLinks.any || _state.value.demoNoConfirm || demoQuiet.isNotEmpty()
 
     fun demoSpeed(x: Double) {
         Demo.speed = x
         _state.value = _state.value.copy()
     }
 
+    /**
+     * Pretend links. The first one on, in the app's own order (Wi-Fi, Firebase,
+     * ThingSpeak), is the one the demo bins answer on, so the cards, banners,
+     * link sounds and command waits behave as they would on that route.
+     */
     fun demoLinks(r: Routes) {
-        _state.value = _state.value.copy(demoLinks = r)
+        val s = _state.value
+        val via = demoSource(r)
+        val bins = s.bins.map { if (it.demo && it.source != Source.STALE) it.copy(source = via) else it }
+        val link = linkOf(bins, r)
+        if (link != s.link) _events.tryEmit(HubEvent.LinkChanged(s.link, link))
+        _state.value = s.copy(bins = bins, demoLinks = r, link = link)
+    }
+
+    /** Pretend cloud commands time out instead of being confirmed. */
+    fun setDemoNoConfirm(no: Boolean) {
+        if (no) demoAnswer.clear()
+        _state.value = _state.value.copy(demoNoConfirm = no)
+    }
+
+    private fun demoSource(r: Routes) = when {
+        r.local -> Source.LIVE
+        r.firebase -> Source.CLOUD
+        r.thingspeak -> Source.THINGSPEAK
+        else -> Source.DEMO
     }
 
     fun demoQuiet(id: String) = id in demoQuiet
@@ -586,7 +640,7 @@ object Hub {
     fun setDemoQuiet(id: String, quiet: Boolean) {
         if (quiet) demoQuiet.add(id) else demoQuiet.remove(id)
         if (quiet) update(id) { it.copy(lastSeen = System.currentTimeMillis()) }
-        if (!quiet) update(id) { it.copy(source = Source.DEMO) }
+        if (!quiet) update(id) { it.copy(source = demoSource(_state.value.demoLinks)) }
     }
 
     enum class DemoEvent { FULL, TAMPER, AIR, EMPTY }
@@ -610,11 +664,14 @@ object Hub {
     fun resetDemo() {
         Demo.speed = Demo.NORMAL_SPEED
         demoQuiet.clear()
+        demoAnswer.clear()
         val now = System.currentTimeMillis()
         val start = Demo.bins().associateBy { it.id }
         val s = _state.value
         val bins = s.bins.map { b -> if (!b.demo) b else start[b.id]?.let { o -> b.copy(reading = o.reading, rate = o.rate, source = Source.DEMO) } ?: b.copy(source = Source.DEMO) }
-        _state.value = s.copy(bins = bins, demoLinks = Routes())
+        val link = linkOf(bins, Routes())
+        if (link != s.link) _events.tryEmit(HubEvent.LinkChanged(s.link, link))
+        _state.value = s.copy(bins = bins, link = link, demoLinks = Routes(), demoNoConfirm = false, pending = s.pending.filterKeys { k -> bins.none { it.id == k && it.demo } })
         _history.value = _history.value + bins.filter { it.demo }.associate { it.id to Demo.history(it, now) }
     }
 
@@ -662,7 +719,7 @@ object Hub {
 
     /** Estimated fill speed in percent per hour, from the last hour of history; demo bins use their own rate. */
     fun ratePerHour(b: Bin): Double {
-        if (b.source == Source.DEMO) return b.rate
+        if (b.demo) return b.rate
         val h = _history.value[b.id] ?: return 0.0
         val now = System.currentTimeMillis()
         val recent = h.filter { it.t >= now - 3600_000L }
@@ -673,6 +730,9 @@ object Hub {
     }
 
     private const val KEY_TS_URL = "ts_url"
+    /** Pretend cloud commands: confirmed after 4 s, or given up after 8 s, as in Garbage-Guard's demo. */
+    private const val DEMO_CONFIRM = 4_000L
+    private const val DEMO_TIMEOUT = 8_000L
 
     private fun fmt(v: Double) = if (v == Math.floor(v)) v.toInt().toString() else "%.1f".format(v)
 

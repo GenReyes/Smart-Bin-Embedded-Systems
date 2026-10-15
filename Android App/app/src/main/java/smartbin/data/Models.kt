@@ -160,11 +160,15 @@ data class HubState(
     val tsPerDay: Double? = null,
     /** Demo options: links to pretend are up, so the link colours can be shown with no hardware. */
     val demoLinks: Routes = Routes(),
+    /** Demo options: pretend cloud commands are never confirmed, so their keys time out. */
+    val demoNoConfirm: Boolean = false,
     /** Cloud commands waiting for the bin to confirm them, by bin id. */
     val pending: Map<String, Pending> = emptyMap(),
 ) {
+    /** Every bin runs on demo data. The demo options can still make it look like any link. */
+    val demo get() = bins.isNotEmpty() && bins.all { it.demo }
     val routes: Routes
-        get() = if (link == Link.DEMO) demoLinks
+        get() = if (demo) demoLinks
         else Routes(local = bins.any { it.source == Source.LIVE }, firebase = fbUp == true, thingspeak = tsUp == true)
     val mode: Mode
         get() {
