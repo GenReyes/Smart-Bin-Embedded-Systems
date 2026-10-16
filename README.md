@@ -7,7 +7,7 @@ Embedded Systems (Lecture) | TUP Manila | Group 2, BET-CpET 4A-M | IoT Level 6
 ## Links
 
 - [Smart-Bin Online Document (Google Doc)](https://docs.google.com/document/d/1rWHQXjgQo8KrHvwuqEfFhKnTxFyY96tXlPZCjHuy8gE/edit?tab=t.0)
-- [Gantt chart (PDF)](Documents/SmartBin_Gantt_Chart.pdf)
+- [Gantt chart (PDF)](Documents/Figures/SmartBin_Gantt_Chart_Portrait.pdf)
 
 ## What it is
 
@@ -37,15 +37,16 @@ Collection priority ranks the fullest bin first, with an estimated time to full.
 
 | Folder | Contents |
 |---|---|
-| `firmware/` | ESP32 firmware and component test sketches |
-| `dashboard/` | Operator web dashboard (single HTML file) |
+| `firmware/` | ESP32 firmware (`firmware/SmartBin`), Firebase rules and setup steps. See its README |
+| `Web Dashboard/` | Operator web dashboard (`smartbin-dashboard.html`, single HTML file) and the integration guides. See its README |
+| `Mockups/` | The UI mockups the dashboard, app and touchscreen follow |
 | `Android App/` | Android app for operators and collectors (Kotlin, Compose). See its README |
 | `hardware/` | Schematic |
-| `docs/` | Implementation plan, UI mockups, schedule |
+| `Documents/` | Paper, figures, implementation plan, UI mockups compilation, references |
 
 ## Secrets
 
-Copy `firmware/secrets.example.h` to `firmware/secrets.h` and fill in your own Wi-Fi and ThingSpeak keys. `secrets.h` is git-ignored. Do not commit keys, passwords or the real Collect PIN.
+Copy `firmware/SmartBin/secrets.example.h` to `firmware/SmartBin/secrets.h` and fill in your own Wi-Fi, Firebase and ThingSpeak keys. `secrets.h` is git-ignored. Do not commit keys, passwords or the real Collect PIN.
 
 ## Team
 

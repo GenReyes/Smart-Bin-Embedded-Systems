@@ -169,6 +169,9 @@ def local_handler(b):
             self.send_response(code)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(data)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type, X-SB-Op")
             self.end_headers()
             self.wfile.write(data)
 
@@ -178,6 +181,15 @@ def local_handler(b):
                 return json.loads(self.rfile.read(n) or b"{}")
             except ValueError:
                 return {}
+
+
+        def do_OPTIONS(self):
+            self.send_response(204)
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type, X-SB-Op")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
 
         def do_GET(self):
             if urlparse(self.path).path == "/api/status":
@@ -213,6 +225,26 @@ def local_handler(b):
 def cloud_handler(bins, ip):
     by_id = {b.id: b for b in bins}
     sent = {"bytes": 0}
+    tree = {}
+
+    def tree_get(parts):
+        node = tree
+        for k in parts:
+            if not isinstance(node, dict) or k not in node:
+                return None
+            node = node[k]
+        return node
+
+    def tree_set(parts, value, merge=False):
+        node = tree
+        for k in parts[:-1]:
+            node = node.setdefault(k, {})
+        if value is None:
+            node.pop(parts[-1], None)
+        elif merge and isinstance(node.get(parts[-1]), dict) and isinstance(value, dict):
+            node[parts[-1]].update(value)
+        else:
+            node[parts[-1]] = value
 
     class H(BaseHTTPRequestHandler):
         def log_message(self, *a):
@@ -224,6 +256,9 @@ def cloud_handler(bins, ip):
             self.send_response(code)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(data)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type, X-SB-Op")
             self.end_headers()
             self.wfile.write(data)
 
@@ -247,10 +282,36 @@ def cloud_handler(bins, ip):
                 self.send(200, s)
             elif parts == ["sb", "usage", "bytes_month"]:
                 self.send(200, sent["bytes"])
+            elif parts == ["sb", "usage"]:
+                self.send(200, {"bytes_month": sent["bytes"], "limit_bytes": 10737418240})
             elif parts[0] == "sb_users":
                 self.send(200, {"role": "collector"})
             else:
-                self.send(200, None)
+                self.send(200, tree_get(parts))
+
+        def do_OPTIONS(self):
+            self.send_response(204)
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type, X-SB-Op")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+        def do_PUT(self, merge=False):
+            parts = urlparse(self.path).path.strip("/").removesuffix(".json").split("/")
+            j = self.body()
+            if isinstance(j, dict) and isinstance(j.get("ts"), dict):
+                j["ts"] = int(time.time() * 1000)
+            tree_set(parts, j, merge)
+            self.send(200, j)
+
+        def do_PATCH(self):
+            self.do_PUT(merge=True)
+
+        def do_DELETE(self):
+            parts = urlparse(self.path).path.strip("/").removesuffix(".json").split("/")
+            tree_set(parts, None)
+            self.send(200, None)
 
         def do_POST(self):
             u = urlparse(self.path)
@@ -287,6 +348,9 @@ def ts_handler(bins, ip):
             self.send_response(code)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(data)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type, X-SB-Op")
             self.end_headers()
             self.wfile.write(data)
 
@@ -310,8 +374,30 @@ def ts_handler(bins, ip):
                     "field5": str(s["iaq"]), "field6": str(s["pressure"]), "field7": str(s["tilt"]), "field8": str(flags),
                     "status": "%s:%d" % (ip, b.port),
                 })
+            elif len(parts) == 3 and parts[0] == "channels" and parts[2] == "feeds.json" and parts[1].isdigit():
+                b = self.bin_for(int(parts[1]), 1001)
+                if b is None:
+                    self.send(404, -1)
+                    return
+                s = b.status_json()
+                now = time.time()
+                feeds = []
+                for i in range(48, -1, -1):
+                    f = max(0.0, s["fill"] - i * 0.6)
+                    feeds.append({"created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now - i * 1800)), "entry_id": 1000 - i,
+                                  "field1": str(round(f, 1)), "field2": str(round(f * 40)), "field3": str(s["temp"]), "field4": str(s["humidity"]),
+                                  "field5": str(s["iaq"]), "field6": str(s["pressure"]), "field7": "0", "field8": "0"})
+                self.send(200, {"channel": {"id": int(parts[1])}, "feeds": feeds})
             else:
                 self.send(404, -1)
+
+        def do_OPTIONS(self):
+            self.send_response(204)
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type, X-SB-Op")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
 
         def do_POST(self):
             parts = urlparse(self.path).path.strip("/").split("/")
