@@ -1,0 +1,44 @@
+{
+  "rules": {
+    "sb_users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid"
+      }
+    },
+    "sb": {
+      ".read": "auth != null && (root.child('sb_users').child(auth.uid).exists() || auth.token.email.matches(/^bin.*@/))",
+      "bins": {
+        "$b": {
+          ".write": "auth != null && auth.token.email.matches(/^bin.*@/)"
+        }
+      },
+      "commands": {
+        "$b": {
+          "$c": {
+            ".write": "auth != null && ((!data.exists() && root.child('sb_users').child(auth.uid).exists()) || (!newData.exists() && auth.token.email.matches(/^bin.*@/)))",
+            ".validate": "!newData.exists() || (newData.hasChildren(['cmd', 'ts']) && newData.child('cmd').isString())"
+          }
+        }
+      },
+      "results": {
+        "$r": {
+          ".write": "auth != null"
+        }
+      },
+      "alerts": {
+        "$b": {
+          ".write": "auth != null && auth.token.email.matches(/^bin.*@/)"
+        }
+      },
+      "watchers": {
+        ".indexOn": "ts",
+        "$w": {
+          ".write": "auth != null && root.child('sb_users').child(auth.uid).exists()"
+        }
+      },
+      "usage": {
+        ".write": "auth != null && auth.token.email.matches(/^bin.*@/)"
+      }
+    }
+  }
+}
