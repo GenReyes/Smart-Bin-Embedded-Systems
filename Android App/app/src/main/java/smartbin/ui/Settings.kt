@@ -62,8 +62,16 @@ fun SettingsPage(vm: AppViewModel, hub: HubState) {
                     vm.selSet = it
                     vm.pinShown = false
                 }
-                if (vm.operator) CalBar(vm, b, on, hub) else CollectorTop(vm, b)
+                // The Collect PIN sits at the top for both roles, as on the dashboard.
+                PinCard(vm, b)
+                if (vm.operator) CalBar(vm, b, on, hub) else ReadOnlyNote()
                 val v: Cal = if (on) vm.edit!! else b.cal
+                val keys = SECTION_KEYS + if (vm.operator) listOf("touch") else emptyList()
+                val allOpen = keys.all { it in vm.open }
+                Btn(
+                    if (allOpen) "HIDE ALL" else "SHOW ALL", { vm.open = if (allOpen) emptySet() else keys.toSet() },
+                    Modifier.fillMaxWidth(), Ic.layers, Look.TINT, small = true, sound = if (allOpen) Sfx.BACK else Sfx.OPEN,
+                )
                 Sections(vm, b, v, on)
             }
             if (b != null) {
@@ -137,26 +145,36 @@ private fun CalBar(vm: AppViewModel, b: Bin, on: Boolean, hub: HubState) {
 }
 
 @Composable
-private fun CollectorTop(vm: AppViewModel, b: Bin) {
+private fun PinCard(vm: AppViewModel, b: Bin) {
     val c = Sb.c
-    Row(
+    Column(
         Modifier.fillMaxWidth().well(c, 16.dp).padding(14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Box(Modifier.size(44.dp).bump(c, 22.dp), contentAlignment = Alignment.Center) { Ico(Ic.pin, 21.dp, c.cal) }
-        Column(Modifier.weight(1f)) {
-            T("Collect PIN for ${b.name}", size = 0.98f)
-            T("Type this on the bin touchscreen when you tap COLLECT.", size = 0.8f, weight = FontWeight.Medium, color = c.ink2)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Box(Modifier.size(44.dp).bump(c, 22.dp), contentAlignment = Alignment.Center) { Ico(Ic.pin, 21.dp, c.cal) }
+            Column(Modifier.weight(1f)) {
+                T("Collect PIN for ${b.name}", size = 0.98f)
+                T(
+                    if (vm.operator) "Collectors type this on the bin for COLLECT and WI-FI SETUP. Change it under Lid and lock."
+                    else "Type this on the bin touchscreen when you tap COLLECT.",
+                    size = 0.8f, weight = FontWeight.Medium, color = c.ink2,
+                )
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            T(
+                if (vm.pinShown) "%04d".format(b.cal.v("collect_pin").toInt()) else "••••", Modifier.weight(1f).padding(start = 4.dp),
+                size = 2f, color = c.cal, tnum = true, spacing = if (vm.pinShown) 0.21f else 0.14f, lineHeight = 1.1f,
+            )
+            Btn(if (vm.pinShown) "HIDE" else "SHOW", { vm.pinShown = !vm.pinShown }, icon = if (vm.pinShown) Ic.eyeoff else Ic.eye, look = Look.TINT, cc = c.cal, small = true, sound = Sfx.CHOICE)
         }
     }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        T(
-            if (vm.pinShown) "%04d".format(b.cal.v("collect_pin").toInt()) else "••••", Modifier.weight(1f).padding(start = 4.dp),
-            size = 2f, color = c.cal, tnum = true, spacing = if (vm.pinShown) 0.21f else 0.14f, lineHeight = 1.1f,
-        )
-        Btn(if (vm.pinShown) "HIDE" else "SHOW", { vm.pinShown = !vm.pinShown }, icon = if (vm.pinShown) Ic.eyeoff else Ic.eye, look = Look.TINT, cc = c.cal, small = true, sound = Sfx.CHOICE)
-    }
+}
+
+@Composable
+private fun ReadOnlyNote() {
+    val c = Sb.c
     Row(
         Modifier.fillMaxWidth().well(c, 16.dp).padding(14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -169,6 +187,9 @@ private fun CollectorTop(vm: AppViewModel, b: Bin) {
         }
     }
 }
+
+/** The fold-out groups, in order. Touchscreen is added for operators. */
+private val SECTION_KEYS = listOf("range", "limits", "air", "lid", "weight")
 
 /** .sect: a fold-out group of settings with its summary on the right. */
 @Composable

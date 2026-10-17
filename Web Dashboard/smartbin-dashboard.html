@@ -177,6 +177,13 @@ header.top:after{content:"";display:block;height:3px;border-radius:3px;backgroun
 .bar i{position:absolute;inset:3px auto 3px 3px;border-radius:11px;transition:width .6s ease,background .4s}
 .bar b{position:absolute;top:4px;bottom:4px;width:3px;border-radius:2px;background:var(--ink);opacity:.35}
 .ticks{display:flex;justify-content:space-between;font-size:11px;color:var(--ink2);font-weight:700}
+.faultnote{margin:6px 0 0;font-size:12px;font-weight:800;color:var(--bad)}
+.cardfoot{display:flex;align-items:center;gap:10px;margin:10px 0 2px;font-size:11.5px;font-weight:700;color:var(--ink2)}
+.cardfoot .h1{font-size:11px;font-weight:800}
+.cardfoot svg{flex:1;height:22px;overflow:visible}
+.cardfoot svg path{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.cardfoot [data-r="ago"]{white-space:nowrap}
+.cardfoot [data-r="ago"].old{color:var(--bad)}
 .sensors{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-top:17px}
 @media(max-width:520px){.sensors{grid-template-columns:repeat(2,1fr)}}
 .sensor{padding:12px 6px 10px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:5px}
@@ -223,7 +230,7 @@ header.top:after{content:"";display:block;height:3px;border-radius:3px;backgroun
 .switch input{width:auto;box-shadow:none;margin:0}
 
 fieldset{border:0;margin:0;padding:0;min-width:0;transition:opacity .35s ease,filter .35s ease}
-fieldset[disabled]{opacity:.5;filter:saturate(.4)}
+fieldset[disabled] .sbody{opacity:.5;filter:saturate(.4)}
 .calbar{display:flex;gap:18px;align-items:center;flex-wrap:wrap;padding:18px 20px;border-radius:16px;margin-top:4px}
 .calbar .calico{width:44px;height:44px;flex:none;border-radius:50%;display:grid;place-items:center;
   background:var(--base);box-shadow:var(--o1);color:var(--ink2);transition:color .4s}
@@ -361,8 +368,20 @@ table.sim tr{box-shadow:var(--o1)}
 .sect[data-sec="weight"]{--cc:var(--c-weight)}
 .sect[data-sec="air"]{--cc:var(--c-gas)}
 .sect[data-sec="touch"]{--cc:var(--cal)}
-.sect h2{display:flex;align-items:center;gap:10px;color:var(--cc)}
-.sect h2:before{content:"";width:4px;height:15px;border-radius:2px;background:var(--cc)}
+.sect{margin-top:12px;border-radius:16px;background:var(--base);box-shadow:var(--o1)}
+.dhd{margin:6px 0 8px;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--ink2)}
+#demoBody .seg{margin-bottom:12px}
+.shead{all:unset;box-sizing:border-box;width:100%;min-height:54px;padding:0 16px;display:flex;align-items:center;gap:10px;cursor:pointer;border-radius:16px}
+.shead:focus-visible{outline:2px solid var(--cc);outline-offset:2px}
+.shead:before{content:"";width:4px;height:15px;border-radius:2px;background:var(--cc);flex:none}
+.shead .ico{width:18px;height:18px;color:var(--cc);flex:none}
+.shead .stitle{font-size:12px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--cc);white-space:nowrap}
+.shead .ssum{flex:1;text-align:right;font-size:12.5px;font-weight:700;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.shead .schev{color:var(--ink2);transition:transform .25s}
+.sect.open .schev{transform:rotate(180deg)}
+.sect .sbody{display:none;padding:2px 16px 16px}
+.sect.open .sbody{display:block}
+.sect .sbody>.fields:first-child{margin-top:4px}
 .sect input:focus{box-shadow:var(--i1), 0 0 0 2px var(--accentSoft)}
 .sect input:focus{box-shadow:var(--i1), 0 0 0 2px color-mix(in srgb,var(--cc) 38%,transparent)}
 .simname{--cc:var(--ink2)}
@@ -565,6 +584,7 @@ table.sim th .ico{width:14px;height:14px}
   border-radius:16px;margin:0 0 20px}
 .pincard .pinico{width:46px;height:46px;flex:none;border-radius:50%;display:grid;place-items:center;
   background:var(--base);box-shadow:var(--o1);color:var(--cal)}
+.pincard .pinico .ico{width:22px;height:22px;display:block}
 .pincard .pintxt{flex:1;min-width:200px}
 .pincard .pintxt b{display:block;font-size:15px}
 .pincard .pintxt span{font-size:12.5px;color:var(--ink2)}
@@ -841,7 +861,8 @@ table.sim th .ico{width:14px;height:14px}
 /* ---- v11 additions ---- */
 /* Alert history tools (from Garbage-Guard): kind symbols, date range, scoped actions */
 #alertKinds{display:flex;gap:7px;flex-wrap:wrap}
-#alertKinds .fchip{width:36px;height:36px}
+#alertKinds .fchip,#filterChips .fchip{width:36px;height:36px}
+#filterChips{gap:7px}
 #alertRange{display:flex;gap:6px;flex-wrap:wrap}
 .alertscope{margin:14px 2px 12px;font-size:13px;font-weight:800;color:var(--ink)}
 .alertscope small{display:block;font-weight:600;color:var(--ink2);margin-top:2px}
@@ -1018,10 +1039,10 @@ html[data-theme="dark"]{--onBrand:#13100D;--brand2:#3FC7C2}
     </div>
     <div class="ovtools hide" id="ovTools">
       <div class="filterchips" id="filterChips">
-        <button class="fchip on" data-filter="all" title="All bins" style="--fc:var(--accent)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="2.5"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/></svg><span class="fbadge"></span></button>
-        <button class="fchip" data-filter="attn" title="Needs attention" style="--fc:#e54d42"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 22h20L12 2z"/><path d="M12 10v4"/><circle cx="12" cy="18" r=".5" fill="currentColor"/></svg><span class="fbadge"></span></button>
-        <button class="fchip" data-filter="sim" title="Simulation active" style="--fc:#a855f7"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6v3l-2 3 2 4v3H9v-3l2-4-2-3V3z"/><path d="M8 3h8M8 21h8"/></svg><span class="fbadge"></span></button>
-        <button class="fchip" data-filter="cal" title="Calibrating" style="--fc:#14b8a6"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h.01"/><path d="M5 12.859A7 7 0 1 1 19 12.86"/><path d="M12 6v6l4 2"/></svg><span class="fbadge"></span></button>
+        <button class="fchip on" data-filter="all" title="All bins" aria-label="All bins" style="--fc:var(--accent)" data-ico="layers"><span class="fbadge"></span></button>
+        <button class="fchip" data-filter="attn" title="Needs attention" aria-label="Needs attention" style="--fc:var(--c-tamper)" data-ico="tamper"><span class="fbadge"></span></button>
+        <button class="fchip" data-filter="sim" title="Simulation active" aria-label="Simulation active" style="--fc:var(--sim)" data-ico="flask"><span class="fbadge"></span></button>
+        <button class="fchip" data-filter="cal" title="Calibrating" aria-label="Calibrating" style="--fc:var(--cal)" data-ico="calib"><span class="fbadge"></span></button>
       </div>
       <button class="iconbtn" id="viewToggle" title="Switch to grid view" aria-label="Toggle view">
         <svg class="ico xs vico" id="vicoGrid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1.4"/><rect x="14" y="3" width="7" height="7" rx="1.4"/><rect x="3" y="14" width="7" height="7" rx="1.4"/><rect x="14" y="14" width="7" height="7" rx="1.4"/></svg>
@@ -1072,10 +1093,10 @@ html[data-theme="dark"]{--onBrand:#13100D;--brand2:#3FC7C2}
       <div class="seg" id="setSeg"></div>
 
       <div class="pincard nm-in hide" id="pinCard">
-        <span class="pinico" id="pinIco"></span>
+        <span class="pinico" id="pinCardIco"></span>
         <span class="pintxt">
           <b>Collect PIN for <span id="pinName">this bin</span></b>
-          <span>Type this on the bin touchscreen when you tap COLLECT.</span>
+          <span id="pinSub">Type this on the bin touchscreen when you tap COLLECT.</span>
         </span>
         <span class="pinval" id="pinVal">----</span>
         <button class="btn sm" id="pinEye"></button>
@@ -1098,6 +1119,7 @@ html[data-theme="dark"]{--onBrand:#13100D;--brand2:#3FC7C2}
         <label class="switch big" for="calToggle"><input type="checkbox" id="calToggle"><span>Calibration mode</span></label>
       </div>
 
+      <div class="actions" style="margin:16px 0 0"><button class="btn sm tint" id="sectAll" style="flex:0 0 auto;--cc:var(--accent)"></button></div>
       <fieldset id="setFields" disabled>
         <div class="sect" data-sec="range">
         <h2 style="margin-top:24px">Fill range</h2>
@@ -1107,8 +1129,8 @@ html[data-theme="dark"]{--onBrand:#13100D;--brand2:#3FC7C2}
           <div class="field"><label for="s_dfull">Distance full (cm)</label>
             <div class="withbtn"><input id="s_dfull" type="number" min="1" max="400" step="0.5"><button class="btn sm" data-capture="s_dfull">USE NOW</button></div></div>
         </div>
-        </div>
         <p class="hint">Empty the bin and press USE NOW for the first box. Hold a board at your full line and press it for the second. Sensor reads <b id="s_dist">-- cm</b> right now.</p>
+        </div>
 
         <div class="sect" data-sec="limits">
         <h2 style="margin-top:24px">Alert limits</h2>
@@ -1251,13 +1273,19 @@ html[data-theme="dark"]{--onBrand:#13100D;--brand2:#3FC7C2}
         <h2 class="ph" style="--cc:var(--sim)">Operator access</h2>
         <span class="btstate" id="opState"></span>
       </div>
-      <p class="hint" style="margin:-6px 0 16px">The dashboard always opens as a collector, the same as the phone app. Operator needs the PIN, and drops back to collector after 2 min with this tab hidden. After 5 wrong PINs it waits 30 s, longer each time. Only an operator can change the PIN, and only by typing the current one first.</p>
+      <p class="hint" style="margin:-6px 0 16px">The dashboard opens on the start page every time, the same as the phone app. Operator needs the PIN, and drops back to collector after 2 min with this tab hidden. After 5 wrong PINs it waits 30 s, longer each time. Only an operator can change the PIN, and only by typing the current one first.</p>
       <div class="actions">
         <button class="btn" id="opChange" style="flex:0 0 auto">CHANGE OPERATOR PIN</button>
         <button class="btn" id="opLockNow" style="flex:0 0 auto">BACK TO COLLECTOR</button>
         <button class="btn" id="opStart" style="flex:0 0 auto">START PAGE</button>
       </div>
       <p class="hint" id="opNote"></p>
+    </div>
+
+    <div class="panel nm hide" id="demoPanel" style="margin-top:22px">
+      <div class="sechead"><h2 class="ph" style="--cc:var(--sim)" id="demoHead"></h2><span class="btstate" id="demoState"></span></div>
+      <p class="hint" style="margin:-6px 0 14px">Act out what simulation cannot, on the demo bins only, the same as the app's demo options. Any choice here pauses the automatic tour for a minute. RESET puts it all back.</p>
+      <div id="demoBody"></div>
     </div>
 
     <div class="panel nm" id="sndPanel" style="margin-top:22px">
@@ -1562,10 +1590,21 @@ function paintHeadings(){
     thValue:['capture','MANUAL VALUE','var(--cal)']};
   for(const id in TH){const el=document.getElementById(id);
     if(el)el.innerHTML='<span class="thh" style="--cc:'+TH[id][2]+'">'+icon(TH[id][0])+TH[id][1]+'</span>';}
-  const SEC={range:'ruler',limits:'bell',lid:'servo',weight:'weight',air:'gas'};
+  $$('#filterChips .fchip[data-ico]').forEach(c=>{if(!c.querySelector('svg'))c.insertAdjacentHTML('afterbegin',icon(c.dataset.ico));});
+  const SEC={range:'ruler',limits:'bell',lid:'servo',weight:'weight',air:'gas',touch:'capture'};
+  /* Each group folds, closed at first like the app, so the one you need is a short scroll away.
+     The summary on the right says what is inside without opening it. */
   $$('.sect').forEach(d=>{
     const h=d.querySelector('h2');if(!h||h.dataset.deco)return;h.dataset.deco='1';
-    h.insertAdjacentHTML('afterbegin',icon(SEC[d.dataset.sec]||'sliders'));
+    h.removeAttribute('style');
+    const body=document.createElement('div');body.className='sbody';
+    while(h.nextSibling)body.appendChild(h.nextSibling);
+    d.appendChild(body);
+    /* A div, not a button: the groups sit in a fieldset that is disabled until calibration is on. */
+    const btn=document.createElement('div');btn.setAttribute('role','button');btn.tabIndex=0;btn.className='shead';btn.setAttribute('aria-expanded','false');
+    btn.innerHTML=icon(SEC[d.dataset.sec]||'sliders')+'<span class="stitle">'+h.textContent+'</span><span class="ssum"></span>'+
+      '<svg class="ico schev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+    h.replaceWith(btn);
   });
   const subs={btnTare:'SETS 0 KG POINT',btnCalW:'SETS KG PER STEP'};
   for(const id in subs){const el=document.getElementById(id);
@@ -1976,6 +2015,45 @@ function stepEnv(b){
   d.warmEnd=b._accT&&d.iaq_acc===0?b._accT+20000:null;
   if(d.iaq_acc>=3)b._accT=0;
 }
+const DEMO={speed:1,pick:null};
+const DEMO_SPEEDS=[[0,'Pause'],[1/60,'Real'],[1,'Normal'],[10,'Fast']];
+function demoInUse(){return DEMO.speed!==1||state.bins.some(b=>b.demo&&(b._demoLink||(b._hold&&Object.keys(b._hold).length)))}
+function demoPanelRender(){
+  const p=$('#demoPanel');if(!p)return;
+  const demos=state.bins.filter(b=>b.demo);
+  p.classList.toggle('hide',!state.demo||!demos.length);
+  if(!state.demo||!demos.length)return;
+  if(!demos.some(b=>b.id===DEMO.pick))DEMO.pick=demos[0].id;
+  const b=byId(DEMO.pick),link=b._demoLink||'';
+  const btn=(attr,val,label,ic,cc,on)=>'<button class="btn sm binbtn" style="--cc:'+cc+'" data-'+attr+'="'+val+'" aria-pressed="'+!!on+'">'+icon(ic)+'<span>'+label+'</span></button>';
+  const html='<h3 class="dhd">Fill speed</h3><div class="seg">'+DEMO_SPEEDS.map(x=>btn('dspeed',x[0],x[1].toUpperCase(),'stopwatch','var(--sim)',DEMO.speed===x[0])).join('')+'</div>'+
+    '<h3 class="dhd">Act out on a bin</h3><div class="seg">'+demos.map(x=>btn('dpick',x.id,esc(x.name),'fill','var(--sim)',x.id===DEMO.pick)).join('')+'</div>'+
+    '<div class="seg">'+btn('devent','full','FULL','fill','var(--bad)')+btn('devent','tamper','TAMPER','tamper','var(--c-tamper)')+
+      btn('devent','air','BAD AIR','gas','var(--c-gas)')+btn('devent','empty','EMPTY','truck','var(--cal)')+'</div>'+
+    '<h3 class="dhd">How '+esc(b.name)+' answers</h3><div class="seg">'+btn('dlink','','WI-FI','wifi','var(--c-link)',link==='')+
+      btn('dlink','fb','FIREBASE','cloud','var(--c-cloud)',link==='fb')+btn('dlink','ts','THINGSPEAK','chart','var(--c-ts)',link==='ts')+
+      btn('dlink','down','GO QUIET','power','var(--warn)',link==='down')+'</div>'+
+    '<div class="actions">'+btn('dreset','1','RESET','undo','var(--sim)')+'</div>';
+  const body=$('#demoBody');if(body.dataset.sig!==html){body.dataset.sig=html;body.innerHTML=html;}
+  $('#demoHead').innerHTML=icon('flask')+'<span>DEMO OPTIONS</span>';
+  $('#demoState').textContent=demoInUse()?'In use':'Not in use';
+}
+function demoAct(el){
+  const b=byId(DEMO.pick);tourPause();
+  if(el.dataset.dspeed!=null){DEMO.speed=+el.dataset.dspeed;sfx('choice');}
+  else if(el.dataset.dpick!=null){DEMO.pick=el.dataset.dpick;sfx('choice');}
+  else if(el.dataset.devent&&b){const d=b.data,c=b.cal,e=el.dataset.devent;
+    if(e==='full')d.fill=Math.min(99,c.fill_th+4);
+    if(e==='tamper')tourHold(b,{tilt:40});
+    if(e==='air'){tourHold(b,{gas:c.gas_th+45});setTimeout(()=>{tourDrop(b,['gas']);b.data.gas=60;},20000);}
+    if(e==='empty'){d.fill=0;d.weight_g=0;}
+    sfx('confirm');toast({full:b.name+' is now over its fill limit.',tamper:b.name+' was tipped. Reset it from its card.',
+      air:'Air quality spiked in '+b.name+'. It settles by itself.',empty:b.name+' is empty.'}[e]);}
+  else if(el.dataset.dlink!=null&&b){const v=el.dataset.dlink||null;
+    if(v==='down'&&b._demoLink!=='down')b._quietAt=Date.now();b._demoLink=v;sfx(v==='down'?'link_lost':v?'cloud':'link_up');}
+  else if(el.dataset.dreset){DEMO.speed=1;state.bins.forEach(x=>{if(x.demo){x._demoLink=null;x._hold={};}});sfx('confirm');toast('Demo options reset.');}
+  demoPanelRender();render();
+}
 function stepDemo(b){
   const d=b.data,s=b.sim,on=bit=>(s.mask>>bit)&1,h=b._hold||{};
   stepEnv(b);
@@ -1985,7 +2063,7 @@ function stepDemo(b){
   d.faults=h.faults||[];
   if(d.status==='CALIBRATING'){d.lid='CLOSED';d.distance_cm=+(b.cal.d_empty-Math.random()*0.4).toFixed(1);return;}
   if(on(0))d.fill=clamp(+s.values.fill,0,100);
-  else if(d.status!=='COLLECTING')d.fill=clamp(d.fill+0.022+Math.random()*0.015,0,100);
+  else if(d.status!=='COLLECTING')d.fill=clamp(d.fill+(0.022+Math.random()*0.015)*DEMO.speed,0,100);
   d.weight_g=on(1)?+s.values.weight:Math.round(clamp(d.fill/100*b.cal.weight_cap*0.92+Math.random()*25,0,5000));
   d.tilt=h.tilt!=null?h.tilt:on(4)&&+s.values.tamper?38:clamp(Math.random()*2.2,0,90);
   d.motion=on(5)?!!+s.values.motion:Math.random()<0.025;
@@ -2417,7 +2495,7 @@ async function command(id,cmd,extra){
   const d=b.data;
   if(cmd==='LOCK'){d.status='LOCKED';d.lid='CLOSED';}
   if(cmd==='UNLOCK')d.status='OK';
-  if(cmd==='CLEAR_TAMPER'){d.status='OK';d.tilt=0;}
+  if(cmd==='CLEAR_TAMPER'){d.status='OK';d.tilt=0;tourDrop(b,['tilt']);}
   if(cmd==='COLLECT'){d.status='COLLECTING';d.lid='OPEN';}
   if(cmd==='COLLECT_DONE'){d.status='OK';d.lid='CLOSED';d.fill=0;d.weight_g=0;
     addAlert('success','truck','Collection complete',b.name+' is back to normal');}
@@ -2622,7 +2700,8 @@ function renderOverlayCard(){
 
   /* status chips - use same sig-check as renderCard */
   const simOn=b.sim.mask>0,calOn=binMode(b)==='cal'||binMode(b)==='dual';
-  const csig=[d.lid,d.status,d.motion,simOn,calOn,b.live,b.route,isLive(b),b._demoLink].join('|');
+  const tilting=d.tamper_phase==='COUNTDOWN'&&d.status!=='TAMPER'&&d.status!=='CALIBRATING';
+  const csig=[d.lid,d.status,d.motion,simOn,calOn,b.live,b.route,isLive(b),b._demoLink,tilting].join('|');
   const ch=q('chips');
   if(ch&&ch.dataset.sig!==csig){
     ch.dataset.sig=csig;
@@ -2635,7 +2714,7 @@ function renderOverlayCard(){
     ch.innerHTML=[
       slot(icon('lid',d.lid==='OPEN'),d.lid==='OPEN'?'OPEN':'CLOSED',d.lid==='OPEN','var(--c-lid)',
         d.lid==='OPEN'?'Lid is open':'Lid is closed'),
-      slot(stIco,st[0],true,stCol,st[1]),
+      tilting?slot(icon('tamper'),'TILTED',true,'var(--warn)','Tipped over. Tamper alert if it stays tipped'):slot(stIco,st[0],true,stCol,st[1]),
       slot.apply(null,linkSlot(b)),
       slot(icon('flask'),'SIM',simOn,'var(--sim)',simOn?'Simulation is on':'Simulation is off'),
       slot(icon('calib'),'CAL',calOn,'var(--cal)',calOn?'Calibration mode is on':'Calibration mode is off'),
@@ -2809,6 +2888,8 @@ function cardHTML(b){
     '<div class="chips" data-r="chips"></div>'+
     '<div class="bar nm-deep"><i data-r="bar"></i><b style="left:50%"></b><b data-r="th"></b></div>'+
     '<div class="ticks"><span>0</span><span>50</span><span data-r="tl">80</span><span>100</span></div>'+
+    '<p class="faultnote hide" data-r="fault">Fill sensor not answering. The bar shows the last reading.</p>'+
+    '<div class="cardfoot"><span class="h1">1 h</span><svg data-r="spark" viewBox="0 0 100 22" preserveAspectRatio="none"><path/></svg><span data-r="ago"></span></div>'+
     '<div class="sensors" data-r="sensors"></div>'+
     '<div class="actions" data-r="actions"></div>'+
     '<div class="editrow nm-in hide" data-r="edit">'+
@@ -2820,6 +2901,16 @@ function cardHTML(b){
         '<button class="btn sm danger" data-remove="'+b.id+'">Remove</button></div>'+
     '</div></article>';
 }
+/* The last hour of fill as a small line, and how long ago the last reading came, as in the app. */
+function cardFoot(b,svg,agoEl,col){
+  const now=Date.now(),H=3600000,pts=(b.hist||[]).filter(h=>now-h.t<=H);
+  const d=pts.length>1?pts.map((h,i)=>(i?'L':'M')+((h.t-(now-H))/H*100).toFixed(2)+' '+(22-clamp(h.fill,0,100)/100*22).toFixed(2)).join(''):'';
+  const path=svg.firstChild;if(path.getAttribute('d')!==d)path.setAttribute('d',d);path.style.stroke=col;
+  const at=isLive(b)?b.lastAt:(b._demoLink==='down'?b._quietAt:now);
+  const s=at?Math.round((now-at)/1000):null;
+  agoEl.textContent=s==null?'No reading yet':s<5?'Updated just now':'Updated '+ago(at);
+  agoEl.classList.toggle('old',isLive(b)?!b.live:b._demoLink==='down');
+}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 
 /* ---------- render ---------- */
@@ -2830,7 +2921,7 @@ function render(){
   state.bins.forEach(renderCard);
   applyMode();renderCollectNext();renderBanners();renderAlerts();renderLink();
   if(state.view==='charts')drawCharts();
-  if(state.view==='settings')updateSettingsLive();
+  if(state.view==='settings'){updateSettingsLive();demoPanelRender();}
   /* live-update overlay clone in place (no re-clone, no flicker) */
   if(state.ovTile){const ov=$('#tileOverlay');if(ov&&!ov.classList.contains('hide'))renderOverlayCard();}
 
@@ -2856,13 +2947,16 @@ function renderCard(b){
   }
 
   tweenPct(q('pct'),b,d.fill);
+  q('fault').classList.toggle('hide',!(d.faults||[]).includes('HC-SR04'));
+  cardFoot(b,q('spark'),q('ago'),levelColor(d.fill,c));
   const bar=q('bar');bar.style.width='calc('+clamp(d.fill,0,100)+'% - 6px)';bar.style.background=levelColor(d.fill,c);
   q('th').style.left=c.fill_th+'%';q('tl').textContent=c.fill_th;
 
   const bm=binMode(b);
   root.dataset.bmode=bm;
   const simOn=b.sim.mask>0,calOn=bm==='cal'||bm==='dual';
-  const csig=[d.lid,d.status,d.motion,simOn,calOn,b.live,b.route,isLive(b),b._demoLink].join('|');
+  const tilting=d.tamper_phase==='COUNTDOWN'&&d.status!=='TAMPER'&&d.status!=='CALIBRATING';
+  const csig=[d.lid,d.status,d.motion,simOn,calOn,b.live,b.route,isLive(b),b._demoLink,tilting].join('|');
   const ch=q('chips');
   if(ch.dataset.sig!==csig){
     ch.dataset.sig=csig;
@@ -2878,7 +2972,7 @@ function renderCard(b){
     ch.innerHTML=[
       slot(icon('lid',d.lid==='OPEN'),d.lid==='OPEN'?'OPEN':'CLOSED',d.lid==='OPEN','var(--c-lid)',
         d.lid==='OPEN'?'Lid is open':'Lid is closed'),
-      slot(stIco,st[0],true,stCol,st[1]),
+      tilting?slot(icon('tamper'),'TILTED',true,'var(--warn)','Tipped over. Tamper alert if it stays tipped'):slot(stIco,st[0],true,stCol,st[1]),
       slot.apply(null,linkSlot(b)),
       slot(icon('flask'),'SIM',simOn,'var(--sim)',simOn?'Simulation is on':'Simulation is off'),
       slot(icon('calib'),'CAL',calOn,'var(--cal)',calOn?'Calibration mode is on':'Calibration mode is off'),
@@ -3415,7 +3509,22 @@ function loadSettings(){
   const b=byId(state.selSet);if(!b)return;
   for(const k in MAP)$('#'+k).value=b.cal[MAP[k]];
   $('#s_autolock').checked=!!b.cal.auto_lock;
+  sectSummaries(b);
+  sectAllRender();
   refreshCalGate();
+}
+function allSectsOpen(){return $$('.sect').every(d=>d.classList.contains('open'))}
+function sectAllRender(){const b=$('#sectAll');if(!b)return;const o=allSectsOpen();
+  b.innerHTML=icon('layers')+'<span>'+(o?'HIDE ALL':'SHOW ALL')+'</span>';b.style.display='inline-flex';b.style.alignItems='center';b.style.gap='8px';}
+function sectSummaries(b){
+  const c=b.cal,f=(v,d)=>Number(v).toFixed(d),d=b.data||{};
+  const sum={range:f(c.d_empty,1)+' to '+f(c.d_full,1)+' cm',
+    limits:f(c.fill_th,0)+'% \u00B7 '+f(c.temp_th,0)+'\u00B0C \u00B7 '+f(c.hum_th,0)+'%RH \u00B7 '+f(c.gas_th,0)+' IAQ',
+    air:'offset '+f(c.temp_off,1)+'\u00B0C',
+    lid:'PIN \u2022\u2022\u2022\u2022 \u00B7 '+f(c.pir_hold_s,0)+' s'+(c.auto_lock?' \u00B7 auto-lock':''),
+    weight:Number.isFinite(d.weight_g)?(d.weight_g/1000).toFixed(2)+' kg now':'',
+    touch:b.touch&&b.touch.custom!=null?(b.touch.custom?'calibrated':'default values'):''};
+  $$('.sect').forEach(x=>{const e=x.querySelector('.ssum');if(e)e.textContent=sum[x.dataset.sec]||'';});
 }
 function calibrating(){const b=byId(state.selSet);return !!(b&&state.calib&&state.calib.bin===b.id)}
 function formDirty(){
@@ -3433,13 +3542,15 @@ function refreshDirty(){
    calibration switch is replaced by a read-only notice and the write buttons
    go away entirely rather than sitting there greyed out. */
 function renderPin(){
-  const card=$('#pinCard'),b=byId(state.selSet),show=state.role==='collector'&&!!b;
+  const card=$('#pinCard'),b=byId(state.selSet),show=!!b;
   card.classList.toggle('hide',!show);
   if(!show)return;
   if(card.dataset.binid!==b.id){card.dataset.binid=b.id;card.dataset.masked='1';}
   const masked=card.dataset.masked!=='0';
-  $('#pinIco').innerHTML=icon('pin');
+  $('#pinCardIco').innerHTML=icon('pin');
   $('#pinName').textContent=b.name;
+  $('#pinSub').textContent=state.role==='collector'?'Type this on the bin touchscreen when you tap COLLECT.':
+    'Collectors type this on the bin touchscreen for COLLECT and WI-FI SETUP. Change it under Lid and lock.';
   $('#pinVal').textContent=masked?'\u2022\u2022\u2022\u2022':String(b.cal.collect_pin);
   $('#pinVal').classList.toggle('masked',masked);
   const eye=$('#pinEye');
@@ -3919,11 +4030,28 @@ document.addEventListener('pointerdown',e=>{
   setTimeout(()=>sp.remove(),640);
 });
 window.addEventListener('resize',()=>{if(state.view==='charts')drawCharts()});
+/* Number keys open the tabs in their order, M turns sounds on or off. Not while typing. */
+document.addEventListener('keydown',e=>{
+  if(e.ctrlKey||e.metaKey||e.altKey||!inMain())return;
+  const t=e.target;if(t&&(t.matches('input,textarea,select')||t.isContentEditable))return;
+  if(document.querySelector('.modal:not(.hide),.pinwrap:not(.hide)'))return;
+  if(/^[1-9]$/.test(e.key)){const tabs=$$('.tab').filter(x=>x.offsetParent!==null),tb=tabs[+e.key-1];
+    if(tb){e.preventDefault();tb.click();}return;}
+  if(e.key==='m'||e.key==='M'){e.preventDefault();$('#sound').click();}
+});
+document.addEventListener('keydown',e=>{const h=e.target.closest&&e.target.closest('.shead');if(h&&(e.key==='Enter'||e.key===' ')){e.preventDefault();h.click();}});
 
 buildTabs();setAddCount(1);decorateStatics();paintHeadings();btDecorate();cloudDecorate();seedAlerts();setRole('collector');setView('overview');render();liveStart();
 
 /* overview filter chips */
 document.addEventListener('click',e=>{
+  const sh=e.target.closest('.shead');
+  if(sh){const d=sh.closest('.sect'),o=d.classList.toggle('open');sh.setAttribute('aria-expanded',o);sfx(o?'open':'back');sectAllRender();return;}
+  const da=e.target.closest('#demoBody [data-dspeed],#demoBody [data-dpick],#demoBody [data-devent],#demoBody [data-dlink],#demoBody [data-dreset]');
+  if(da){demoAct(da);return;}
+  if(e.target.closest('#sectAll')){const open=!allSectsOpen();
+    $$('.sect').forEach(d=>{d.classList.toggle('open',open);const h=d.querySelector('.shead');if(h)h.setAttribute('aria-expanded',open);});
+    sfx(open?'open':'back');sectAllRender();return;}
   const fc=e.target.closest('#filterChips .fchip');
   if(fc){state.ovFilter=fc.dataset.filter;applyOvFilter();return;}
   /* view toggle */
@@ -4019,14 +4147,14 @@ const SOUNDS={
 };
 /* The sound test list, the same groups and names as the phone app's Sound test. */
 const SND_GROUPS=[
-  ['Alerts',[['alert_full','Bin full'],['alert_tamper','Tamper'],['alert_sensor','Sensor limit'],['alert_lock','Bin locked'],['alert_pickup','Pickup alert'],['alert_info','Info']]],
-  ['Bins and links',[['link_up','Wi-Fi link'],['cloud','Cloud link'],['link_lost','Link lost'],['bin_lost','Bin quiet'],['bin_back','Bin back'],['cmd_ok','Command OK'],['cmd_fail','Command failed']]],
-  ['Lid and pickup',[['lock','Lock'],['unlock','Unlock'],['pickup','Pickup start'],['done','Pickup finished']]],
-  ['Setup',[['calib','Calibrate'],['sim','Simulation'],['saved','Saved'],['denied','Not allowed']]],
-  ['Bluetooth Wi-Fi setup',[['bt_paired','Paired'],['bt_wrong','Wrong code'],['bt_blocked','Pairing stopped'],['wifi_joined','Wi-Fi joined'],['wifi_failed','Wi-Fi failed'],['bt_off','Bluetooth off']]],
-  ['Operator PIN',[['op_in','Operator in'],['op_out','Operator out'],['pin_key','PIN key'],['pin_wrong','Wrong PIN'],['pin_lockout','PIN lockout'],['pin_set','PIN saved']]],
-  ['App',[['boot','Start'],['logo','Logo'],['demo','Demo on'],['theme_light','Light theme'],['theme_dark','Dark theme']]],
-  ['Keys',[['tap','Tap'],['choice','Choice'],['tab','Tab'],['open','Open'],['back','Back'],['confirm','Confirm'],['danger','Danger'],['switch_on','Switch on'],['switch_off','Switch off'],['step_up','Step up'],['step_down','Step down']]]
+  ['Alerts',[['alert_full','Bin full','fill',null,'var(--bad)'],['alert_tamper','Tamper','tamper',null,'var(--c-tamper)'],['alert_sensor','Sensor limit','temp',null,'var(--c-temp)'],['alert_lock','Bin locked','lock',true,'var(--sim)'],['alert_pickup','Pickup alert','truck',null,'var(--cal)'],['alert_info','Info','bell',null,'var(--c-bt)']]],
+  ['Bins and links',[['link_up','Wi-Fi link','wifi',true,'var(--c-link)'],['cloud','Cloud link','cloud',null,'var(--c-cloud)'],['link_lost','Link lost','wifi',false,'var(--bad)'],['bin_lost','Bin quiet','radar',null,'var(--warn)'],['bin_back','Bin back','bins',null,'var(--ok)'],['cmd_ok','Command OK','check',null,'var(--ok)'],['cmd_fail','Command failed','cross',null,'var(--bad)']]],
+  ['Lid and pickup',[['lock','Lock','lock',true,'var(--sim)'],['unlock','Unlock','lock',false,'var(--c-lid)'],['pickup','Pickup start','truck',null,'var(--cal)'],['done','Pickup finished','check',null,'var(--c-fill)']]],
+  ['Setup',[['calib','Calibrate','calib',null,'var(--cal)'],['sim','Simulation','flask',null,'var(--sim)'],['saved','Saved','save',null,'var(--ok)'],['denied','Not allowed','cross',null,'var(--warn)']]],
+  ['Bluetooth Wi-Fi setup',[['bt_paired','Paired','bluetooth',null,'var(--c-bt)'],['bt_wrong','Wrong code','key',null,'var(--warn)'],['bt_blocked','Pairing stopped','lock',true,'var(--bad)'],['wifi_joined','Wi-Fi joined','wifi',true,'var(--ok)'],['wifi_failed','Wi-Fi failed','wifi',false,'var(--c-tamper)'],['bt_off','Bluetooth off','power',null,'var(--c-motion)']]],
+  ['Operator PIN',[['op_in','Operator in','sliders',null,'var(--accent)'],['op_out','Operator out','undo',null,'var(--c-weight)'],['pin_key','PIN key','pin',null,'var(--c-humid)'],['pin_wrong','Wrong PIN','key',null,'var(--bad)'],['pin_lockout','PIN lockout','stopwatch',null,'var(--c-tamper)'],['pin_set','PIN saved','save',null,'var(--c-gas)']]],
+  ['App',[['boot','Start','power',null,'var(--ok)'],['logo','Logo','bins',null,'var(--c-gas)'],['demo','Demo on','flask',null,'var(--warn)'],['theme_light','Light theme','sunmoon',false,'var(--c-lid)'],['theme_dark','Dark theme','sunmoon',true,'var(--c-humid)']]],
+  ['Keys',[['tap','Tap','capture',null,'var(--c-humid)'],['choice','Choice','sliders',null,'var(--c-gas)'],['tab','Tab','layers',null,'var(--c-motion)'],['open','Open','eye',null,'var(--c-fill)'],['back','Back','undo',null,'var(--c-weight)'],['confirm','Confirm','check',null,'var(--ok)'],['danger','Danger','trash',null,'var(--bad)'],['switch_on','Switch on','power',null,'var(--c-link)'],['switch_off','Switch off','power',null,'var(--ink2)'],['step_up','Step up','plus',null,'var(--c-temp)'],['step_down','Step down','percent',null,'var(--c-press)']]]
 ];
 const SND_LEVEL={ui:.5,event:.72,alert:.85},SND_TIMBRE={ui:[.18,0],event:[.22,.05],alert:[.35,.22]};
 const CMD_SFX={LOCK:'lock',UNLOCK:'unlock',COLLECT:'pickup',COLLECT_DONE:'done',CALIBRATE_START:'calib',CALIBRATE_END:'switch_off',CLEAR_TAMPER:'confirm',TARE:'confirm',CAL_WEIGHT:'confirm',RESET_GAS:'confirm',TOUCH_CAL:'calib',TOUCH_CAL_RESET:'confirm'};
@@ -4334,7 +4462,7 @@ playLogo('#gateLogo .sblogo');
 $('#brand').addEventListener('click',()=>{SND.armed=true;sfx('logo');playLogo('#brandLogo .sblogo');});
 $('#sndHead').innerHTML=icon('speaker')+'<span>SOUND TEST</span>';
 $('#sndGroups').innerHTML=SND_GROUPS.map(g=>'<div class="sndgrp"><h3>'+g[0]+'</h3><div>'+
-  g[1].map(x=>'<button type="button" class="btn sm tint" style="--cc:var(--accent)" data-snd="'+x[0]+'">'+icon('speaker')+'<span>'+x[1]+'</span></button>').join('')+
+  g[1].map(x=>'<button type="button" class="btn sm tint" style="--cc:'+x[4]+'" data-snd="'+x[0]+'">'+(x[3]===null?icon(x[2]):ICONS[x[2]](x[3]))+'<span>'+x[1]+'</span></button>').join('')+
   '</div></div>').join('');
 </script>
 </body>

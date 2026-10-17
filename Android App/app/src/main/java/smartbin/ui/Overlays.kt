@@ -1,5 +1,8 @@
 package smartbin.ui
 
+import smartbin.notify.Feel
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -67,7 +70,7 @@ fun Overlays(vm: AppViewModel, hub: HubState, allowAlerts: () -> Unit) {
                     IconKey(Ic.back, { vm.overlay = Overlay.BinDetail(bins[i - 1].id) }, tint = muted(), enabled = i > 0, sound = Sfx.STEP_DOWN)
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                         T(b.name, size = 1.02f, maxLines = 1)
-                        T("${i + 1} of ${bins.size} · arrows move between bins", size = 0.74f, weight = FontWeight.Bold, color = Sb.c.ink2, maxLines = 1)
+                        T("${i + 1} of ${bins.size} · swipe or use the arrows", size = 0.74f, weight = FontWeight.Bold, color = Sb.c.ink2, maxLines = 1)
                     }
                     IconKey(
                         Ic.back, { vm.overlay = Overlay.BinDetail(bins[i + 1].id) }, tint = muted(), enabled = i < bins.size - 1, sound = Sfx.STEP_UP,
@@ -75,7 +78,23 @@ fun Overlays(vm: AppViewModel, hub: HubState, allowAlerts: () -> Unit) {
                     )
                     IconKey(Ic.cross, close, tint = muted(), sound = Sfx.BACK)
                 }
-                BinCard(vm, b, hub, inSheet = true)
+                // A swipe across the card moves to the next or previous bin, like the arrows.
+                var drag by remember { mutableStateOf(0f) }
+                Box(
+                    Modifier.pointerInput(i, bins.size) {
+                        detectHorizontalDragGestures(
+                            onDragStart = { drag = 0f },
+                            onDragEnd = {
+                                val far = 80.dp.toPx()
+                                when {
+                                    drag < -far && i < bins.size - 1 -> { Feel.event(Sfx.STEP_UP); vm.overlay = Overlay.BinDetail(bins[i + 1].id) }
+                                    drag > far && i > 0 -> { Feel.event(Sfx.STEP_DOWN); vm.overlay = Overlay.BinDetail(bins[i - 1].id) }
+                                }
+                                drag = 0f
+                            },
+                        ) { _, dx -> drag += dx }
+                    },
+                ) { BinCard(vm, b, hub, inSheet = true) }
             }
         }
         is Overlay.Pick -> Sheet(close) { Picker(vm, hub, o.forWhat) }
