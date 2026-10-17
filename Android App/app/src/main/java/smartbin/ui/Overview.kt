@@ -99,9 +99,9 @@ fun Overview(vm: AppViewModel, hub: HubState) {
             CollectNext(vm, bins)
             head()
             if (n > 2) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 2.dp), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                FilterKey(Ic.bins, "All $n", vm.binFilter == BinFilter.ALL) { vm.binFilter = BinFilter.ALL }
-                FilterKey(Ic.bell, "Needs action ${bins.count { it.needsAction }}", vm.binFilter == BinFilter.ACTION) { vm.binFilter = BinFilter.ACTION }
-                FilterKey(Ic.flask, "Sim / Cal ${bins.count { it.simulating || it.calibrating }}", vm.binFilter == BinFilter.MODES) { vm.binFilter = BinFilter.MODES }
+                FilterKey(Ic.layers, "All $n", vm.binFilter == BinFilter.ALL) { vm.binFilter = BinFilter.ALL }
+                FilterKey(Ic.tamper, "Needs action ${bins.count { it.needsAction }}", vm.binFilter == BinFilter.ACTION, Sb.c.tamper) { vm.binFilter = BinFilter.ACTION }
+                FilterKey(Ic.flask, "Sim / Cal ${bins.count { it.simulating || it.calibrating }}", vm.binFilter == BinFilter.MODES, Sb.c.sim) { vm.binFilter = BinFilter.MODES }
             }
             if (list.isEmpty()) Card { Empty(Ic.check, "No bins match this filter.") }
             else TileGrid(list) { b -> Tile(b) { vm.overlay = Overlay.BinDetail(b.id) } }

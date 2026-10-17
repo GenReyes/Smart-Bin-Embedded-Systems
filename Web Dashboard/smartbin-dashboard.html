@@ -223,7 +223,7 @@ header.top:after{content:"";display:block;height:3px;border-radius:3px;backgroun
 .switch input{width:auto;box-shadow:none;margin:0}
 
 fieldset{border:0;margin:0;padding:0;min-width:0;transition:opacity .35s ease,filter .35s ease}
-fieldset[disabled]{opacity:.5;filter:saturate(.4)}
+fieldset[disabled] .sbody{opacity:.5;filter:saturate(.4)}
 .calbar{display:flex;gap:18px;align-items:center;flex-wrap:wrap;padding:18px 20px;border-radius:16px;margin-top:4px}
 .calbar .calico{width:44px;height:44px;flex:none;border-radius:50%;display:grid;place-items:center;
   background:var(--base);box-shadow:var(--o1);color:var(--ink2);transition:color .4s}
@@ -361,8 +361,18 @@ table.sim tr{box-shadow:var(--o1)}
 .sect[data-sec="weight"]{--cc:var(--c-weight)}
 .sect[data-sec="air"]{--cc:var(--c-gas)}
 .sect[data-sec="touch"]{--cc:var(--cal)}
-.sect h2{display:flex;align-items:center;gap:10px;color:var(--cc)}
-.sect h2:before{content:"";width:4px;height:15px;border-radius:2px;background:var(--cc)}
+.sect{margin-top:12px;border-radius:16px;background:var(--base);box-shadow:var(--o1)}
+.shead{all:unset;box-sizing:border-box;width:100%;min-height:54px;padding:0 16px;display:flex;align-items:center;gap:10px;cursor:pointer;border-radius:16px}
+.shead:focus-visible{outline:2px solid var(--cc);outline-offset:2px}
+.shead:before{content:"";width:4px;height:15px;border-radius:2px;background:var(--cc);flex:none}
+.shead .ico{width:18px;height:18px;color:var(--cc);flex:none}
+.shead .stitle{font-size:12px;font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--cc);white-space:nowrap}
+.shead .ssum{flex:1;text-align:right;font-size:12.5px;font-weight:700;color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.shead .schev{color:var(--ink2);transition:transform .25s}
+.sect.open .schev{transform:rotate(180deg)}
+.sect .sbody{display:none;padding:2px 16px 16px}
+.sect.open .sbody{display:block}
+.sect .sbody>.fields:first-child{margin-top:4px}
 .sect input:focus{box-shadow:var(--i1), 0 0 0 2px var(--accentSoft)}
 .sect input:focus{box-shadow:var(--i1), 0 0 0 2px color-mix(in srgb,var(--cc) 38%,transparent)}
 .simname{--cc:var(--ink2)}
@@ -565,6 +575,7 @@ table.sim th .ico{width:14px;height:14px}
   border-radius:16px;margin:0 0 20px}
 .pincard .pinico{width:46px;height:46px;flex:none;border-radius:50%;display:grid;place-items:center;
   background:var(--base);box-shadow:var(--o1);color:var(--cal)}
+.pincard .pinico .ico{width:22px;height:22px;display:block}
 .pincard .pintxt{flex:1;min-width:200px}
 .pincard .pintxt b{display:block;font-size:15px}
 .pincard .pintxt span{font-size:12.5px;color:var(--ink2)}
@@ -841,7 +852,8 @@ table.sim th .ico{width:14px;height:14px}
 /* ---- v11 additions ---- */
 /* Alert history tools (from Garbage-Guard): kind symbols, date range, scoped actions */
 #alertKinds{display:flex;gap:7px;flex-wrap:wrap}
-#alertKinds .fchip{width:36px;height:36px}
+#alertKinds .fchip,#filterChips .fchip{width:36px;height:36px}
+#filterChips{gap:7px}
 #alertRange{display:flex;gap:6px;flex-wrap:wrap}
 .alertscope{margin:14px 2px 12px;font-size:13px;font-weight:800;color:var(--ink)}
 .alertscope small{display:block;font-weight:600;color:var(--ink2);margin-top:2px}
@@ -1018,10 +1030,10 @@ html[data-theme="dark"]{--onBrand:#13100D;--brand2:#3FC7C2}
     </div>
     <div class="ovtools hide" id="ovTools">
       <div class="filterchips" id="filterChips">
-        <button class="fchip on" data-filter="all" title="All bins" style="--fc:var(--accent)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="2.5"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M18.4 5.6l-2.8 2.8M8.4 15.6l-2.8 2.8"/></svg><span class="fbadge"></span></button>
-        <button class="fchip" data-filter="attn" title="Needs attention" style="--fc:#e54d42"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 22h20L12 2z"/><path d="M12 10v4"/><circle cx="12" cy="18" r=".5" fill="currentColor"/></svg><span class="fbadge"></span></button>
-        <button class="fchip" data-filter="sim" title="Simulation active" style="--fc:#a855f7"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6v3l-2 3 2 4v3H9v-3l2-4-2-3V3z"/><path d="M8 3h8M8 21h8"/></svg><span class="fbadge"></span></button>
-        <button class="fchip" data-filter="cal" title="Calibrating" style="--fc:#14b8a6"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h.01"/><path d="M5 12.859A7 7 0 1 1 19 12.86"/><path d="M12 6v6l4 2"/></svg><span class="fbadge"></span></button>
+        <button class="fchip on" data-filter="all" title="All bins" aria-label="All bins" style="--fc:var(--accent)" data-ico="layers"><span class="fbadge"></span></button>
+        <button class="fchip" data-filter="attn" title="Needs attention" aria-label="Needs attention" style="--fc:var(--c-tamper)" data-ico="tamper"><span class="fbadge"></span></button>
+        <button class="fchip" data-filter="sim" title="Simulation active" aria-label="Simulation active" style="--fc:var(--sim)" data-ico="flask"><span class="fbadge"></span></button>
+        <button class="fchip" data-filter="cal" title="Calibrating" aria-label="Calibrating" style="--fc:var(--cal)" data-ico="calib"><span class="fbadge"></span></button>
       </div>
       <button class="iconbtn" id="viewToggle" title="Switch to grid view" aria-label="Toggle view">
         <svg class="ico xs vico" id="vicoGrid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7" rx="1.4"/><rect x="14" y="3" width="7" height="7" rx="1.4"/><rect x="3" y="14" width="7" height="7" rx="1.4"/><rect x="14" y="14" width="7" height="7" rx="1.4"/></svg>
@@ -1072,10 +1084,10 @@ html[data-theme="dark"]{--onBrand:#13100D;--brand2:#3FC7C2}
       <div class="seg" id="setSeg"></div>
 
       <div class="pincard nm-in hide" id="pinCard">
-        <span class="pinico" id="pinIco"></span>
+        <span class="pinico" id="pinCardIco"></span>
         <span class="pintxt">
           <b>Collect PIN for <span id="pinName">this bin</span></b>
-          <span>Type this on the bin touchscreen when you tap COLLECT.</span>
+          <span id="pinSub">Type this on the bin touchscreen when you tap COLLECT.</span>
         </span>
         <span class="pinval" id="pinVal">----</span>
         <button class="btn sm" id="pinEye"></button>
@@ -1107,8 +1119,8 @@ html[data-theme="dark"]{--onBrand:#13100D;--brand2:#3FC7C2}
           <div class="field"><label for="s_dfull">Distance full (cm)</label>
             <div class="withbtn"><input id="s_dfull" type="number" min="1" max="400" step="0.5"><button class="btn sm" data-capture="s_dfull">USE NOW</button></div></div>
         </div>
-        </div>
         <p class="hint">Empty the bin and press USE NOW for the first box. Hold a board at your full line and press it for the second. Sensor reads <b id="s_dist">-- cm</b> right now.</p>
+        </div>
 
         <div class="sect" data-sec="limits">
         <h2 style="margin-top:24px">Alert limits</h2>
@@ -1562,10 +1574,21 @@ function paintHeadings(){
     thValue:['capture','MANUAL VALUE','var(--cal)']};
   for(const id in TH){const el=document.getElementById(id);
     if(el)el.innerHTML='<span class="thh" style="--cc:'+TH[id][2]+'">'+icon(TH[id][0])+TH[id][1]+'</span>';}
-  const SEC={range:'ruler',limits:'bell',lid:'servo',weight:'weight',air:'gas'};
+  $$('#filterChips .fchip[data-ico]').forEach(c=>{if(!c.querySelector('svg'))c.insertAdjacentHTML('afterbegin',icon(c.dataset.ico));});
+  const SEC={range:'ruler',limits:'bell',lid:'servo',weight:'weight',air:'gas',touch:'capture'};
+  /* Each group folds, closed at first like the app, so the one you need is a short scroll away.
+     The summary on the right says what is inside without opening it. */
   $$('.sect').forEach(d=>{
     const h=d.querySelector('h2');if(!h||h.dataset.deco)return;h.dataset.deco='1';
-    h.insertAdjacentHTML('afterbegin',icon(SEC[d.dataset.sec]||'sliders'));
+    h.removeAttribute('style');
+    const body=document.createElement('div');body.className='sbody';
+    while(h.nextSibling)body.appendChild(h.nextSibling);
+    d.appendChild(body);
+    /* A div, not a button: the groups sit in a fieldset that is disabled until calibration is on. */
+    const btn=document.createElement('div');btn.setAttribute('role','button');btn.tabIndex=0;btn.className='shead';btn.setAttribute('aria-expanded','false');
+    btn.innerHTML=icon(SEC[d.dataset.sec]||'sliders')+'<span class="stitle">'+h.textContent+'</span><span class="ssum"></span>'+
+      '<svg class="ico schev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+    h.replaceWith(btn);
   });
   const subs={btnTare:'SETS 0 KG POINT',btnCalW:'SETS KG PER STEP'};
   for(const id in subs){const el=document.getElementById(id);
@@ -3415,7 +3438,18 @@ function loadSettings(){
   const b=byId(state.selSet);if(!b)return;
   for(const k in MAP)$('#'+k).value=b.cal[MAP[k]];
   $('#s_autolock').checked=!!b.cal.auto_lock;
+  sectSummaries(b);
   refreshCalGate();
+}
+function sectSummaries(b){
+  const c=b.cal,f=(v,d)=>Number(v).toFixed(d),d=b.data||{};
+  const sum={range:f(c.d_empty,1)+' to '+f(c.d_full,1)+' cm',
+    limits:f(c.fill_th,0)+'% \u00B7 '+f(c.temp_th,0)+'\u00B0C \u00B7 '+f(c.hum_th,0)+'%RH \u00B7 '+f(c.gas_th,0)+' IAQ',
+    air:'offset '+f(c.temp_off,1)+'\u00B0C',
+    lid:'PIN \u2022\u2022\u2022\u2022 \u00B7 '+f(c.pir_hold_s,0)+' s'+(c.auto_lock?' \u00B7 auto-lock':''),
+    weight:Number.isFinite(d.weight_g)?(d.weight_g/1000).toFixed(2)+' kg now':'',
+    touch:b.touch&&b.touch.custom!=null?(b.touch.custom?'calibrated':'default values'):''};
+  $$('.sect').forEach(x=>{const e=x.querySelector('.ssum');if(e)e.textContent=sum[x.dataset.sec]||'';});
 }
 function calibrating(){const b=byId(state.selSet);return !!(b&&state.calib&&state.calib.bin===b.id)}
 function formDirty(){
@@ -3433,13 +3467,15 @@ function refreshDirty(){
    calibration switch is replaced by a read-only notice and the write buttons
    go away entirely rather than sitting there greyed out. */
 function renderPin(){
-  const card=$('#pinCard'),b=byId(state.selSet),show=state.role==='collector'&&!!b;
+  const card=$('#pinCard'),b=byId(state.selSet),show=!!b;
   card.classList.toggle('hide',!show);
   if(!show)return;
   if(card.dataset.binid!==b.id){card.dataset.binid=b.id;card.dataset.masked='1';}
   const masked=card.dataset.masked!=='0';
-  $('#pinIco').innerHTML=icon('pin');
+  $('#pinCardIco').innerHTML=icon('pin');
   $('#pinName').textContent=b.name;
+  $('#pinSub').textContent=state.role==='collector'?'Type this on the bin touchscreen when you tap COLLECT.':
+    'Collectors type this on the bin touchscreen for COLLECT and WI-FI SETUP. Change it under Lid and lock.';
   $('#pinVal').textContent=masked?'\u2022\u2022\u2022\u2022':String(b.cal.collect_pin);
   $('#pinVal').classList.toggle('masked',masked);
   const eye=$('#pinEye');
@@ -3919,11 +3955,14 @@ document.addEventListener('pointerdown',e=>{
   setTimeout(()=>sp.remove(),640);
 });
 window.addEventListener('resize',()=>{if(state.view==='charts')drawCharts()});
+document.addEventListener('keydown',e=>{const h=e.target.closest&&e.target.closest('.shead');if(h&&(e.key==='Enter'||e.key===' ')){e.preventDefault();h.click();}});
 
 buildTabs();setAddCount(1);decorateStatics();paintHeadings();btDecorate();cloudDecorate();seedAlerts();setRole('collector');setView('overview');render();liveStart();
 
 /* overview filter chips */
 document.addEventListener('click',e=>{
+  const sh=e.target.closest('.shead');
+  if(sh){const d=sh.closest('.sect'),o=d.classList.toggle('open');sh.setAttribute('aria-expanded',o);sfx(o?'open':'back');return;}
   const fc=e.target.closest('#filterChips .fchip');
   if(fc){state.ovFilter=fc.dataset.filter;applyOvFilter();return;}
   /* view toggle */
@@ -4019,14 +4058,14 @@ const SOUNDS={
 };
 /* The sound test list, the same groups and names as the phone app's Sound test. */
 const SND_GROUPS=[
-  ['Alerts',[['alert_full','Bin full'],['alert_tamper','Tamper'],['alert_sensor','Sensor limit'],['alert_lock','Bin locked'],['alert_pickup','Pickup alert'],['alert_info','Info']]],
-  ['Bins and links',[['link_up','Wi-Fi link'],['cloud','Cloud link'],['link_lost','Link lost'],['bin_lost','Bin quiet'],['bin_back','Bin back'],['cmd_ok','Command OK'],['cmd_fail','Command failed']]],
-  ['Lid and pickup',[['lock','Lock'],['unlock','Unlock'],['pickup','Pickup start'],['done','Pickup finished']]],
-  ['Setup',[['calib','Calibrate'],['sim','Simulation'],['saved','Saved'],['denied','Not allowed']]],
-  ['Bluetooth Wi-Fi setup',[['bt_paired','Paired'],['bt_wrong','Wrong code'],['bt_blocked','Pairing stopped'],['wifi_joined','Wi-Fi joined'],['wifi_failed','Wi-Fi failed'],['bt_off','Bluetooth off']]],
-  ['Operator PIN',[['op_in','Operator in'],['op_out','Operator out'],['pin_key','PIN key'],['pin_wrong','Wrong PIN'],['pin_lockout','PIN lockout'],['pin_set','PIN saved']]],
-  ['App',[['boot','Start'],['logo','Logo'],['demo','Demo on'],['theme_light','Light theme'],['theme_dark','Dark theme']]],
-  ['Keys',[['tap','Tap'],['choice','Choice'],['tab','Tab'],['open','Open'],['back','Back'],['confirm','Confirm'],['danger','Danger'],['switch_on','Switch on'],['switch_off','Switch off'],['step_up','Step up'],['step_down','Step down']]]
+  ['Alerts',[['alert_full','Bin full','fill',null,'var(--bad)'],['alert_tamper','Tamper','tamper',null,'var(--c-tamper)'],['alert_sensor','Sensor limit','temp',null,'var(--c-temp)'],['alert_lock','Bin locked','lock',true,'var(--sim)'],['alert_pickup','Pickup alert','truck',null,'var(--cal)'],['alert_info','Info','bell',null,'var(--c-bt)']]],
+  ['Bins and links',[['link_up','Wi-Fi link','wifi',true,'var(--c-link)'],['cloud','Cloud link','cloud',null,'var(--c-cloud)'],['link_lost','Link lost','wifi',false,'var(--bad)'],['bin_lost','Bin quiet','radar',null,'var(--warn)'],['bin_back','Bin back','bins',null,'var(--ok)'],['cmd_ok','Command OK','check',null,'var(--ok)'],['cmd_fail','Command failed','cross',null,'var(--bad)']]],
+  ['Lid and pickup',[['lock','Lock','lock',true,'var(--sim)'],['unlock','Unlock','lock',false,'var(--c-lid)'],['pickup','Pickup start','truck',null,'var(--cal)'],['done','Pickup finished','check',null,'var(--c-fill)']]],
+  ['Setup',[['calib','Calibrate','calib',null,'var(--cal)'],['sim','Simulation','flask',null,'var(--sim)'],['saved','Saved','save',null,'var(--ok)'],['denied','Not allowed','cross',null,'var(--warn)']]],
+  ['Bluetooth Wi-Fi setup',[['bt_paired','Paired','bluetooth',null,'var(--c-bt)'],['bt_wrong','Wrong code','key',null,'var(--warn)'],['bt_blocked','Pairing stopped','lock',true,'var(--bad)'],['wifi_joined','Wi-Fi joined','wifi',true,'var(--ok)'],['wifi_failed','Wi-Fi failed','wifi',false,'var(--c-tamper)'],['bt_off','Bluetooth off','power',null,'var(--c-motion)']]],
+  ['Operator PIN',[['op_in','Operator in','sliders',null,'var(--accent)'],['op_out','Operator out','undo',null,'var(--c-weight)'],['pin_key','PIN key','pin',null,'var(--c-humid)'],['pin_wrong','Wrong PIN','key',null,'var(--bad)'],['pin_lockout','PIN lockout','stopwatch',null,'var(--c-tamper)'],['pin_set','PIN saved','save',null,'var(--c-gas)']]],
+  ['App',[['boot','Start','power',null,'var(--ok)'],['logo','Logo','bins',null,'var(--c-gas)'],['demo','Demo on','flask',null,'var(--warn)'],['theme_light','Light theme','sunmoon',false,'var(--c-lid)'],['theme_dark','Dark theme','sunmoon',true,'var(--c-humid)']]],
+  ['Keys',[['tap','Tap','capture',null,'var(--c-humid)'],['choice','Choice','sliders',null,'var(--c-gas)'],['tab','Tab','layers',null,'var(--c-motion)'],['open','Open','eye',null,'var(--c-fill)'],['back','Back','undo',null,'var(--c-weight)'],['confirm','Confirm','check',null,'var(--ok)'],['danger','Danger','trash',null,'var(--bad)'],['switch_on','Switch on','power',null,'var(--c-link)'],['switch_off','Switch off','power',null,'var(--ink2)'],['step_up','Step up','plus',null,'var(--c-temp)'],['step_down','Step down','percent',null,'var(--c-press)']]]
 ];
 const SND_LEVEL={ui:.5,event:.72,alert:.85},SND_TIMBRE={ui:[.18,0],event:[.22,.05],alert:[.35,.22]};
 const CMD_SFX={LOCK:'lock',UNLOCK:'unlock',COLLECT:'pickup',COLLECT_DONE:'done',CALIBRATE_START:'calib',CALIBRATE_END:'switch_off',CLEAR_TAMPER:'confirm',TARE:'confirm',CAL_WEIGHT:'confirm',RESET_GAS:'confirm',TOUCH_CAL:'calib',TOUCH_CAL_RESET:'confirm'};
@@ -4334,7 +4373,7 @@ playLogo('#gateLogo .sblogo');
 $('#brand').addEventListener('click',()=>{SND.armed=true;sfx('logo');playLogo('#brandLogo .sblogo');});
 $('#sndHead').innerHTML=icon('speaker')+'<span>SOUND TEST</span>';
 $('#sndGroups').innerHTML=SND_GROUPS.map(g=>'<div class="sndgrp"><h3>'+g[0]+'</h3><div>'+
-  g[1].map(x=>'<button type="button" class="btn sm tint" style="--cc:var(--accent)" data-snd="'+x[0]+'">'+icon('speaker')+'<span>'+x[1]+'</span></button>').join('')+
+  g[1].map(x=>'<button type="button" class="btn sm tint" style="--cc:'+x[4]+'" data-snd="'+x[0]+'">'+(x[3]===null?icon(x[2]):ICONS[x[2]](x[3]))+'<span>'+x[1]+'</span></button>').join('')+
   '</div></div>').join('');
 </script>
 </body>

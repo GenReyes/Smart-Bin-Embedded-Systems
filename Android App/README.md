@@ -6,7 +6,7 @@ It runs with no hardware. Turn DEMO on at the start page and three made-up bins 
 
 **Connecting to the real bins:** [INTEGRATION.md](INTEGRATION.md) lists what the firmware does. Version 2.0 covers all of it: Bluetooth Wi-Fi setup, the new status fields, touch calibration, Firebase command results and watchers.
 
-Version 2.0. Kotlin and Jetpack Compose, the same stack as Garbage-Guard (AGP 9.4.1, Gradle 9.6.0, compile and target SDK 37, minimum Android 8.0).
+Version 2.1. Kotlin and Jetpack Compose, the same stack as Garbage-Guard (AGP 9.4.1, Gradle 9.6.0, compile and target SDK 37, minimum Android 8.0).
 
 ## Build and run
 
@@ -24,7 +24,7 @@ gradlew :app:assembleDebug
 
 The APK lands in `app/build/outputs/apk/debug/app-debug.apk`. Copy it to a phone to install it there.
 
-A ready-built debug APK, `Smart-Bin v2.0.apk`, sits in this folder for installing on a phone without building.
+A ready-built debug APK, `Smart-Bin v2.1.apk`, sits in this folder for installing on a phone without building.
 
 ## What is in it
 
@@ -42,9 +42,9 @@ A ready-built debug APK, `Smart-Bin v2.0.apk`, sits in this folder for installin
 
 **Charts.** Fill level over 15 minutes, 1 hour, 6 hours or 24 hours, for one bin or the five fullest, with the alert line. Environment shows temperature, humidity and air quality as a share of their limits, or one reading in real units (temperature 0 to 85 C, humidity 0 to 100 %, air quality 0 to 500 IAQ, pressure 300 to 1100 hPa). The expand key turns the phone sideways for a full-width chart.
 
-**Settings.** The calibration switch (one bin at a time, Wi-Fi only), then fold-out groups: fill range with USE NOW, alert limits, the BME680 offsets and gas baseline, lid and lock, weight with tare and calibrate, and for operators the touchscreen (CALIBRATE TOUCH and RESET). Changes wait in a save bar until SAVE. Collectors see the collect PIN and read-only values. Under it are Reload from bin and a row to App settings. Everything about the app itself is behind the gear.
+**Settings.** The calibration switch (one bin at a time, Wi-Fi only), then fold-out groups: fill range with USE NOW, alert limits, the BME680 offsets and gas baseline, lid and lock, weight with tare and calibrate, and for operators the touchscreen (CALIBRATE TOUCH and RESET). Every group starts folded, with its summary on the right. Changes wait in a save bar until SAVE. The Collect PIN sits at the top for both roles; collectors see read-only values. Under it are Reload from bin and a row to App settings. Everything about the app itself is behind the gear.
 
-**App settings** (the gear at the top right). Two big keys for Sound and Vibration, vibration strength (Light, Normal, Strong), a sound test with every sound in the same groups as the dashboard's (each plays with its vibration even with sound off), and keep the screen on. Then appearance (Auto, Light, Dark) and role, Connection and Bluetooth setup, push alerts, Unrestricted battery (asks Android to stop pausing the app in the background), Android alert settings, Start page, Export bin list, and the demo options while demo is on.
+**App settings** (the gear at the top right). Two big keys for Sound and Vibration, vibration strength (Light, Normal, Strong), a sound test with every sound in the same groups, icons and colours as the dashboard's (each plays with its vibration even with sound off), and keep the screen on. Then appearance (Auto, Light, Dark) and role, Connection and Bluetooth setup, push alerts, Unrestricted battery (asks Android to stop pausing the app in the background), Android alert settings, Start page, Export bin list, and the demo options while demo is on.
 
 **Demo options** (in App settings, only while demo is on). Any choice here pauses the automatic tour for 60 s. They act on the demo bins only: fill speed (Pause, Real, Normal, Fast), pretend links (Wi-Fi, Firebase, ThingSpeak in any mix, to show the link colours), and one-tap events on a bin: FULL, TAMPER, BAD AIR, EMPTY, and GO QUIET, which makes the bin stop answering until ANSWER AGAIN. RESET puts it all back. They are forgotten when the app closes, and while none is used the demo runs as normal.
 

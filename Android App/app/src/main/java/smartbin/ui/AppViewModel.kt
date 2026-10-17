@@ -551,7 +551,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var dirty by mutableStateOf(false)
         private set
-    var open by mutableStateOf(setOf("limits"))
+    /** Settings groups that are open. All start closed, so the one needed is a short scroll away. */
+    var open by mutableStateOf(emptySet<String>())
     var pinShown by mutableStateOf(false)
     var tref by mutableStateOf(27.5)
     var known by mutableStateOf(1000.0)
