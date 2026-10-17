@@ -127,7 +127,8 @@ header.top:after{content:"";display:block;height:3px;border-radius:3px;backgroun
 .link{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:700;padding:8px 15px;border-radius:999px;
   background:var(--base);box-shadow:var(--o1)}
 .link .ico{color:var(--accent)}
-#demoBtn[aria-pressed="true"]{color:var(--warn)}
+#demoBtn{color:var(--warn);display:inline-flex;align-items:center;gap:6px}
+#demoBtn .ico{width:15px;height:15px}
 .btnets{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .btnets:empty{display:none}
 .btnets .btn{font-size:12.5px;padding:8px 12px;display:flex;gap:8px;align-items:center}
@@ -268,7 +269,22 @@ table.sim tr{box-shadow:var(--o1)}
 .alert .meta{font-size:12px;color:var(--ink2)}
 .empty{padding:34px;text-align:center;color:var(--ink2);font-weight:700}
 
-.gate{position:fixed;inset:0;background:var(--tint);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
+.gate{position:fixed;inset:0;background:var(--tint);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px;overflow:auto}
+.gatehead{display:flex;align-items:center;gap:18px;margin:0 0 18px}
+.gatehead .sblogo{width:92px;height:92px;flex:none}
+.gatehead h1{margin:0 0 4px}
+.gatehead p{margin:0}
+@media(max-width:480px){.gatehead{flex-direction:column;text-align:center}}
+.gatedemo{display:flex;align-items:center;gap:16px;margin-top:22px;padding:16px 18px;border-radius:18px;background:var(--well);box-shadow:var(--i1);flex-wrap:wrap}
+.gatedemo .btn{display:inline-flex;align-items:center;gap:8px;flex:none}
+.gatedemo .btn[aria-pressed="true"]{color:var(--warn)}
+.gatedemo p{flex:1;min-width:200px;margin:0;font-size:13px;color:var(--ink2)}
+.sndgrp{margin:0 0 14px}
+.sndgrp h3{margin:0 0 8px;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--ink2)}
+.sndgrp div{display:flex;flex-wrap:wrap;gap:8px}
+.sndgrp .btn{font-size:12.5px;padding:8px 12px;display:inline-flex;align-items:center;gap:7px}
+.sndgrp .btn .ico{width:14px;height:14px}
+.sndgrp .btn.playing{color:var(--accent)}
 .gatecard{max-width:660px;width:100%;padding:34px}
 .gatecard h1{margin:0 0 7px;font-size:27px;letter-spacing:.4px}
 .gatecard p{margin:0 0 24px;color:var(--ink2)}
@@ -789,7 +805,7 @@ table.sim th .ico{width:14px;height:14px}
 .set-close svg{width:14px;height:14px;pointer-events:none}
 .set-close:hover{box-shadow:var(--i1);color:var(--bad);transform:rotate(90deg)}
 
-/* Collect next panel */
+/* Collection priority panel */
 .collectnext-panel{padding:20px;margin-top:22px}
 .collecthead{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .collecthead h2{margin:0}
@@ -879,14 +895,59 @@ table.sim th .ico{width:14px;height:14px}
 /* Fill chart note */
 .chart-note{font-size:11px;color:var(--ink2);margin:4px 0 0;font-style:italic}
 
+/* ---------- v2 logo: a bin with a fill wave, a controller chip and a Wi-Fi signal.
+   It plays a short build-up (lid opens, the bin fills, the chip lights, the signal
+   goes out) and then holds its still frame. */
+.sblogo{overflow:visible;display:block}
+.sblogo .sb-ln{stroke:var(--ink)}
+.sblogo .sb-ac{stroke:var(--ok)}
+.sblogo .sb-chp{stroke:var(--onBrand)}
+.sblogo .sb-nd{fill:var(--onBrand)}
+.sblogo .sb-led{fill:var(--ok)}
+.sblogo .g0{stop-color:var(--ok)}
+.sblogo .g1{stop-color:var(--brand2)}
+:root{--onBrand:#FFFFFF;--brand2:#0D8A8A}
+html[data-theme="dark"]{--onBrand:#13100D;--brand2:#3FC7C2}
+.sblogo *{transform-box:view-box}
+.sblogo .sb-lid{transform-origin:13px 22.5px}
+.sblogo .sb-wave{animation:sbWave 3.2s linear infinite}
+.sblogo .sb-wave.b{animation-duration:4.6s;animation-direction:reverse}
+.sblogo .sb-sig path{animation:sbPing 3.6s ease-in-out infinite}
+.sblogo .sb-sig .s2{animation-delay:.25s}
+.sblogo .sb-sig .s3{animation-delay:.5s}
+.sblogo .sb-led{animation:sbLed 2.4s ease-in-out infinite}
+.sblogo.play .sb-lid{animation:sbLid 1.1s cubic-bezier(.3,.7,.3,1.2) both}
+.sblogo.play .sb-fill{animation:sbFill 1.5s cubic-bezier(.2,.8,.2,1) .25s both}
+.sblogo.play .sb-chip{transform-origin:32px 46.5px;animation:sbChip .6s cubic-bezier(.2,.9,.3,1.4) 1s both}
+.sblogo.play .sb-ticks{animation:sbFade .4s ease 1.2s both}
+.sblogo.play .sb-glow{transform-origin:32px 12px;animation:sbGlow 1.2s ease 1.3s both}
+.sblogo.play .sb-sig path{animation:sbIn .45s ease both,sbPing 3.6s ease-in-out 2.4s infinite}
+.sblogo.play .sb-sig .s1{animation-delay:1.35s,2.4s}
+.sblogo.play .sb-sig .s2{animation-delay:1.5s,2.65s}
+.sblogo.play .sb-sig .s3{animation-delay:1.65s,2.9s}
+@keyframes sbWave{from{transform:translateX(0)}to{transform:translateX(-10px)}}
+@keyframes sbPing{0%,70%,100%{opacity:1}35%{opacity:.35}}
+@keyframes sbLed{0%,100%{opacity:1}50%{opacity:.35}}
+@keyframes sbLid{0%{transform:none}35%{transform:translateY(-3px) rotate(-16deg)}70%{transform:translateY(-1px) rotate(-6deg)}100%{transform:none}}
+@keyframes sbFill{from{transform:translateY(17px)}to{transform:none}}
+@keyframes sbChip{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:none}}
+@keyframes sbFade{from{opacity:0}to{opacity:1}}
+@keyframes sbGlow{0%{opacity:0;transform:scale(.3)}60%{opacity:1;transform:scale(1.25)}100%{opacity:1;transform:none}}
+@keyframes sbIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.sblogo *,.sblogo.play *{animation:none!important}}
+#brand{cursor:pointer}
+#brand .sblogo{width:40px;height:40px;margin:-8px 0}
 </style>
 </head>
 <body>
 
 <div class="gate" id="gate">
   <div class="gatecard nm">
-    <h1>Smart Bin Dashboard</h1>
-    <p>Pick how you are using the system today. Operator asks for a PIN. Collector is the default.</p>
+    <div class="gatehead">
+      <div id="gateLogo"></div>
+      <div><h1>Smart-Bin Dashboard</h1>
+      <p>Pick how you are using the system today. Operator asks for a PIN. Collector is the default.</p></div>
+    </div>
     <div class="roles">
       <button class="role" data-role="operator">
         <svg class="ico lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.6v3M12 18.4v3M2.6 12h3M18.4 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M18.7 5.3l-2.1 2.1M7.4 16.6l-2.1 2.1"/></svg>
@@ -898,6 +959,10 @@ table.sim th .ico{width:14px;height:14px}
         <h3>Collector</h3>
         <ul><li>Which bin to empty first</li><li>Charts, alerts and the collect PIN</li><li>Start and finish a pickup</li><li>Lock and unlock a bin</li><li>Pair a bin to Wi-Fi over Bluetooth</li><li>Settings are read only</li></ul>
       </button>
+    </div>
+    <div class="gatedemo">
+      <button class="btn" id="gateDemo" aria-pressed="false"></button>
+      <p id="gateDemoNote"></p>
     </div>
   </div>
 </div>
@@ -917,8 +982,8 @@ table.sim th .ico{width:14px;height:14px}
 
 <header class="top">
   <div class="topin">
-    <div class="brand" id="brand">
-      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4.6h6V7M6.4 7l1.2 13h8.8l1.2-13"/></svg>
+    <div class="brand" id="brand" title="Smart-Bin">
+      <span id="brandLogo"></span>
       <span class="btxt">SMART-BIN</span>
     </div>
     <button class="statuspill hide" id="statusPill" aria-expanded="false">
@@ -927,7 +992,7 @@ table.sim th .ico{width:14px;height:14px}
     <div class="spacer"></div>
     <div class="modechip" id="modechip"><span id="modeico"></span><span id="modetext">NORMAL</span></div>
     <div class="link" id="link"><span id="wifiico"></span><span id="linktext">Demo data</span></div>
-    <button class="btn sm" id="demoBtn" aria-pressed="false" title="Show made-up demo bins next to your real ones">DEMO OFF</button>
+    <button class="btn sm hide" id="demoBtn" title="Demo mode is on. Press to go back to the start page, where demo is turned off.">DEMO</button>
     <button class="btn sm" id="rolechip">COLLECTOR</button>
     <button class="iconbtn" id="sound" title="Sounds on or off" aria-pressed="true"><span id="soundIco"></span></button>
     <button class="iconbtn" id="theme" title="Switch light or dark"><span id="themeIco"></span></button>
@@ -1190,8 +1255,15 @@ table.sim th .ico{width:14px;height:14px}
       <div class="actions">
         <button class="btn" id="opChange" style="flex:0 0 auto">CHANGE OPERATOR PIN</button>
         <button class="btn" id="opLockNow" style="flex:0 0 auto">BACK TO COLLECTOR</button>
+        <button class="btn" id="opStart" style="flex:0 0 auto">START PAGE</button>
       </div>
       <p class="hint" id="opNote"></p>
+    </div>
+
+    <div class="panel nm" id="sndPanel" style="margin-top:22px">
+      <div class="sechead"><h2 class="ph" style="--cc:var(--accent)" id="sndHead"></h2></div>
+      <p class="hint" style="margin:-6px 0 16px">Press a key to hear that sound. The phone app has the same sounds under the same names, and vibrates with each one. This test plays even with sounds turned off.</p>
+      <div id="sndGroups"></div>
     </div>
   </section>
   <section data-view="sim" class="hide">
@@ -1391,6 +1463,7 @@ const state={
   demo:demoStart,selSet:null,selSim:null
 };
 state.selSet=state.selSim=state.envBin=state.bins[0]?state.bins[0].id:null;
+var TOUR={i:0,next:0,pauseUntil:0,msg:'',busy:false};
 
 const $=s=>document.querySelector(s);
 const $$=s=>Array.from(document.querySelectorAll(s));
@@ -1513,7 +1586,7 @@ const BT={
   SCAN:'b1a70006-5c2e-4f8a-9d33-0a9c2b6f17c1'
 };
 const BT_STEPS=[['bluetooth','PAIR + CODE'],['radar','PICK NETWORK'],['key','SEND'],['power','BLUETOOTH OFF']];
-const bt={dev:null,ch:{},step:0,demo:false,ip:''};
+const bt={dev:null,ch:{},step:0,demo:false,ip:'',name:'',busy:false,off:false,pollT:null,waitT:null};
 function btRender(){
   $('#btSteps').innerHTML=BT_STEPS.map((s,i)=>
     '<div class="btstep '+(bt.step>i?'done':bt.step===i?'on':'')+'">'+icon(bt.step>i?'check':s[0])+'<b>'+s[1]+'</b></div>').join('');
@@ -1597,46 +1670,112 @@ function btDecorate(){
     el.style.display='inline-flex';el.style.alignItems='center';el.style.gap='8px';}
   $('#btHead').innerHTML=icon('bluetooth')+'<span>BLUETOOTH SETUP</span>';
   $('#btWhy').textContent=btSupported()
-    ?'Web Bluetooth is available in this browser.'
-    :'Web Bluetooth needs a secure page. Opening this file directly (file://) blocks it, so the panel runs in demo mode. To use it for real, run "python -m http.server" in this folder and open http://localhost:8000 instead, in Chrome or Edge.';
+    ?'Web Bluetooth is ready in this browser.'
+    :'This page cannot use Bluetooth: browsers allow it only on secure pages, and a bin serves the dashboard over plain http. Use the Smart-Bin phone app, or on a laptop run "python -m http.server" in the Web Dashboard folder and open http://localhost:8000 in Chrome or Edge. Demo bins still walk through the steps.';
   btRender();
 }
 function btSupported(){return typeof navigator!=='undefined'&&!!navigator.bluetooth}
+const btWait=ms=>new Promise(r=>setTimeout(r,ms));
+const btDec=v=>new TextDecoder().decode(v);
+function btMsg(t){$('#btMsg').textContent=t}
+const btDevs=new WeakSet();
+/* Connect and find the five characteristics. A laptop or phone that remembers an old
+   pairing often drops the first try, so it tries 3 times. */
+async function btConnect(){
+  for(let i=0;i<3;i++){
+    try{
+      if(i)btMsg('The bin dropped the link, trying again ('+(i+1)+' of 3)...');
+      const srv=bt.dev.gatt.connected?bt.dev.gatt:await bt.dev.gatt.connect();
+      await btWait(400);
+      const svc=await srv.getPrimaryService(BT.SVC);
+      bt.ch={};
+      for(const k of ['SSID','PASS','CTRL','STAT','SCAN']){try{bt.ch[k]=await svc.getCharacteristic(BT[k]);}catch(e){}}
+      if(bt.ch.STAT&&bt.ch.SSID)return true;
+    }catch(e){try{bt.dev.gatt.disconnect()}catch(_){}}
+    await btWait(1200);
+  }
+  return false;
+}
+/* Every characteristic is encrypted, so the first read makes Windows or the phone ask for
+   the code the bin shows. That can take as long as the person needs to type it, so the
+   read is tried again while the code (60 s) is still good. */
+async function btSecure(){
+  const end=Date.now()+70000;let last=null;
+  while(Date.now()<end){
+    try{return btDec(await bt.ch.STAT.readValue());}
+    catch(e){last=e;
+      if(!bt.dev.gatt.connected&&!(await btConnect()))throw e;
+      await btWait(1500);}
+  }
+  throw last||new Error('No code was typed in time');
+}
+function btWatch(dev){
+  if(btDevs.has(dev))return;
+  btDevs.add(dev);
+  dev.addEventListener('gattserverdisconnected',btLost);
+}
+function btLost(){
+  if(bt.demo||bt.busy)return;
+  if(bt.step===2){btMsg('The Bluetooth link dropped while the bin joins the Wi-Fi. Reconnecting to read the result...');btRejoin();return;}
+  if(bt.step===1){bt.step=0;btRender();sfx('bin_lost');
+    btMsg('The bin closed the Bluetooth link. On the bin, open WI-FI SETUP again, then press PAIR A BIN.');}
+}
+async function btRejoin(){
+  if(await btConnect()){try{await bt.ch.STAT.startNotifications();bt.ch.STAT.addEventListener('characteristicvaluechanged',btOnNotify);}catch(e){}btReadStat();}
+}
+/* A notification is cut to 20 bytes on a small link, so a reply that does not parse is read in full. */
+function btOnNotify(e){
+  let j=null;try{j=JSON.parse(btDec(e.target.value))}catch(err){}
+  if(j)btStatus(j);else btReadStat();
+}
+async function btReadStat(){
+  if(!bt.ch.STAT)return;
+  try{btStatus(JSON.parse(btDec(await bt.ch.STAT.readValue())));}catch(e){}
+}
+function btStop(){clearInterval(bt.pollT);clearTimeout(bt.waitT);bt.pollT=bt.waitT=null;}
 async function btPair(){
   const b=byId(state.selSet);
+  if(bt.busy)return;
+  btStop();
   if(!btSupported()){
-    /* Demo: a stand-in for the bin's screen shows the code, as the real touchscreen will. */
-    bt.demo=true;btCodeStart();return;
+    if(b&&b.demo){bt.demo=true;btCodeStart();return;}
+    sfx('denied');
+    btMsg(location.protocol==='http:'&&location.hostname!=='localhost'
+      ?'This page came from the bin over plain http, and browsers only allow Bluetooth on secure pages. Use the Smart-Bin phone app, or open the dashboard file on a laptop as the note above says. Demo bins can still walk through the steps.'
+      :'This browser has no Web Bluetooth. Use Chrome or Edge as the note above says, or the Smart-Bin phone app. Demo bins can still walk through the steps.');
+    return;
   }
+  bt.demo=false;bt.busy=true;bt.step=0;bt.ip='';btRender();
+  $('#btResult').classList.add('hide');
   try{
-    $('#btMsg').textContent='Pick the bin in the browser list. When the bin shows a 6-digit code, type it into the pairing window Windows or your phone opens.';
-    bt.dev=await navigator.bluetooth.requestDevice({filters:[{services:[BT.SVC]}],optionalServices:[BT.SVC]});
-    let svc=null,lastErr=null;
-    for(let i=0;i<3&&!svc;i++){
-      try{
-        if(i)$('#btMsg').textContent='The bin dropped the link, trying again ('+(i+1)+' of 3)...';
-        const srv=await bt.dev.gatt.connect();
-        await new Promise(r=>setTimeout(r,400));
-        svc=await srv.getPrimaryService(BT.SVC);
-      }catch(e){lastErr=e;try{bt.dev.gatt.disconnect()}catch(_){};await new Promise(r=>setTimeout(r,1200));}
-    }
-    if(!svc){
-      $('#btMsg').textContent='The bin keeps dropping the Bluetooth link. Windows (or the phone) most likely still remembers the bin from an earlier pairing. '+
-        'Open Settings > Bluetooth & devices, remove '+(bt.dev.name||'SmartBin-01')+', then press PAIR A BIN again. On the bin, cancel and open WI-FI SETUP again first.';
+    btMsg('Pick SmartBin-01 or SmartBin-02 in the browser list.');
+    bt.dev=await navigator.bluetooth.requestDevice({filters:[{services:[BT.SVC]},{namePrefix:'SmartBin'}],optionalServices:[BT.SVC]});
+    bt.name=bt.dev.name||'the bin';
+    btWatch(bt.dev);
+    if(!(await btConnect())){
+      sfx('bt_wrong');
+      btMsg(bt.name+' keeps dropping the Bluetooth link. Windows (or the phone) most likely remembers it from an earlier pairing. '+
+        'Open Settings > Bluetooth & devices, remove '+bt.name+', then press PAIR A BIN again. On the bin, cancel and open WI-FI SETUP again first.');
       return;
     }
-    for(const k of ['SSID','PASS','CTRL','STAT','SCAN']){
-      try{bt.ch[k]=await svc.getCharacteristic(BT[k]);}catch(e){}
-    }
-    if(bt.ch.STAT){
-      await bt.ch.STAT.startNotifications();
-      bt.ch.STAT.addEventListener('characteristicvaluechanged',e=>btStatus(new TextDecoder().decode(e.target.value)));
-    }
-    bt.dev.addEventListener('gattserverdisconnected',()=>{bt.step=0;btRender();$('#btMsg').textContent='The bin disconnected from Bluetooth.';});
+    btMsg('Connected to '+bt.name+'. The bin now shows a 6-digit code. Type it into the pairing window Windows or your phone opens, not on this page. The code lasts 60 s.');
+    await btSecure();
+    try{await bt.ch.STAT.startNotifications();bt.ch.STAT.addEventListener('characteristicvaluechanged',btOnNotify);}catch(e){}
+    sfx('bt_paired');
     bt.step=1;btRender();
-    $('#btMsg').textContent='Paired with '+(bt.dev.name||'the bin')+'. Pick the Wi-Fi network next.';
+    btMsg('Paired with '+bt.name+'. The link is encrypted now. Pick the Wi-Fi network next.');
+    bt.busy=false;
     btScan();
-  }catch(e){$('#btMsg').textContent='Pairing cancelled or failed: '+(e.message||e);}
+  }catch(e){
+    if(e&&e.name==='NotFoundError')btMsg('No bin was picked. Press PAIR A BIN when the bin shows WI-FI SETUP.');
+    else{
+      sfx('bt_wrong');
+      btMsg('Pairing did not finish ('+(e&&e.message||e)+'). If the code was wrong, the bin shows a new one; after 3 wrong codes it waits 60 s. '+
+        'If it keeps failing, remove '+(bt.name||'the bin')+' in Settings > Bluetooth & devices and press PAIR A BIN again.');
+    }
+    try{bt.dev&&bt.dev.gatt.disconnect()}catch(_){}
+    bt.step=0;btRender();
+  }finally{bt.busy=false;}
 }
 function btShowNets(nets){
   const list=nets.map(n=>typeof n==='string'?{ssid:n}:n).filter(n=>n&&n.ssid);
@@ -1648,55 +1787,95 @@ function btShowNets(nets){
 function btFakeNets(){
   btShowNets([{ssid:'HomeWiFi-2G',rssi:-48},{ssid:'TUP-Manila',rssi:-61},{ssid:'Smart_Bin_Lab',rssi:-70},{ssid:'PLDTHOMEFIBR24',rssi:-79}]);
 }
+/* The bin scans when WI-FI SETUP opens. An empty list means it is still scanning, so try again after 5 s. */
 async function btScan(){
   const tail=' Tap one to fill in the name, or type it yourself.';
-  if(bt.demo||!bt.ch.SCAN){
-    if(bt.demo){btFakeNets();$('#btMsg').textContent='Demo networks listed.'+tail;}
-    else $('#btMsg').textContent='This bin does not share a network list, so type the name yourself.';
-    return;
+  sfx('tap');
+  if(bt.demo){btFakeNets();btMsg('Demo networks listed.'+tail);return;}
+  if(!bt.ch.SCAN){btMsg('This bin does not share a network list, so type the name yourself.');return;}
+  for(let i=0;i<3;i++){
+    try{
+      const nets=JSON.parse(btDec(await bt.ch.SCAN.readValue()));
+      if(nets.length){btShowNets(nets);btMsg('Found '+nets.length+' network'+(nets.length===1?'':'s')+' (strongest first). Only 2.4 GHz ones work.'+tail);return;}
+      btMsg('The bin is still scanning for networks. Trying again in 5 s...');
+    }catch(e){btMsg('Could not read the network list ('+(e.message||e)+'). Trying again in 5 s...');}
+    await btWait(5000);
+    if(bt.step!==1)return;
   }
-  try{
-    const v=await bt.ch.SCAN.readValue();
-    const nets=JSON.parse(new TextDecoder().decode(v));
-    btShowNets(nets);
-    $('#btMsg').textContent=nets.length?'Found '+nets.length+' networks (strongest first). Only 2.4 GHz ones work.'+tail
-      :'The bin has not finished scanning yet. Press SCAN again in a few seconds, or type the name yourself.';
-  }catch(e){$('#btMsg').textContent='Could not read the network list: '+(e.message||e);}
+  btMsg('The bin found no networks. Check that the router is on 2.4 GHz and close by, press SCAN again, or type the name yourself.');
 }
-function btStatus(txt){
-  let j={};try{j=JSON.parse(txt)}catch(e){return}
-  if(j.ip){bt.ip=j.ip;bt.step=3;btRender();btShowResult();}
-  else if(j.state)$('#btMsg').textContent='Bin says: '+j.state;
+function btStatus(j){
+  if(bt.step!==2)return;
+  const st=String(j.state||'').toUpperCase();
+  if(st==='CONNECTED'&&j.ip){btStop();bt.ip=j.ip;bt.step=3;btRender();btShowResult(j.ssid);}
+  else if(st==='FAILED'){btStop();bt.step=1;btRender();sfx('wifi_failed');
+    btMsg('The bin could not join: '+(j.why||'it gave no reason')+'. It went back to its old Wi-Fi. Check the name and password, then press SEND WI-FI again.');}
+  else if(st==='CONNECTING')btMsg('The bin is joining '+($('#bt_ssid').value.trim()||'the network')+'. This takes up to 15 s.');
 }
 async function btSend(){
   const ssid=$('#bt_ssid').value.trim(),pass=$('#bt_pass').value;
-  if(!ssid){$('#btMsg').textContent='Type the Wi-Fi name first.';return;}
-  bt.step=2;btRender();
-  $('#btMsg').textContent='Sending credentials and waiting for the bin to join...';
-  if(bt.demo||!bt.ch.SSID){
-    setTimeout(()=>{bt.ip='192.168.1.'+(101+state.bins.indexOf(byId(state.selSet)));bt.step=3;btRender();btShowResult();},1800);
+  if(!ssid){sfx('denied');btMsg('Type the Wi-Fi name first.');return;}
+  if(ssid.length>32||pass.length>63){sfx('denied');btMsg('The Wi-Fi name can be 32 characters at most and the password 63.');return;}
+  if(pass&&pass.length<8){sfx('denied');btMsg('A Wi-Fi password has at least 8 characters. Leave it empty only for an open network.');return;}
+  sfx('confirm');
+  bt.step=2;btRender();$('#btResult').classList.add('hide');
+  btMsg('Sending the Wi-Fi name and password and waiting for the bin to join...');
+  if(bt.demo){
+    const b=byId(state.selSet);
+    bt.waitT=setTimeout(()=>{
+      if(/fail|wrong/i.test(ssid)){btStatus({state:'FAILED',why:'Network not found'});return;}
+      btStatus({state:'CONNECTED',ip:'192.168.1.'+(101+Math.max(0,state.bins.indexOf(b))),ssid});},1800);
     return;
   }
   try{
+    if(!bt.dev.gatt.connected&&!(await btConnect()))throw new Error('the bin is out of reach');
     const enc=new TextEncoder();
     await bt.ch.SSID.writeValue(enc.encode(ssid));
     await bt.ch.PASS.writeValue(enc.encode(pass));
     await bt.ch.CTRL.writeValue(Uint8Array.of(1));
-  }catch(e){$('#btMsg').textContent='Could not send: '+(e.message||e);bt.step=1;btRender();}
+  }catch(e){sfx('cmd_fail');btMsg('Could not send: '+(e.message||e)+'. Press SEND WI-FI again.');bt.step=1;btRender();return;}
+  /* Notifications can be missed, so read the status every 2 s too. The bin gives up after 15 s. */
+  bt.pollT=setInterval(()=>{if(bt.step===2&&bt.dev.gatt.connected)btReadStat();},2000);
+  bt.waitT=setTimeout(async()=>{
+    if(bt.step!==2)return;
+    await btReadStat();
+    if(bt.step!==2)return;
+    btStop();bt.step=1;btRender();sfx('wifi_failed');
+    btMsg('No answer from the bin after 25 s. Check the touchscreen: it shows whether it joined. Then press SEND WI-FI again or PAIR A BIN.');
+  },25000);
 }
-function btShowResult(){
-  const b=byId(state.selSet);
-  if(typeof sfx==='function')sfx('wifi_joined');
+function btShowResult(ssid){
+  const b=byId(state.selSet),real=b&&!b.demo&&!bt.demo;
+  sfx('wifi_joined');
+  const num=(/(\d+)\s*$/.exec(bt.name||'')||[])[1];
+  const label=bt.demo?(b?'USE FOR '+esc(b.name):'USE'):real?'USE FOR '+esc(b.name):'ADD AS BIN '+(num||'');
   const r=$('#btResult');r.classList.remove('hide');
-  r.innerHTML=icon('wifi',true)+'<span>Joined the network. Address: <span class="ip">'+bt.ip+'</span></span>'+
-    '<button class="btn sm solid" style="--cc:var(--ok)" id="btUse">'+icon('check')+'<span>USE FOR '+esc(b?b.name:'THIS BIN')+'</span></button>';
-  $('#btMsg').textContent='Press USE to store this address, then turn Bluetooth off on the bin.';
+  r.innerHTML=icon('wifi',true)+'<span>Joined '+esc(ssid||'the network')+'. Address: <span class="ip">'+esc(bt.ip)+'</span></span>'+
+    '<button class="btn sm solid" style="--cc:var(--ok)" id="btUse">'+icon('check')+'<span>'+label.trim()+'</span></button>';
+  btMsg('Press '+label.trim()+' to store this address, then TURN BT OFF.');
+}
+function btUse(){
+  if(!bt.ip)return;
+  let b=byId(state.selSet);
+  if(!bt.demo&&(!b||b.demo)){
+    if(state.role!=='operator'&&state.bins.some(x=>!x.demo)){toast('Pick the bin in Settings first, or ask an operator to add it.');sfx('denied');return;}
+    const num=(/(\d+)\s*$/.exec(bt.name||'')||[])[1]||String(state.bins.filter(x=>!x.demo).length+1).padStart(2,'0');
+    b=state.bins.find(x=>!x.demo&&x.ip===bt.ip);
+    if(!b){b=newBin({id:'bin'+num+'-'+Date.now().toString(36),name:'Bin '+num,place:'',ip:bt.ip,cloud:'bin'+num});state.bins.unshift(b);}
+    state.selSet=b.id;
+  }
+  if(b.demo){toast(b.name+' is a demo bin, so nothing was stored.');return;}
+  b.ip=bt.ip;relink(b);persist();cardSig='';render();loadSettings();sfx('saved');
+  toast(b.name+' will now be read at '+bt.ip+'.');
 }
 async function btOff(){
+  btStop();
+  bt.off=true;
   if(!bt.demo&&bt.ch.CTRL){try{await bt.ch.CTRL.writeValue(Uint8Array.of(2));}catch(e){}}
-  if(bt.dev&&bt.dev.gatt&&bt.dev.gatt.connected)bt.dev.gatt.disconnect();
-  bt.step=4;btRender();
-  $('#btMsg').textContent='Bluetooth switched off on the bin. It stays on Wi-Fi until you reset it.';
+  try{if(bt.dev&&bt.dev.gatt&&bt.dev.gatt.connected)bt.dev.gatt.disconnect();}catch(e){}
+  bt.step=4;btRender();bt.off=false;
+  sfx('bt_off');
+  btMsg('Bluetooth is off on the bin. It stays on its Wi-Fi until someone opens WI-FI SETUP again.');
 }
 const reduce=()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 function setAddCount(n){
@@ -1794,16 +1973,21 @@ function stepEnv(b){
   }
   d.pressure=+(clamp((d.pressure||1008)+(Math.random()-0.5)*0.06,985,1030)).toFixed(2);
   d.iaq_acc=b._accT?Math.min(3,Math.floor((Date.now()-b._accT)/20000)):3;
+  d.warmEnd=b._accT&&d.iaq_acc===0?b._accT+20000:null;
   if(d.iaq_acc>=3)b._accT=0;
 }
 function stepDemo(b){
-  const d=b.data,s=b.sim,on=bit=>(s.mask>>bit)&1;
+  const d=b.data,s=b.sim,on=bit=>(s.mask>>bit)&1,h=b._hold||{};
   stepEnv(b);
+  if(h.gas!=null)d.gas=h.gas;
+  if(h.temp!=null){d.temp=h.temp;d.temp_raw=h.temp-(b.cal.temp_off||0);}
+  if(h.humidity!=null)d.humidity=h.humidity;
+  d.faults=h.faults||[];
   if(d.status==='CALIBRATING'){d.lid='CLOSED';d.distance_cm=+(b.cal.d_empty-Math.random()*0.4).toFixed(1);return;}
   if(on(0))d.fill=clamp(+s.values.fill,0,100);
   else if(d.status!=='COLLECTING')d.fill=clamp(d.fill+0.022+Math.random()*0.015,0,100);
   d.weight_g=on(1)?+s.values.weight:Math.round(clamp(d.fill/100*b.cal.weight_cap*0.92+Math.random()*25,0,5000));
-  d.tilt=on(4)&&+s.values.tamper?38:clamp(Math.random()*2.2,0,90);
+  d.tilt=h.tilt!=null?h.tilt:on(4)&&+s.values.tamper?38:clamp(Math.random()*2.2,0,90);
   d.motion=on(5)?!!+s.values.motion:Math.random()<0.025;
   d.distance_cm=+(b.cal.d_empty-(d.fill/100)*(b.cal.d_empty-b.cal.d_full)).toFixed(1);
   if(d.status==='COLLECTING'){d.lid='OPEN';return;}
@@ -2015,10 +2199,12 @@ async function pollTs(b,l){
 }
 async function poll(){
   const now=Date.now();
+  let binSnd='';
   for(const b of state.bins){
     if(!isLive(b)){
       closeStream(b);b.online=b.live=false;b.route=null;
-      stepDemo(b);pushHistory(b);watchAlerts(b);continue;
+      if(b._demoLink!=='down'){stepDemo(b);pushHistory(b);}
+      watchAlerts(b);continue;
     }
     const l=L(b);
     if(b.ip&&!SECURE){
@@ -2036,10 +2222,11 @@ async function poll(){
     const route=localOk?'local':now-b.seen.fb<20000?'fb':now-b.seen.ts<45000?'ts':null;
     const was=b.live;
     b.route=route;b.live=b.online=!!route;
-    if(b._linked&&was!==b.live)sfx(b.live?'bin_back':'bin_lost');
+    if(b._linked&&was!==b.live)binSnd=b.live?'bin_back':'bin_lost';
     if(b.live)b._linked=true;
     if(b.live){pushHistory(b);watchAlerts(b);}
   }
+  linkSound(binSnd);tourTick(now);
   fbWatchTick(now);fbUsageTick(now);
   if($('#cloudRows')&&state.view==='settings'&&now-(poll._cloudAt||0)>2000){poll._cloudAt=now;cloudRender();}
   render();
@@ -2103,7 +2290,25 @@ function cloudRowText(b){
   if(b.route==='ts')return ['var(--c-ts)','through ThingSpeak, last reading '+ago(b.seen.ts)];
   return ['var(--c-tamper)','not answering'+(b.lastAt?', last reading '+ago(b.lastAt):'')];
 }
+/* The link sound follows the whole dashboard, not each bin: Wi-Fi, a cloud, or nothing.
+   A single bin dropping or coming back plays its own sound only when the overall link stays. */
+function overallLink(){
+  const live=state.bins.filter(isLive);
+  if(!live.length)return '';
+  const r=live.map(b=>b.route);
+  return r.includes('local')?'local':r.includes('fb')?'fb':r.includes('ts')?'ts':'down';
+}
+function linkSound(binSnd){
+  const ov=overallLink(),was=linkSound.last;
+  linkSound.last=ov;
+  if(!inMain())return;
+  if(was!==undefined&&ov!==was&&ov)sfx(ov==='local'?'link_up':ov==='down'?'link_lost':'cloud');
+  else if(binSnd)sfx(binSnd);
+}
+function inMain(){const g=$('#gate');return !!g&&g.classList.contains('hide')}
 function linkSlot(b){
+  if(!isLive(b)&&b._demoLink==='down')return [icon('wifi',false),'OFFLINE',false,'var(--c-tamper)','Demo: this bin stopped answering'];
+  if(!isLive(b)&&b._demoLink){const r=ROUTE[b._demoLink];return [icon(r[2]),b._demoLink==='fb'?'CLOUD':'TS',true,r[1],'Demo: read through '+r[0]+' because its Wi-Fi is down'];}
   if(!isLive(b))return [icon('wifi',false),'DEMO',true,'var(--warn)','Demo data, no IP address or cloud link set'];
   if(!b.live)return [icon('wifi',false),'OFFLINE',false,'var(--c-tamper)','Bin is not answering'+(b.lastAt?'. Last reading '+ago(b.lastAt):'')];
   const r=ROUTE[b.route];
@@ -2150,7 +2355,12 @@ const unreadCount=()=>state.alerts.reduce((n,a)=>n+(a.read?0:1),0);
 const KIND_BY_IC={fill:'full',temp:'sensor',humid:'sensor',gas:'sensor',tamper:'tamper',lock:'lock',truck:'pickup',calib:'setup'};
 function addAlert(sev,ic,title,meta,k){
   const kind=k||KIND_BY_IC[ic]||'setup';
-  if(kind!=='pickup')sfx(kind==='full'?'alert_full':kind==='tamper'?'alert_tamper':kind==='sensor'?'alert_sensor':(kind==='lock'&&ic==='lock')?'alert_lock':'alert_info');
+  /* No alert sounds on the start page. A pickup alert right after the DONE key would
+     play over the key's own tune, so it only sounds when nothing else just played. */
+  if(inMain()){
+    if(kind==='pickup'){if(Date.now()-SND.at>500)sfx('alert_pickup');}
+    else sfx(kind==='full'?'alert_full':kind==='tamper'?'alert_tamper':kind==='sensor'?(sev==='success'?'alert_info':'alert_sensor'):(kind==='lock'&&ic==='lock')?'alert_lock':'alert_info');
+  }
   state.alerts.unshift({id:++alertSeq,sev,ic,k:k||KIND_BY_IC[ic]||'setup',title,meta,t:Date.now(),read:false});
   state.alerts=state.alerts.slice(0,120);
 }
@@ -2191,12 +2401,17 @@ function watchAlerts(b){
   if(d.status==='LOCKED'&&p.status!=='LOCKED')addAlert('info','lock','Bin locked',b.name+' locked from the dashboard');
   if(d.status!=='LOCKED'&&p.status==='LOCKED')addAlert('success','check','Bin unlocked',b.name+' is open for use again','lock');
   if(d.status==='CALIBRATING'&&p.status!=='CALIBRATING')addAlert('info','calib','Calibration started',b.name+' is being calibrated');
-  b.prev={full,hot,humid,gassy,status:d.status};
+  const fl=(d.faults||[]).join(', ');
+  if(fl&&fl!==p.faults)addAlert('warning','gear','Sensor not answering',b.name+': '+fl,'sensor');
+  if(!fl&&p.faults)addAlert('success','check','Sensor back',b.name+' reads every sensor again','sensor');
+  if(p.acc===0&&d.iaq_acc>0)addAlert('success','gas','Air sensor ready',b.name+' air quality readings are settled','sensor');
+  b.prev={full,hot,humid,gassy,status:d.status,faults:fl,acc:d.iaq_acc};
 }
 
 /* ---------- commands ---------- */
 async function command(id,cmd,extra){
   const b=byId(id);if(!b)return;
+  if(b.demo&&!TOUR.busy)tourPause();
   sfx(CMD_SFX[cmd]||'confirm');
   if(isLive(b)){await sendLive(b,cmd,extra);render();return;}
   const d=b.data;
@@ -2207,7 +2422,7 @@ async function command(id,cmd,extra){
   if(cmd==='COLLECT_DONE'){d.status='OK';d.lid='CLOSED';d.fill=0;d.weight_g=0;
     addAlert('success','truck','Collection complete',b.name+' is back to normal');}
   if(cmd==='TARE')d.weight_g=0;
-  if(cmd==='RESET_GAS'){d.iaq_acc=0;b._accT=Date.now();}
+  if(cmd==='RESET_GAS'){d.iaq_acc=0;b._accT=Date.now();d.warmEnd=b._accT+20000;}
   if(cmd==='CALIBRATE_START')d.status='CALIBRATING';
   if(cmd==='CALIBRATE_END')d.status='OK';
   render();
@@ -2407,7 +2622,7 @@ function renderOverlayCard(){
 
   /* status chips - use same sig-check as renderCard */
   const simOn=b.sim.mask>0,calOn=binMode(b)==='cal'||binMode(b)==='dual';
-  const csig=[d.lid,d.status,d.motion,simOn,calOn,b.live,b.route,isLive(b)].join('|');
+  const csig=[d.lid,d.status,d.motion,simOn,calOn,b.live,b.route,isLive(b),b._demoLink].join('|');
   const ch=q('chips');
   if(ch&&ch.dataset.sig!==csig){
     ch.dataset.sig=csig;
@@ -2569,7 +2784,7 @@ function buildCards(){
   $('#bins').innerHTML=state.bins.length?state.bins.map((b,i)=>cardHTML(b)+makeTile(b,i)).join('')
     :'<div class="nm" style="grid-column:1/-1;padding:28px 24px;border-radius:24px"><h2 style="margin:0 0 8px">No bins linked yet</h2>'+
      '<p class="hint" style="margin:0">Open this page from the bin itself (type its IP address in the browser, for example http://192.168.0.112) and it links automatically. '+
-     'Or switch to operator, add a bin and type its IP address. Press DEMO in the top bar to look around with made-up bins.</p></div>';
+     'Or switch to operator, add a bin and type its IP address. To look around with made-up bins, open the START PAGE (Settings) and turn DEMO on.</p></div>';
   $('#addRow').classList.toggle('hide',!op);
   $('#addNote').textContent=state.bins.length?'':'No bins yet.';
   const bt=$('#binsTitle');
@@ -2647,7 +2862,7 @@ function renderCard(b){
   const bm=binMode(b);
   root.dataset.bmode=bm;
   const simOn=b.sim.mask>0,calOn=bm==='cal'||bm==='dual';
-  const csig=[d.lid,d.status,d.motion,simOn,calOn,b.live,b.route,isLive(b)].join('|');
+  const csig=[d.lid,d.status,d.motion,simOn,calOn,b.live,b.route,isLive(b),b._demoLink].join('|');
   const ch=q('chips');
   if(ch.dataset.sig!==csig){
     ch.dataset.sig=csig;
@@ -2685,13 +2900,18 @@ function renderCard(b){
     weight:[(d.weight_g/1000).toFixed(2)+'kg',d.weight_g>=c.weight_cap,band(d.weight_g/(c.weight_cap||4500))],
     gas:[String(Math.round(d.gas)),d.gas>=c.gas_th,band(d.gas/(c.gas_th||200))]
   };
-  const warming=isLive(b)&&d.iaq_acc===0&&!(b.sim.mask&4);
+  const warming=(isLive(b)||b.demo)&&d.iaq_acc===0&&!(b.sim.mask&4);
   if(warming){
     const l=d.warmEnd?Math.max(0,Math.round((d.warmEnd-Date.now())/1000)):null;
     vals.gas=[l?Math.floor(l/60)+':'+String(l%60).padStart(2,'0'):'...',false,'low'];
   }
-  const gk=host.querySelector('[data-s="gas"] .k');
-  if(gk){const t=warming?'Air warming up':'Air quality';if(gk.textContent!==t)gk.textContent=t;}
+  /* A sensor that stops answering shows -- and says so, instead of an old number. */
+  const F=d.faults||[],dead={temp:F.includes('BME680'),humid:F.includes('BME680'),gas:F.includes('BME680'),weight:F.includes('HX711')};
+  const lbl={temp:'Temperature',humid:'Humidity',weight:'Weight',gas:warming?'Air warming up':'Air quality'};
+  for(const k in dead)if(dead[k]){vals[k]=['--',true,'crit'];lbl[k]='Not answering';}
+  host.querySelectorAll('[data-s]').forEach(el=>{
+    const kk=el.querySelector('.k');if(kk&&lbl[el.dataset.s]&&kk.textContent!==lbl[el.dataset.s])kk.textContent=lbl[el.dataset.s];
+  });
   host.querySelectorAll('[data-s]').forEach(el=>{
     const v=vals[el.dataset.s];if(!v)return;
     const t=el.querySelector('.v');if(t.textContent!==v[0])t.textContent=v[0];
@@ -2816,8 +3036,11 @@ function renderBanners(){
   if(tam.length)out.push(ban('red','tamper','TAMPER: '+tam.map(b=>b.name).join(', '),'Check the bin before resetting the alert.'));
   if(full.length)out.push(ban('red','truck','COLLECT NOW: '+full.map(b=>b.name+' at '+Math.round(b.data.fill)+'%').join(', '),''));
   if(sim.length)out.push(ban('purple','flask','SIMULATION MODE','Some readings are set by hand, not by the sensors.'));
-  if(!state.bins.length)out.push(ban('amber','wifi','No bins linked yet','Add a bin and type its IP address, or switch DEMO on to look around with made-up bins.'));
-  else if(state.demo)out.push(ban('amber','wifi','Demo mode','Bins marked DEMO show made-up readings. Switch DEMO off to see only your real bins.'));
+  if(!state.bins.length)out.push(ban('amber','wifi','No bins linked yet','Add a bin and type its IP address, or turn DEMO on at the start page to look around with made-up bins.'));
+  else if(state.demo)out.push(ban('amber','demo','Demo mode','Bins marked DEMO show made-up readings. Press DEMO in the top bar to go back to the start page and turn it off.'));
+  if(state.demo&&TOUR.msg)out.unshift(ban('purple','demo','Demo tour: '+TOUR.msg,'The tour runs by itself. Press a key on a demo bin and it waits a minute for you.'));
+  const flt=state.bins.filter(b=>(b.data.faults||[]).length);
+  if(flt.length)out.push(ban('amber','gear','SENSOR NOT ANSWERING: '+flt.map(b=>b.name+' ('+b.data.faults.join(', ')+')').join(', '),'Its readings show -- until the sensor answers again. Check the wiring.'));
   if(state.bins.some(isLive)){const down=state.bins.filter(b=>isLive(b)&&!b.live);
     if(down.length)out.push(ban('red','wifi',down.length===1?down[0].name+' is not answering':down.length+' bins are not answering','Readings shown are the last ones received. Check that the bin is on and on the same Wi-Fi, or set up Firebase or ThingSpeak.'));}
 
@@ -3396,11 +3619,10 @@ document.addEventListener('click',async e=>{
     const b=byId(state.selSim);if(b)b.sim.values[box.dataset.sv]=+tw.dataset.v;
     return;
   }
-  if(t.closest('#btUse')){
-    const b=byId(state.selSet);
-    if(b&&bt.ip){b.ip=bt.ip;relink(b);persist();cardSig='';render();toast(b.name+' will now be read at '+bt.ip+'.');}
-    return;
-  }
+  if(t.closest('#btUse')){btUse();return;}
+  const snd=t.closest('[data-snd]');
+  if(snd){SND.armed=true;sfx(snd.dataset.snd,true);
+    snd.classList.add('playing');setTimeout(()=>snd.classList.remove('playing'),600);return;}
   const rdt=t.closest('[data-read-toggle]');
   if(rdt){toggleRead(+rdt.dataset.readToggle);return;}
   if(t.closest('#pinEye')){
@@ -3482,9 +3704,14 @@ document.addEventListener('click',async e=>{
 });
 let demoStash=[];
 function demoBtnRender(){
-  const d=$('#demoBtn');if(!d)return;
-  d.setAttribute('aria-pressed',state.demo?'true':'false');
-  d.textContent=state.demo?'DEMO ON':'DEMO OFF';
+  const d=$('#demoBtn');
+  if(d){d.classList.toggle('hide',!state.demo);d.innerHTML=icon('demo')+'<span>DEMO</span>';}
+  const g=$('#gateDemo');
+  if(g){g.setAttribute('aria-pressed',state.demo?'true':'false');g.innerHTML=icon('demo')+'<span>'+(state.demo?'DEMO ON':'DEMO OFF')+'</span>';}
+  const n=$('#gateDemoNote');
+  if(n)n.textContent=state.demo
+    ?'Three made-up bins sit next to your real ones and run through every alert by themselves: full, pickup, tamper, lock, bad air, heat, humidity, a sensor fault, warm-up and a lost link.'
+    :'Turn DEMO on to add three made-up bins that show every alert by themselves. Demo can only be turned on or off here, on the start page.';
 }
 function setDemo(on){
   state.demo=on;
@@ -3494,9 +3721,12 @@ function setDemo(on){
     extra.forEach((b,i)=>{if(!b.hist.length)seedHistory(b,i)});
     state.bins=state.bins.filter(b=>!b.demo).concat(extra);
     demoStash=[];
+    TOUR.i=0;TOUR.next=0;TOUR.pauseUntil=0;
   }else{
     demoStash=state.bins.filter(b=>b.demo);
+    demoStash.forEach(tourClear);
     state.bins=state.bins.filter(b=>!b.demo);
+    TOUR.msg='';
   }
   const first=state.bins[0]?state.bins[0].id:null;
   if(!byId(state.selSet))state.selSet=first;
@@ -3504,11 +3734,67 @@ function setDemo(on){
   if(!byId(state.envBin))state.envBin=state.selSet;
   state.chartPick=state.chartPick.filter(id=>byId(id));
   if(state.calib&&!byId(state.calib.bin))state.calib=null;
-  demoBtnRender();cardSig='';render();loadSettings();buildSim();
-  toast(on?'Demo on: bins marked DEMO show made-up readings.':'Demo off: only your real bins are shown.');
+  demoBtnRender();cardSig='';banSig='';render();loadSettings();buildSim();
 }
-$('#demoBtn').addEventListener('click',()=>setDemo(!state.demo));
+/* The start page opens on every visit. Demo is turned on or off only here. */
+function showGate(){
+  if(state.role==='operator')setRole('collector');
+  if(!$('#pinWrap').classList.contains('hide'))pinClose();
+  demoBtnRender();
+  $('#gate').classList.remove('hide');
+  sfx('back');
+  playLogo('#gateLogo .sblogo');
+}
+$('#gateDemo').addEventListener('click',()=>{
+  SND.armed=true;
+  setDemo(!state.demo);
+  sfx(state.demo?'demo':'switch_off');
+});
+$('#demoBtn').addEventListener('click',showGate);
+$('#opStart').addEventListener('click',showGate);
 demoBtnRender();
+
+/* ---------- demo tour ----------
+   With DEMO on and nobody pressing anything on a demo bin, the demo bins act out every
+   outcome in turn, with the same alerts, banners and sounds as a real bin. A key pressed
+   on a demo bin pauses the tour for a minute. */
+function tourPause(){TOUR.pauseUntil=Date.now()+60000;TOUR.msg='';banSig='';}
+function tourClear(b){delete b._hold;b._demoLink=null;}
+function tourBins(){const d=state.bins.filter(b=>b.demo);return [d[0],d[1%d.length],d[2%d.length]];}
+function tourHold(b,o){b._hold=Object.assign({},b._hold||{},o);}
+function tourDrop(b,k){if(b._hold){k.forEach(x=>delete b._hold[x]);}}
+function tourCmd(b,c){TOUR.busy=true;try{command(b.id,c)}finally{TOUR.busy=false}}
+const TOUR_STEPS=[
+  ([a])=>{a.data.fill=Math.min(99,a.cal.fill_th+4);return a.name+' fills past its '+a.cal.fill_th+'% limit.';},
+  ([a])=>{if(a.data.status==='LOCKED')tourCmd(a,'UNLOCK');tourCmd(a,'COLLECT');return 'A collector starts the pickup at '+a.name+'. The lid opens.';},
+  ([a])=>{tourCmd(a,'COLLECT_DONE');return a.name+' is emptied and back to normal.';},
+  ([,b])=>{tourHold(b,{tilt:40});return b.name+' is tipped over. Tamper alert.';},
+  ([,b])=>{tourDrop(b,['tilt']);b.data.tilt=1;tourCmd(b,'CLEAR_TAMPER');return 'The tamper alert on '+b.name+' is reset.';},
+  ([,,c])=>{tourCmd(c,'LOCK');return c.name+' is locked from the dashboard.';},
+  ([,,c])=>{tourCmd(c,'UNLOCK');return c.name+' is unlocked again.';},
+  ([,,c])=>{tourHold(c,{gas:c.cal.gas_th+45});return 'The air in '+c.name+' goes bad.';},
+  ([,b,c])=>{tourDrop(c,['gas']);c.data.gas=60;tourHold(b,{temp:+c.cal.temp_th+3.5});return b.name+' gets too hot.';},
+  ([,b])=>{tourDrop(b,['temp']);b.data.temp=b.data.temp_raw=29;tourHold(b,{humidity:+b.cal.hum_th+5});return b.name+' gets too humid.';},
+  ([a,b])=>{tourDrop(b,['humidity']);b.data.humidity=62;tourHold(a,{faults:['HX711']});return 'The weight sensor of '+a.name+' stops answering.';},
+  ([a])=>{tourDrop(a,['faults']);return 'The weight sensor of '+a.name+' answers again.';},
+  ([,,c])=>{tourCmd(c,'RESET_GAS');return 'The air sensor of '+c.name+' warms up. The reading is held until it is settled.';},
+  ([,b])=>{b._demoLink='fb';sfx('cloud');return b.name+' loses Wi-Fi and is read through Firebase.';},
+  ([,b])=>{b._demoLink='ts';sfx('cloud');return 'Firebase is down too, so '+b.name+' is read through ThingSpeak.';},
+  ([,b])=>{b._demoLink='down';sfx('bin_lost');return b.name+' stops answering on every link.';},
+  ([,b])=>{b._demoLink=null;sfx('link_up');return b.name+' is back on Wi-Fi.';},
+  ([,b])=>{tourCmd(b,'CALIBRATE_START');return b.name+' is being calibrated.';},
+  ([,b])=>{tourCmd(b,'CALIBRATE_END');return 'Calibration of '+b.name+' is done. The tour starts again.';}
+];
+function tourTick(now){
+  if(!state.demo||!inMain()||document.hidden||!state.bins.some(b=>b.demo)){TOUR.next=Math.max(TOUR.next,now+6000);return;}
+  if(now<TOUR.pauseUntil||now<TOUR.next)return;
+  if(state.calib&&byId(state.calib.bin)&&byId(state.calib.bin).demo){TOUR.next=now+10000;return;}
+  TOUR.next=now+10000;
+  const step=TOUR_STEPS[TOUR.i%TOUR_STEPS.length];
+  TOUR.i=(TOUR.i+1)%TOUR_STEPS.length;
+  try{TOUR.msg=step(tourBins())||'';}catch(e){TOUR.msg='';}
+  banSig='';
+}
 $('#rolechip').addEventListener('click',()=>{
   if(state.role==='operator'){setRole('collector');toast('Back to collector. Operator needs the PIN again.');}
   else askOperator(false);
@@ -3645,7 +3931,7 @@ document.addEventListener('click',e=>{
   /* tile click */
   const tl=e.target.closest('.tile[data-tid]');
   if(tl&&state.ovView==='grid'){showTileOverlay(tl.dataset.tid);return;}
-  /* collect next row click */
+  /* collection priority row click */
   const cr=e.target.closest('.crow[data-pb]');
   if(cr){setView('overview');const card=$('#card-'+cr.dataset.pb);if(card)card.scrollIntoView({behavior:'smooth',block:'center'});return;}
   /* collect toggle */
@@ -3704,12 +3990,19 @@ const SOUNDS={
   calib:['event',[[988,40],[0,50],[988,40],[0,50],[988,40],[0,50],[1319,130]]],
   sim:['event',[[523,60],[622,60],[740,60],[880,140]]],
   link_up:['event',[[659,70],[880,70],[1319,150]]],
+  link_lost:['event',[[880,90],[659,90],[440,190]]],
+  cloud:['event',[[880,60],[0,30],[1047,60],[0,30],[784,130]]],
+  logo:['ui',[[784,70],[988,70],[1175,70],[1568,170]]],
+  boot:['event',[[523,80],[659,80],[784,80],[1047,220]]],
+  demo:['event',[[659,60],[784,60],[988,60],[784,60],[1319,160]]],
   cmd_ok:['event',[[1319,50],[0,25],[1760,110]]],
   cmd_fail:['event',[[659,80],[0,30],[523,80],[0,30],[392,200]]],
   bt_paired:['event',[[1175,40],[1568,40],[1175,40],[1976,140]]],
   bt_wrong:['event',[[466,50],[0,25],[466,50],[370,140]]],
   bt_blocked:['event',[[622,180],[0,50],[311,320]]],
   wifi_joined:['event',[[880,60],[1175,60],[1480,60],[1760,180]]],
+  wifi_failed:['event',[[740,60],[0,25],[554,60],[0,25],[440,90],[370,180]]],
+  bt_off:['event',[[1568,35],[1175,35],[784,35],[523,150]]],
   pin_set:['event',[[1047,50],[1397,50],[1047,50],[1397,120]]],
   bin_lost:['event',[[740,100],[0,60],[554,210]]],bin_back:['event',[[554,80],[740,150]]],
   pin_key:['ui',[[1660,14]]],
@@ -3721,15 +4014,28 @@ const SOUNDS={
   alert_tamper:['alert',[[700,1400,340],[1400,700,340],[700,1400,340],[1400,700,340]]],
   alert_sensor:['alert',[[1047,120],[784,120],[1047,120],[784,260]]],
   alert_lock:['alert',[[660,70],[0,30],[440,220]]],
+  alert_pickup:['alert',[[523,90],[659,90],[784,90],[1047,260]]],
   alert_info:['alert',[[988,90],[1319,170]]]
 };
+/* The sound test list, the same groups and names as the phone app's Sound test. */
+const SND_GROUPS=[
+  ['Alerts',[['alert_full','Bin full'],['alert_tamper','Tamper'],['alert_sensor','Sensor limit'],['alert_lock','Bin locked'],['alert_pickup','Pickup alert'],['alert_info','Info']]],
+  ['Bins and links',[['link_up','Wi-Fi link'],['cloud','Cloud link'],['link_lost','Link lost'],['bin_lost','Bin quiet'],['bin_back','Bin back'],['cmd_ok','Command OK'],['cmd_fail','Command failed']]],
+  ['Lid and pickup',[['lock','Lock'],['unlock','Unlock'],['pickup','Pickup start'],['done','Pickup finished']]],
+  ['Setup',[['calib','Calibrate'],['sim','Simulation'],['saved','Saved'],['denied','Not allowed']]],
+  ['Bluetooth Wi-Fi setup',[['bt_paired','Paired'],['bt_wrong','Wrong code'],['bt_blocked','Pairing stopped'],['wifi_joined','Wi-Fi joined'],['wifi_failed','Wi-Fi failed'],['bt_off','Bluetooth off']]],
+  ['Operator PIN',[['op_in','Operator in'],['op_out','Operator out'],['pin_key','PIN key'],['pin_wrong','Wrong PIN'],['pin_lockout','PIN lockout'],['pin_set','PIN saved']]],
+  ['App',[['boot','Start'],['logo','Logo'],['demo','Demo on'],['theme_light','Light theme'],['theme_dark','Dark theme']]],
+  ['Keys',[['tap','Tap'],['choice','Choice'],['tab','Tab'],['open','Open'],['back','Back'],['confirm','Confirm'],['danger','Danger'],['switch_on','Switch on'],['switch_off','Switch off'],['step_up','Step up'],['step_down','Step down']]]
+];
 const SND_LEVEL={ui:.5,event:.72,alert:.85},SND_TIMBRE={ui:[.18,0],event:[.22,.05],alert:[.35,.22]};
 const CMD_SFX={LOCK:'lock',UNLOCK:'unlock',COLLECT:'pickup',COLLECT_DONE:'done',CALIBRATE_START:'calib',CALIBRATE_END:'switch_off',CLEAR_TAMPER:'confirm',TARE:'confirm',CAL_WEIGHT:'confirm',RESET_GAS:'confirm',TOUCH_CAL:'calib',TOUCH_CAL_RESET:'confirm'};
-var SND={on:true,ctx:null,armed:false};
+var SND={on:true,ctx:null,armed:false,at:0};
 try{SND.on=localStorage.getItem('smartbin.sound')!=='0'}catch(e){}
-function sfx(name){
+function sfx(name,force){
   const s=SOUNDS[name];
-  if(!SND.on||!SND.armed||!s)return;
+  if(!(SND.on||force)||!SND.armed||!s)return;
+  SND.at=Date.now();
   try{SND.ctx=SND.ctx||new (window.AudioContext||window.webkitAudioContext)();}catch(e){return}
   const ctx=SND.ctx;if(ctx.state==='suspended')ctx.resume();
   const [h2,h3]=SND_TIMBRE[s[0]],lvl=SND_LEVEL[s[0]]*0.32,norm=1+h2+h3;
@@ -3777,7 +4083,7 @@ document.addEventListener('click',e=>{
   SND.armed=true;
   const h=e.target.closest('button,.tile,.crow,.fchip');
   if(!h||h.disabled)return;
-  if(h.closest('[data-cmd],#pinWrap')||['theme','sound','rolechip'].includes(h.id))return;
+  if(h.closest('[data-cmd],#pinWrap,[data-snd]')||['theme','sound','rolechip','gateDemo','brand','btPair','btSend','btOff','btScan'].includes(h.id))return;
   sfx(ID_SFX[h.id]||(h.classList.contains('tab')?'tab':h.classList.contains('role')?'choice':
     h.closest('[data-del],[data-remove]')?'danger':h.classList.contains('accent')?'confirm':'tap'));
 },true);
@@ -3852,7 +4158,11 @@ var OPLOCK={
 };
 const pinUI={mode:null,first:false,pin:'',pinNew:''};
 const KEY_SVG='<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.2" cy="12" r="3.6"/><path d="M11.8 12h9v3M17.6 12v2.6"/></svg>';
-function leaveGate(){$('#gate').classList.add('hide');OPLOCK.put('picked','1');}
+function leaveGate(){
+  $('#gate').classList.add('hide');
+  TOUR.next=Date.now()+5000;
+  setTimeout(()=>{sfx('boot');playLogo('#brandLogo .sblogo');},180);
+}
 function askOperator(first){
   pinUI.first=first;pinUI.pin='';pinUI.pinNew='';
   pinOpen(OPLOCK.has()?'unlock':'set',null);
@@ -3888,7 +4198,7 @@ function btCodeCheck(){
   if(pinUI.pin===btc.code){
     pinClose();sfx('bt_paired');
     bt.step=1;btRender();btFakeNets();
-    $('#btMsg').textContent='Paired with '+n+' (demo). The link is encrypted now. Pick the Wi-Fi network next.';
+    $('#btMsg').textContent='Paired with '+n+' (demo). The link is encrypted now. Pick the Wi-Fi network next. A name with "fail" in it shows what a failed join looks like.';
     return;
   }
   pinUI.pin='';btc.fails++;
@@ -3988,7 +4298,44 @@ document.addEventListener('visibilitychange',()=>{
   opAway=0;
 });
 opBooted=true;soundRender();opRender();
-if(OPLOCK.get('picked'))$('#gate').classList.add('hide');
+
+/* ---------- v2 logo and sound test ---------- */
+let logoSeq=0;
+function sbLogo(){
+  const n=++logoSeq,body='M17.5 26h29l-2.7 27.6a3.2 3.2 0 0 1-3.2 2.9H23.4a3.2 3.2 0 0 1-3.2-2.9z';
+  return '<svg class="sblogo" viewBox="0 0 64 64" fill="none" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Smart-Bin">'+
+    '<defs><linearGradient id="sbF'+n+'" x1="0" y1="0" x2="0" y2="1"><stop class="g0" offset="0"/><stop class="g1" offset="1"/></linearGradient>'+
+    '<linearGradient id="sbG'+n+'" x1="0" y1="0" x2="1" y2="0"><stop class="g0" offset="0" stop-opacity=".05"/><stop class="g0" offset=".5" stop-opacity=".16"/><stop class="g0" offset="1" stop-opacity=".05"/></linearGradient>'+
+    '<radialGradient id="sbR'+n+'"><stop class="g0" offset="0" stop-opacity=".45"/><stop class="g0" offset="1" stop-opacity="0"/></radialGradient>'+
+    '<clipPath id="sbC'+n+'"><path d="'+body+'"/></clipPath></defs>'+
+    '<circle class="sb-glow" cx="32" cy="12" r="12" fill="url(#sbR'+n+')"/>'+
+    '<g class="sb-sig"><path class="sb-ac s1" d="M27.8 12.6a6 6 0 0 1 8.4 0" stroke-width="2.6"/>'+
+    '<path class="sb-ac s2" d="M24.2 8.9a11 11 0 0 1 15.6 0" stroke-width="2.6" stroke-opacity=".7"/>'+
+    '<path class="sb-ac s3" d="M20.6 5.2a16 16 0 0 1 22.8 0" stroke-width="2.6" stroke-opacity=".4"/></g>'+
+    '<path d="'+body+'" fill="url(#sbG'+n+')"/>'+
+    '<g clip-path="url(#sbC'+n+')"><g class="sb-fill">'+
+    '<path class="sb-wave b" d="M0 37q5-3.6 10 0t10 0t10 0t10 0t10 0t10 0t10 0v30H0z" fill="url(#sbF'+n+')" opacity=".35"/>'+
+    '<path class="sb-wave" d="M-5 39q5-3.6 10 0t10 0t10 0t10 0t10 0t10 0t10 0v30H-5z" fill="url(#sbF'+n+')"/></g></g>'+
+    '<g class="sb-ticks"><path class="sb-ac" d="M22 30.5h3.4M22 34h2.2" stroke-width="1.8" stroke-opacity=".8"/></g>'+
+    '<g class="sb-chip"><rect class="sb-chp" x="27.5" y="42" width="9" height="9" rx="1.8" stroke-width="2"/>'+
+    '<path class="sb-chp" d="M32 42v-3.2M32 51v2.5M27.5 46.5h-4M36.5 46.5h4" stroke-width="1.8"/>'+
+    '<circle class="sb-nd" cx="32" cy="37.6" r="1.5"/><circle class="sb-nd" cx="22.6" cy="46.5" r="1.5"/><circle class="sb-nd" cx="41.4" cy="46.5" r="1.5"/></g>'+
+    '<path class="sb-ln" d="'+body+'" stroke-width="3"/>'+
+    '<g class="sb-lid"><path class="sb-ln" d="M13 22.5h38" stroke-width="3.4"/><path class="sb-ln" d="M27 22.5v-3.4h10v3.4" stroke-width="3"/>'+
+    '<circle class="sb-led" cx="45.5" cy="22.5" r="1.3"/></g></svg>';
+}
+function playLogo(sel){
+  const el=$(sel);if(!el)return;
+  el.classList.remove('play');void el.getBoundingClientRect();el.classList.add('play');
+}
+$('#gateLogo').innerHTML=sbLogo();
+$('#brandLogo').innerHTML=sbLogo();
+playLogo('#gateLogo .sblogo');
+$('#brand').addEventListener('click',()=>{SND.armed=true;sfx('logo');playLogo('#brandLogo .sblogo');});
+$('#sndHead').innerHTML=icon('speaker')+'<span>SOUND TEST</span>';
+$('#sndGroups').innerHTML=SND_GROUPS.map(g=>'<div class="sndgrp"><h3>'+g[0]+'</h3><div>'+
+  g[1].map(x=>'<button type="button" class="btn sm tint" style="--cc:var(--accent)" data-snd="'+x[0]+'">'+icon('speaker')+'<span>'+x[1]+'</span></button>').join('')+
+  '</div></div>').join('');
 </script>
 </body>
 </html>

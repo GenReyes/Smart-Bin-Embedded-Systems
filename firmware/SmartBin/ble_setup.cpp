@@ -9,6 +9,7 @@ static BtView view;
 static volatile bool running = false, stopReq = false, stopRemote = false, joinReq = false, retryReq = false;
 static String newSsid, newPass;
 static uint8_t wrongCodes = 0;
+static volatile bool codeShown = false;
 static NimBLEServer* server = nullptr;
 static NimBLECharacteristic *chStat = nullptr, *chScan = nullptr;
 static uint16_t connHandle = 0xFFFF;
@@ -39,6 +40,7 @@ static void notifyStat(const String& json) {
 class ServerCb : public NimBLEServerCallbacks {
   void onConnect(NimBLEServer*, NimBLEConnInfo& info) override {
     connHandle = info.getConnHandle();
+    codeShown = false;
     xSemaphoreTake(vLock, portMAX_DELAY);
     view.offAtMs = millis() + BT_IDLE_OFF_MS;
     xSemaphoreGive(vLock);
@@ -54,6 +56,7 @@ class ServerCb : public NimBLEServerCallbacks {
     xSemaphoreTake(vLock, portMAX_DELAY);
     view.code = code;
     xSemaphoreGive(vLock);
+    codeShown = true;
     setPhase(BT_CODE);
     buzz(T_BT_CODE);
     return code;
@@ -66,6 +69,15 @@ class ServerCb : public NimBLEServerCallbacks {
       return;
     }
     server->disconnect(info.getConnHandle());
+    // Only a code that was shown and then typed wrong counts. A phone or laptop that
+    // still remembers an old pairing fails here without any code, and that must not
+    // use up the 3 tries.
+    bool counted = codeShown;
+    codeShown = false;
+    if (!counted) {
+      setPhase(BT_WAIT);
+      return;
+    }
     if (++wrongCodes >= 3) {
       NimBLEDevice::stopAdvertising();
       setPhase(BT_LOCKOUT);

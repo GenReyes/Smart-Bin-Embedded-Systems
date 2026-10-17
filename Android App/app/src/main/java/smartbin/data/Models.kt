@@ -49,7 +49,19 @@ data class Reading(
     val status: BinStatus = BinStatus.OK,
     /** When the phone received it. */
     val at: Long = 0L,
-)
+    /** Sensors that stopped answering, as the firmware names them: HC-SR04, HX711, BME680, BMI160. */
+    val faults: List<String> = emptyList(),
+    /** Seconds left in the air sensor's warm-up, sent only while [iaqAcc] is 0. */
+    val iaqWarmS: Int? = null,
+    /** The raw gas resistance in kOhm, shown while the air sensor warms up. */
+    val gasK: Double? = null,
+    /** COUNTDOWN (clears by itself) or LATCHED (needs RESET TAMPER), while the bin is in TAMPER. */
+    val tamperPhase: String = "",
+) {
+    fun fault(sensor: String) = sensor in faults
+    /** The air score is not settled yet. */
+    val warming get() = iaqAcc == 0 && !fault("BME680")
+}
 
 /**
  * The calibration values of one bin, kept as named numbers so they map one to
@@ -100,10 +112,17 @@ data class Bin(
     val tsKey: String = "",
     val tbId: String = "",
     val tbKey: String = "",
+    /** One of the made-up bins that demo mode adds. They are never saved. */
+    val isDemo: Boolean = false,
+    /** From /api/status: firmware version, Wi-Fi signal in dBm, seconds since start, touch calibrated on the bin. */
+    val fw: String = "",
+    val rssi: Int? = null,
+    val uptimeS: Long? = null,
+    val touchCustom: Boolean? = null,
 ) {
     val onThingSpeak get() = tsChannel.isNotBlank()
-    /** No address and no ThingSpeak channel: the app makes up its readings. */
-    val demo get() = ip.isBlank() && !onThingSpeak
+    /** A made-up demo bin. Real bins are read over Wi-Fi, Firebase or ThingSpeak, and show "not answering" instead. */
+    val demo get() = isDemo
     val stale get() = source == Source.STALE
     val calibrating get() = reading.status == BinStatus.CALIBRATING
     val simulating get() = sim.mask > 0
@@ -127,6 +146,8 @@ data class AlertRow(
     val meta: String,
     val at: Long,
     val read: Boolean = false,
+    /** Raised by a demo bin: shown while demo mode is on, never saved. */
+    val demo: Boolean = false,
 )
 
 /** The ThingSpeak server. The real one unless the mock server is used. */
@@ -164,6 +185,10 @@ data class HubState(
     val demoNoConfirm: Boolean = false,
     /** Cloud commands waiting for the bin to confirm them, by bin id. */
     val pending: Map<String, Pending> = emptyMap(),
+    /** Demo mode, turned on or off only on the start page. It adds the demo bins. */
+    val demoOn: Boolean = false,
+    /** What the demo tour is acting out right now, for its banner. */
+    val tourMsg: String? = null,
 ) {
     /** Every bin runs on demo data. The demo options can still make it look like any link. */
     val demo get() = bins.isNotEmpty() && bins.all { it.demo }

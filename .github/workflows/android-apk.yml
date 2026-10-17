@@ -1,0 +1,56 @@
+# Builds the Android app and puts the debug APK in "Android App/Smart-Bin vX.Y.apk",
+# replacing the older one, so the APK can be made without a laptop.
+# The Firebase account is never baked in: local.properties holds only sdk.dir here.
+name: Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['Android App/app/**', 'Android App/*.kts', 'Android App/gradle/**', '.github/workflows/android-apk.yml']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Android App
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      # The runner image already has the Android SDK; AGP fetches any missing platform.
+      - name: Point Gradle at the SDK
+        run: |
+          sdk="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          yes | "$sdk/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          echo "sdk.dir=$sdk" > local.properties
+      - name: Build
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug --no-configuration-cache --stacktrace
+      - name: Put the APK in the repo
+        run: |
+          ver=$(sed -n 's/.*versionName = "\(.*\)".*/\1/p' app/build.gradle.kts | head -1)
+          name="Smart-Bin v$ver.apk"
+          git rm -q --ignore-unmatch Smart-Bin\ v*.apk
+          cp app/build/outputs/apk/debug/app-debug.apk "$name"
+          git add -f "$name"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --cached --quiet; then echo "No change"; exit 0; fi
+          git commit -q -m "Build $name"
+          git push origin HEAD:${GITHUB_REF_NAME}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smart-bin-apk
+          path: Android App/app/build/outputs/apk/debug/app-debug.apk

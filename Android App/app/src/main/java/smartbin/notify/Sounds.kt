@@ -54,6 +54,9 @@ enum class Sfx(val res: Int, val volume: Float = 0.6f) {
     BT_BLOCKED(R.raw.sb_bt_blocked, 0.75f),
     WIFI_JOINED(R.raw.sb_wifi_joined, 0.7f),
     PIN_SET(R.raw.sb_pin_set, 0.7f),
+    WIFI_FAILED(R.raw.sb_wifi_failed, 0.7f),
+    BT_OFF(R.raw.sb_bt_off, 0.7f),
+    DEMO(R.raw.sb_demo, 0.7f),
 
     ALERT_FULL(R.raw.sb_alert_full, 0.8f),
     ALERT_TAMPER(R.raw.sb_alert_tamper, 0.8f),
@@ -95,8 +98,8 @@ object Sounds {
         Sfx.entries.forEach { loaded[it] = made.load(app, it.res, 1) }
     }
 
-    fun play(sfx: Sfx) {
-        if (!Feel.sounds) return
+    fun play(sfx: Sfx, force: Boolean = false) {
+        if (!Feel.sounds && !force) return
         val id = loaded[sfx] ?: return
         if (id !in ready) return
         last = SystemClock.uptimeMillis()

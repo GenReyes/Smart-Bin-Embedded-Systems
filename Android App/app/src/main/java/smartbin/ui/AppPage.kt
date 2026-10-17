@@ -42,6 +42,7 @@ import smartbin.notify.Alerts
 import smartbin.notify.Feel
 import smartbin.notify.Haptics
 import smartbin.notify.Sfx
+import smartbin.notify.Sounds
 
 /**
  * The gear page: everything about the app itself, kept apart from the bins'
@@ -71,7 +72,7 @@ fun AppPage(vm: AppViewModel, hub: HubState) {
                 }
             }
         }
-        AlertSounds()
+        SoundTest()
         LRow(Ic.sun, "Keep screen on", "Stops the phone dimming while the app is open", chevron = false) {
             Toggle(vm.keepAwake, { vm.toggleAwake() })
         }
@@ -91,7 +92,7 @@ fun AppPage(vm: AppViewModel, hub: HubState) {
             }
         }
         if (vm.operator) LRow(Ic.key, "Change operator PIN", "Asks for the current PIN first", onClick = { vm.changePin() })
-        Hint("The app always opens as a collector. Operator needs the PIN, and drops back to collector after 2 min in the background. After 5 wrong PINs it waits 30 s, longer each time.")
+        Hint("The app opens on the start page each time, where you pick a role. Operator needs the PIN, and drops back to collector after 2 min in the background. After 5 wrong PINs it waits 30 s, longer each time.")
 
         Row(Modifier.padding(top = 4.dp)) { Sh(Ic.layers, "Links to the bins") }
         val looks = routeLooks(hub.routes, c)
@@ -99,7 +100,7 @@ fun AppPage(vm: AppViewModel, hub: HubState) {
             looks.firstOrNull()?.icon ?: Ic.wifi(false), "Connection",
             when {
                 looks.isNotEmpty() -> looks.joinToString(" + ") { it.name } + if (hub.demo) " (demo)" else " answering"
-                hub.link == Link.DEMO -> "Demo data. Add an address or channel to a bin to go live."
+                hub.link == Link.DEMO -> "Demo bins only. Pair a bin over Bluetooth to go live."
                 else -> "Nothing answers. Check Wi-Fi and the cloud accounts."
             },
             looks.firstOrNull()?.color ?: if (hub.link == Link.OFFLINE) c.bad else c.warn, onClick = { vm.go(Screen.NET) },
@@ -142,13 +143,20 @@ fun AppPage(vm: AppViewModel, hub: HubState) {
         )
         if (!vm.unrestricted) Btn("OPEN APP INFO", { vm.openAppInfo() }, Modifier.fillMaxWidth(), Ic.gear, Look.TINT, sound = Sfx.OPEN)
 
+        Row(Modifier.padding(top = 4.dp)) { Sh(Ic.flask, "Demo", c.sim) }
+        LRow(
+            Ic.undo, "Start page",
+            if (hub.demoOn) "Demo is on. Turn it off or on from the start page." else "Pick a role again, or turn on the demo",
+            c.sim, onClick = { vm.toStart() },
+        )
+
         if (vm.operator) {
             Row(Modifier.padding(top = 4.dp)) { Sh(Ic.download, "Bin list") }
             LRow(Ic.download, "Export bin list", "Names, places and addresses as a file", onClick = { vm.exportBins(hub.bins) }, chevron = false, sound = Sfx.SAVED)
         }
 
-        DemoOptions(vm, hub)
-        Hint("Smart-Bin app ${BuildConfig.VERSION_NAME}, matches dashboard v12", Modifier.fillMaxWidth(), align = TextAlign.Center)
+        if (hub.demoOn) DemoOptions(vm, hub)
+        Hint("Smart-Bin app ${BuildConfig.VERSION_NAME}, matches dashboard v2 and firmware ${hub.bins.firstOrNull { !it.isDemo && it.fw.isNotBlank() }?.fw ?: "v2"}", Modifier.fillMaxWidth(), align = TextAlign.Center)
     }
 }
 
@@ -176,28 +184,46 @@ private fun RowScope.BigSwitch(icon: ImageVector, label: String, on: Boolean, cc
     }
 }
 
-/** A preview of each alert's own sound and buzz, from Garbage-Guard. */
+/**
+ * The sound test, the same groups and names as the dashboard's. Each key plays
+ * its sound and vibration even with sound off, so people can learn them.
+ */
+private val SOUND_GROUPS: List<Pair<String, List<Pair<Sfx, String>>>> = listOf(
+    "Alerts" to listOf(Sfx.ALERT_FULL to "Bin full", Sfx.ALERT_TAMPER to "Tamper", Sfx.ALERT_SENSOR to "Sensor limit", Sfx.ALERT_LOCK to "Bin locked", Sfx.ALERT_PICKUP to "Pickup alert", Sfx.ALERT_INFO to "Info"),
+    "Bins and links" to listOf(Sfx.LINK_UP to "Wi-Fi link", Sfx.CLOUD to "Cloud link", Sfx.LINK_LOST to "Link lost", Sfx.BIN_LOST to "Bin quiet", Sfx.BIN_BACK to "Bin back", Sfx.CMD_OK to "Command OK", Sfx.CMD_FAIL to "Command failed"),
+    "Lid and pickup" to listOf(Sfx.LOCK to "Lock", Sfx.UNLOCK to "Unlock", Sfx.PICKUP to "Pickup start", Sfx.DONE to "Pickup finished"),
+    "Setup" to listOf(Sfx.CALIB to "Calibrate", Sfx.SIM to "Simulation", Sfx.SAVED to "Saved", Sfx.DENIED to "Not allowed"),
+    "Bluetooth Wi-Fi setup" to listOf(Sfx.BT_PAIRED to "Paired", Sfx.BT_WRONG to "Wrong code", Sfx.BT_BLOCKED to "Pairing stopped", Sfx.WIFI_JOINED to "Wi-Fi joined", Sfx.WIFI_FAILED to "Wi-Fi failed", Sfx.BT_OFF to "Bluetooth off"),
+    "Operator PIN" to listOf(Sfx.OP_IN to "Operator in", Sfx.OP_OUT to "Operator out", Sfx.PIN_KEY to "PIN key", Sfx.PIN_WRONG to "Wrong PIN", Sfx.PIN_LOCKOUT to "PIN lockout", Sfx.PIN_SET to "PIN saved"),
+    "App" to listOf(Sfx.BOOT to "Start", Sfx.LOGO to "Logo", Sfx.DEMO to "Demo on", Sfx.THEME_LIGHT to "Light theme", Sfx.THEME_DARK to "Dark theme"),
+    "Keys" to listOf(
+        Sfx.TAP to "Tap", Sfx.CHOICE to "Choice", Sfx.TAB to "Tab", Sfx.OPEN to "Open", Sfx.BACK to "Back", Sfx.CONFIRM to "Confirm",
+        Sfx.DANGER to "Danger", Sfx.SWITCH_ON to "Switch on", Sfx.SWITCH_OFF to "Switch off", Sfx.STEP_UP to "Step up", Sfx.STEP_DOWN to "Step down",
+    ),
+)
+
 @Composable
-private fun AlertSounds() {
+private fun SoundTest() {
     val c = Sb.c
+    var open by remember { mutableStateOf(false) }
     Column(
         Modifier.fillMaxWidth().bump(c, 14.dp).padding(horizontal = 13.dp, vertical = 11.dp),
         verticalArrangement = Arrangement.spacedBy(9.dp),
     ) {
-        T("Alert sounds", weight = FontWeight.Bold)
-        T("Each kind of alert has its own sound and vibration, so you can tell them apart without looking. Tap one to hear it.", size = 0.8f, weight = FontWeight.SemiBold, color = c.ink2)
-        val kinds: List<Triple<AlertType, String, Pair<ImageVector, Color>>> = listOf(
-            Triple(AlertType.FULL, "Full", Ic.fill to c.bad),
-            Triple(AlertType.TAMPER, "Tamper", Ic.tamper to c.tamper),
-            Triple(AlertType.SENSOR, "Sensor", Ic.temp(41.0) to c.temp),
-            Triple(AlertType.LOCK, "Lock", Ic.lock(true) to c.sim),
-            Triple(AlertType.PICKUP, "Pickup", Ic.truck to c.cal),
-            Triple(AlertType.INFO, "Setup", Ic.calib to c.ink2),
-        )
-        kinds.chunked(3).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                row.forEach { (type, label, ic) ->
-                    Btn(label, { Feel.event(Alerts.sfxFor(type)) }, Modifier.weight(1f), ic.first, Look.TINT, ic.second, small = true, sound = Sfx.TAP)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            T("Sound test", Modifier.weight(1f), weight = FontWeight.Bold)
+            Btn(if (open) "HIDE" else "SHOW", { open = !open }, icon = Ic.speaker, look = Look.TINT, small = true, sound = Sfx.OPEN)
+        }
+        T("Every sound the app and dashboard make, in the same groups. Each one plays with its vibration, even with sound off, so you can learn them.", size = 0.8f, weight = FontWeight.SemiBold, color = c.ink2)
+        if (open) SOUND_GROUPS.forEach { (group, sounds) ->
+            T(group, size = 0.78f, spacing = 0.06f, weight = FontWeight.Bold, color = c.ink2)
+            sounds.chunked(3).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    row.forEach { (sfx, label) ->
+                        // The key itself plays the sound and its buzz; with sound off, play it anyway.
+                        Btn(label, { if (!Feel.sounds) Sounds.play(sfx, force = true) }, Modifier.weight(1f), Ic.speaker, Look.TINT, c.accent, small = true, sound = sfx, textSize = 0.7f)
+                    }
+                    repeat(3 - row.size) { Box(Modifier.weight(1f)) }
                 }
             }
         }
@@ -215,11 +241,6 @@ private fun DemoOptions(vm: AppViewModel, hub: HubState) {
     val c = Sb.c
     @Suppress("UNUSED_VARIABLE") val tick = vm.demoTick
     Row(Modifier.padding(top = 4.dp)) { Sh(Ic.flask, "Demo options", c.sim) }
-    val demoBins = hub.bins.filter { it.demo }
-    if (demoBins.isEmpty()) {
-        Card { Hint("Demo options act on bins with no address. Every bin is set up for real now, so there is nothing to act out.") }
-        return
-    }
     val inUse = Hub.demoInUse
     Card {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -239,7 +260,7 @@ private fun DemoOptions(vm: AppViewModel, hub: HubState) {
 
         Field("Pretend these links answer", Ic.layers, c.sim) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                val r = vm.demoLinks
+                val r = hub.demoLinks
                 Btn("WI-FI", { vm.toggleDemoLink(0) }, Modifier.weight(1f), Ic.wifi(true), Look.TINT, c.link, small = true, pressedIn = r.local, sound = Sfx.CHOICE)
                 Btn("FIREBASE", { vm.toggleDemoLink(1) }, Modifier.weight(1f), Ic.cloud, Look.TINT, c.cloud, small = true, pressedIn = r.firebase, sound = Sfx.CHOICE, textSize = 0.7f)
                 Btn("TSPEAK", { vm.toggleDemoLink(2) }, Modifier.weight(1f), Ic.chart, Look.TINT, c.ts, small = true, pressedIn = r.thingspeak, sound = Sfx.CHOICE, textSize = 0.7f)
@@ -274,89 +295,6 @@ private fun DemoOptions(vm: AppViewModel, hub: HubState) {
                 Ic.wifi(quiet), Look.TINT, if (quiet) c.ok else c.warn, small = true, sound = if (quiet) Sfx.LINK_UP else Sfx.LINK_LOST,
             )
         }
-        Hint("Simulation holds sensor values by hand. These act out events instead: a bin filling past its limit, being tipped, a burst of bad air, a pickup, or a bin that stops answering. They change only bins with no address and are forgotten when the app closes.")
+        Hint("Simulation holds sensor values by hand. These act out events instead: a bin filling past its limit, being tipped, a burst of bad air, a pickup, or a bin that stops answering. They change only the demo bins and are forgotten when the app closes.")
     }
 }
-
-// ---------- start page ----------
-
-/**
- * Shown when the app opens after it was closed or ended, while the bins are
- * reached. It lets go by itself once a route answers, or at once for demo
- * data. Coming back from the background skips it.
- */
-@Composable
-fun StartPage(vm: AppViewModel, hub: HubState) {
-    val c = Sb.c
-    var waited by remember { mutableStateOf(false) }
-    var slow by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        delay(1300)
-        waited = true
-        delay(9000)
-        slow = true
-    }
-    val live = hub.link == Link.LIVE || hub.link == Link.CLOUD || hub.link == Link.THINGSPEAK
-    val ready = !hub.loading && (hub.link == Link.DEMO || live)
-    LaunchedEffect(waited, ready) {
-        if (waited && ready) vm.started = true
-    }
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(
-            Modifier.widthIn(max = 420.dp).fillMaxWidth().padding(horizontal = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            Box(Modifier.size(112.dp).well(c, 56.dp).press(true, Sfx.LOGO) {}, contentAlignment = Alignment.Center) {
-                BinIcon(46.0, c.accent, 80.dp)
-            }
-            T("SMART-BIN", size = 1.6f, spacing = 0.04f)
-            T(
-                when {
-                    hub.link == Link.DEMO -> "Opening with demo data"
-                    live -> "Connected"
-                    slow -> "No bin has answered yet"
-                    else -> "Reaching the bins"
-                },
-                size = 0.9f, weight = FontWeight.Bold, color = c.ink2,
-            )
-            if (hub.link != Link.DEMO) {
-                Column(Modifier.fillMaxWidth().well(c, 16.dp).padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    val anyIp = hub.bins.any { it.ip.isNotBlank() }
-                    StartLine(
-                        Ic.wifi(true), "Local Wi-Fi", c.link,
-                        when { hub.bins.any { it.source == Source.LIVE } -> true; !anyIp -> null; else -> false },
-                        if (anyIp) "Trying" else "No address",
-                    )
-                    StartLine(Ic.cloud, "Firebase", c.cloud, hub.fbUp, if (hub.fbUp == null) "Not set up" else "Trying")
-                    StartLine(Ic.chart, "ThingSpeak", c.ts, hub.tsUp, if (hub.tsUp == null) "Not set up" else "Trying")
-                }
-            }
-            if (slow && !live) {
-                Hint("Check the phone is on the bins' Wi-Fi or has internet. You can go in now and the app keeps trying.", align = TextAlign.Center)
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Btn("CONNECTION", { vm.started = true; vm.go(Screen.NET) }, Modifier.weight(1f), Ic.layers, Look.TINT, sound = Sfx.OPEN)
-                    Btn("GO IN", { vm.started = true }, Modifier.weight(1f), Ic.check, Look.ACCENT, sound = Sfx.CONFIRM)
-                }
-            } else if (!ready) {
-                Btn("SKIP", { vm.started = true }, icon = Ic.chev, look = Look.TINT, small = true, sound = Sfx.TAP, iconMod = Modifier.rotate270())
-            }
-        }
-    }
-}
-
-@Composable
-private fun StartLine(icon: ImageVector, name: String, cc: Color, up: Boolean?, waiting: String) {
-    val c = Sb.c
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        Ico(icon, 19.dp, if (up == true) cc else c.ink2, Modifier.breathe(up == false, 1200))
-        T(name, Modifier.weight(1f), size = 0.9f, weight = FontWeight.Bold)
-        when (up) {
-            true -> Tag("CONNECTED", cc)
-            false -> T(waiting, size = 0.78f, weight = FontWeight.Bold, color = c.ink2)
-            null -> T(waiting, size = 0.78f, weight = FontWeight.SemiBold, color = c.ink2)
-        }
-    }
-}
-
-private fun Modifier.rotate270() = this.graphicsLayer { rotationZ = -90f }

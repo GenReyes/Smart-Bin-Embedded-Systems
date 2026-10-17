@@ -70,6 +70,11 @@ SOUNDS = {
     "bt_blocked":  ("event", [(622, 180), (0, 50), (311, 320)]),
     "wifi_joined": ("event", [(880, 60), (1175, 60), (1480, 60), (1760, 180)]),
     "pin_set":     ("event", [(1047, 50), (1397, 50), (1047, 50), (1397, 120)]),
+    # v2: the bin could not join the Wi-Fi, Bluetooth switched off on the bin,
+    # and demo mode turned on at the start page.
+    "wifi_failed": ("event", [(740, 60), (0, 25), (554, 60), (0, 25), (440, 90), (370, 180)]),
+    "bt_off":      ("event", [(1568, 35), (1175, 35), (784, 35), (523, 150)]),
+    "demo":        ("event", [(659, 60), (784, 60), (988, 60), (784, 60), (1319, 160)]),
     # Notification sounds, one per kind of alert. They also play inside the app.
     "alert_full":   ("alert", [(880, 180), (0, 80), (880, 180), (0, 80), (880, 180), (0, 200), (1175, 420)]),
     "alert_tamper": ("alert", [(700, 1400, 340), (1400, 700, 340), (700, 1400, 340), (1400, 700, 340)]),

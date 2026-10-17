@@ -28,8 +28,10 @@ sealed interface HubEvent {
     data class LinkChanged(val from: Link, val to: Link) : HubEvent
     data class BinLost(val name: String) : HubEvent
     data class BinBack(val name: String) : HubEvent
-    /** A cloud command was confirmed by the bin, or ran out of time. */
-    data class CommandResult(val binId: String, val name: String, val cmd: String, val ok: Boolean) : HubEvent
+    /** A cloud command was confirmed by the bin, refused ([why]), or ran out of time. */
+    data class CommandResult(val binId: String, val name: String, val cmd: String, val ok: Boolean, val why: String? = null) : HubEvent
+    /** A sound for something the demo tour did, named as in the Sfx list (LOCK, PICKUP, ...). */
+    data class Sound(val name: String) : HubEvent
 }
 
 /**
@@ -90,7 +92,25 @@ object Hub {
     private var lastUsage = 0L
     private var alertSeq = 0L
 
-    private data class Flags(val full: Boolean, val hot: Boolean, val humid: Boolean, val gassy: Boolean, val status: BinStatus, val source: Source)
+    private data class Flags(
+        val full: Boolean, val hot: Boolean, val humid: Boolean, val gassy: Boolean, val status: BinStatus, val source: Source,
+        val faults: String, val acc: Int,
+    )
+
+    /** Demo tour: readings held on a demo bin while the tour acts something out. */
+    private val holds = HashMap<String, (Reading) -> Reading>()
+    private var tourStep = 0
+    private var tourNext = 0L
+    private var tourPauseUntil = 0L
+
+    /** Firebase watchers: this phone's id, and when it last told the bins it is watching. */
+    private var watcherId = ""
+    private var watchedAt = 0L
+    private var watching = false
+    /** Firebase alerts written by the bins while the app was away, read once per bin per run. */
+    private val alertsRead = HashSet<String>()
+    private var alertsCheck = 0L
+    private var startedAt = 0L
 
     fun init(context: Context) {
         if (started) return
@@ -99,11 +119,25 @@ object Hub {
         cloud = Cloud(store.firebase())
         ts = ThingSpeak().apply { use(store.string(KEY_TS_URL, THINGSPEAK_URL)) }
         val now = System.currentTimeMillis()
-        val bins = store.bins() ?: Demo.bins().also(store::saveBins)
-        val alerts = store.alerts() ?: (if (bins.all { it.demo }) Demo.alerts(bins, now) else emptyList()).also(store::saveAlerts)
+        startedAt = now
+        watcherId = store.string(KEY_WATCHER, "").ifBlank { "app-" + java.util.UUID.randomUUID().toString().take(10) }.also { store.putString(KEY_WATCHER, it) }
+        var bins = store.bins() ?: emptyList()
+        var alerts = store.alerts() ?: emptyList()
+        // Version 1 kept its demo bins in the saved list, as bins with no address. Version 2 makes
+        // demo bins only when DEMO is on at the start page, so those old ones go, once.
+        if (!store.bool(KEY_V2, false)) {
+            // b1 and b2 were the demo bins; a bin with no address, channel or cloud account was demo data too.
+            val real = bins.filter { it.ip.isNotBlank() || it.onThingSpeak || (cloud.ready && it.id !in setOf("b1", "b2")) }
+            if (real.isEmpty()) alerts = emptyList()
+            bins = real
+            store.saveBins(bins)
+            store.saveAlerts(alerts)
+            store.putBool(KEY_V2, true)
+        }
+        bins = bins.map { it.copy(source = Source.STALE) }
         alertSeq = alerts.maxOfOrNull { it.id } ?: 0L
         _state.value = HubState(bins = bins, alerts = alerts, link = linkOf(bins), loading = true)
-        _history.value = bins.filter { it.demo }.associate { it.id to Demo.history(it, now) }
+        _history.value = emptyMap()
 
         // A new network (joining the bins' Wi-Fi, or leaving it) means try Wi-Fi again at once.
         runCatching {
@@ -162,8 +196,11 @@ object Hub {
             tsUp = if (merged.any { it.onThingSpeak }) now - tsOk < 60_000 else null,
             tsPerDay = tsPerDay(merged),
         )
-        if (merged.any { it.ip != (current.bins.firstOrNull { c -> c.id == it.id }?.ip) }) store.saveBins(merged)
+        if (merged.any { it.ip != (current.bins.firstOrNull { c -> c.id == it.id }?.ip) }) persist(merged)
         watch(merged, now)
+        tour(now)
+        watchers(merged, now)
+        cloudAlerts(merged, now)
         if (now - lastSample >= 10_000) {
             lastSample = now
             sample(merged, now)
@@ -189,7 +226,8 @@ object Hub {
                     from = b.copy(reading = effect(b.reading, cmd))
                 }
             }
-            val r = Demo.step(from, _state.value.calibBin == b.id, now)
+            var r = Demo.step(from, _state.value.calibBin == b.id, now)
+            holds[b.id]?.let { r = it(r) }
             return from.copy(reading = r, source = demoSource(_state.value.demoLinks), lastSeen = now)
         }
         // Local Wi-Fi first: every second while it answers. After a miss it is tried
@@ -203,6 +241,7 @@ object Hub {
                     reading = s.reading, source = Source.LIVE, lastSeen = now,
                     cal = s.cal ?: b.cal,
                     sim = if (s.simMask != null && b.id !in simDirty) b.sim.copy(mask = s.simMask) else b.sim,
+                    fw = s.fw.ifBlank { b.fw }, rssi = s.rssi ?: b.rssi, uptimeS = s.uptimeS ?: b.uptimeS, touchCustom = s.touchCustom ?: b.touchCustom,
                 )
             } catch (e: CancellationException) {
                 throw e
@@ -226,6 +265,7 @@ object Hub {
                             cal = c.status.cal ?: b.cal,
                             // Each bin writes its own address, so a new one is picked up without typing it.
                             ip = c.localIp ?: b.ip,
+                            fw = c.status.fw.ifBlank { b.fw }, rssi = c.status.rssi ?: b.rssi, uptimeS = c.status.uptimeS ?: b.uptimeS,
                         )
                     }
                 } catch (e: CancellationException) {
@@ -262,6 +302,7 @@ object Hub {
     }
 
     private fun linkOf(bins: List<Bin>, pretend: Routes = _state.value.demoLinks): Link = when {
+        bins.isEmpty() -> Link.OFFLINE
         bins.all { it.demo } -> when (demoSource(pretend)) {
             Source.LIVE -> Link.LIVE
             Source.CLOUD -> Link.CLOUD
@@ -355,8 +396,9 @@ object Hub {
             val r = b.reading
             val c = b.cal
             val f = Flags(
-                full = r.fill >= c.v("fill_th"), hot = r.temp >= c.v("temp_th"), humid = r.hum >= c.v("hum_th"),
-                gassy = r.gas >= c.v("gas_th"), status = r.status, source = b.source,
+                full = r.fill >= c.v("fill_th") && !r.fault("HC-SR04"), hot = r.temp >= c.v("temp_th") && !r.fault("BME680"),
+                humid = r.hum >= c.v("hum_th") && !r.fault("BME680"), gassy = r.gas >= c.v("gas_th") && !r.warming && !r.fault("BME680"),
+                status = r.status, source = b.source, faults = r.faults.joinToString(", "), acc = r.iaqAcc,
             )
             val p = prev[b.id]
             prev[b.id] = f
@@ -377,6 +419,9 @@ object Hub {
                     else -> {}
                 }
             }
+            if (f.faults.isNotEmpty() && f.faults != p.faults) add(b, Severity.WARNING, "gear", "Sensor not answering", "$n: ${f.faults}", AlertType.SENSOR)
+            if (f.faults.isEmpty() && p.faults.isNotEmpty()) add(b, Severity.SUCCESS, "check", "Sensor back", "$n reads every sensor again", AlertType.INFO, kind = AlertKind.SENSOR)
+            if (p.acc == 0 && f.acc > 0) add(b, Severity.SUCCESS, "gas", "Air sensor ready", "$n air quality readings are settled", AlertType.INFO, kind = AlertKind.SENSOR)
             run {
                 if (f.source == Source.STALE && p.source != Source.STALE) _events.tryEmit(HubEvent.BinLost(n))
                 if (f.source != Source.STALE && p.source == Source.STALE) _events.tryEmit(HubEvent.BinBack(n))
@@ -386,10 +431,10 @@ object Hub {
     }
 
     private fun add(b: Bin, sev: Severity, icon: String, title: String, meta: String, type: AlertType, kind: AlertKind = Demo.kindFor(icon)) {
-        val row = AlertRow(++alertSeq, sev, icon, kind, title, meta, System.currentTimeMillis())
+        val row = AlertRow(++alertSeq, sev, icon, kind, title, meta, System.currentTimeMillis(), demo = b.demo)
         val list = (listOf(row) + _state.value.alerts).take(200)
         _state.value = _state.value.copy(alerts = list)
-        store.saveAlerts(list)
+        saveAlerts(list)
         _events.tryEmit(HubEvent.NewAlert(row, type, b.id))
     }
 
@@ -401,8 +446,12 @@ object Hub {
         val s = _state.value
         val bins = s.bins.map { if (it.id == id) f(it) else it }
         _state.value = s.copy(bins = bins, link = linkOf(bins))
-        if (persist) store.saveBins(bins)
+        if (persist) persist(bins)
     }
+
+    /** Only real bins and their alerts are saved. Demo ones live while demo mode is on. */
+    private fun persist(bins: List<Bin>) = store.saveBins(bins.filterNot { it.demo })
+    private fun saveAlerts(list: List<AlertRow>) = store.saveAlerts(list.filterNot { it.demo })
 
     /**
      * Sends one command. Over Wi-Fi every command works; over the cloud only
@@ -433,9 +482,12 @@ object Hub {
                 LocalApi.command(b.ip, cmd, extra)
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: LocalApi.Refused) {
+                // The bin answered and said no: say why, and do not try the cloud.
+                return "${b.name}: ${e.why}."
             } catch (_: Exception) {
                 problem = if (cmd in Cloud.CLOUD_COMMANDS && (cloud.ready || b.tbId.isNotBlank())) {
-                    val viaFb = cloud.ready && runCatching { cloud.command(b.cloudId, cmd) }.isSuccess
+                    val viaFb = cloud.ready && runCatching { cloud.command(b.cloudId, cmd).also { k -> k?.let { confirm(id, b.name, cmd, it) } } }.isSuccess
                     val viaTs = !viaFb && b.tbId.isNotBlank() && runCatching { ts.command(b.tbId, b.tbKey, cmd) }.isSuccess
                     if (viaFb) via = Source.CLOUD
                     if (viaTs) via = Source.THINGSPEAK
@@ -443,7 +495,8 @@ object Hub {
                 } else "${b.name} did not answer. Check its power and Wi-Fi."
             }
             Source.CLOUD -> problem = if (cmd !in Cloud.CLOUD_COMMANDS) "That needs the bins' Wi-Fi."
-            else runCatching { cloud.command(b.cloudId, cmd) }.exceptionOrNull()?.let { "The cloud did not take it. ${it.message.orEmpty()}" }
+            else runCatching { cloud.command(b.cloudId, cmd).also { k -> k?.let { confirm(id, b.name, cmd, it) } } }
+                .exceptionOrNull()?.let { "The cloud did not take it. ${it.message.orEmpty()}" }
                 .also { if (it == null) via = Source.CLOUD }
             Source.THINGSPEAK -> problem = when {
                 cmd !in Cloud.CLOUD_COMMANDS -> "That needs the bins' Wi-Fi."
@@ -471,6 +524,29 @@ object Hub {
         return problem
     }
 
+    /**
+     * The bin writes its answer to a Firebase command under the push key. It is
+     * read every second for 8 s; with no answer the key keeps waiting for the
+     * bin's status instead, as before.
+     */
+    private fun confirm(id: String, name: String, cmd: String, key: String) {
+        scope.launch {
+            repeat(8) {
+                delay(1000)
+                val r = runCatching { cloud.result(key) }.getOrNull()
+                if (r != null && (r.optString("cmd").isBlank() || r.optString("cmd") == cmd)) {
+                    cloud.dropResult(key)
+                    if (_state.value.pending[id]?.cmd != cmd) return@launch
+                    _state.value = _state.value.copy(pending = _state.value.pending - id)
+                    val ok = r.optBoolean("ok", false)
+                    _events.tryEmit(HubEvent.CommandResult(id, name, cmd, ok, r.optString("why").takeIf { !ok && it.isNotBlank() }))
+                    if (ok) update(id) { it.copy(reading = effect(it.reading, cmd)) }
+                    return@launch
+                }
+            }
+        }
+    }
+
     /** What a command does to a bin's reading, as the card shows it. */
     private fun effect(r: Reading, cmd: String): Reading = when (cmd) {
         "LOCK" -> r.copy(status = BinStatus.LOCKED, lidOpen = false)
@@ -479,7 +555,7 @@ object Hub {
         "COLLECT" -> r.copy(status = BinStatus.COLLECTING, lidOpen = true)
         "COLLECT_DONE" -> r.copy(status = BinStatus.OK, lidOpen = false, fill = 0.0, weight = 0.0, gas = minOf(r.gas, 48.0))
         "TARE" -> r.copy(weight = 0.0)
-        "RESET_GAS" -> r.copy(iaqAcc = 0)
+        "RESET_GAS" -> r.copy(iaqAcc = 0, iaqWarmS = 20)
         else -> r
     }
 
@@ -557,13 +633,39 @@ object Hub {
         val s = _state.value
         val now = System.currentTimeMillis()
         val added = (0 until n).map { k ->
-            val index = s.bins.size + k
+            val index = s.bins.count { !it.demo } + k
             Demo.newBin(index, "b$now-$k").copy(cloudId = "bin%02d".format(index + 1))
         }
         val bins = s.bins + added
         _state.value = s.copy(bins = bins, link = linkOf(bins))
         _history.value = _history.value + added.associate { it.id to emptyList() }
-        store.saveBins(bins)
+        persist(bins)
+    }
+
+    /**
+     * A bin that just joined Wi-Fi over Bluetooth and is not in the list yet.
+     * Named after its Bluetooth name (SmartBin-01 is Bin 01, cloud name bin01).
+     */
+    fun addRealBin(number: String, ip: String): Bin {
+        val s = _state.value
+        s.bins.firstOrNull { !it.demo && it.ip == ip }?.let { return it }
+        val index = s.bins.count { !it.demo }
+        val num = number.ifBlank { "%02d".format(index + 1) }
+        val b = Demo.newBin(index, "b${System.currentTimeMillis()}").copy(name = "Bin $num", place = "", cloudId = "bin$num", ip = ip)
+        val bins = listOf(b) + s.bins
+        _state.value = s.copy(bins = bins, link = linkOf(bins))
+        _history.value = _history.value + (b.id to emptyList())
+        persist(bins)
+        return b
+    }
+
+    /** Sends the saved Firebase account to every real bin on Wi-Fi. Returns how many took it and how many were tried. */
+    suspend fun sendCloudToBins(): Pair<Int, Int> {
+        val cfg = store.firebase()
+        val bins = _state.value.bins.filter { !it.demo && it.ip.isNotBlank() }
+        var ok = 0
+        bins.forEach { b -> if (runCatching { LocalApi.sendCloud(b.ip, cfg) }.isSuccess) ok++ }
+        return ok to bins.size
     }
 
     fun editBin(
@@ -591,7 +693,7 @@ object Hub {
         val s = _state.value
         val bins = s.bins.filterNot { it.id == id }
         _state.value = s.copy(bins = bins, link = linkOf(bins), calibBin = s.calibBin.takeIf { it != id })
-        store.saveBins(bins)
+        persist(bins)
     }
 
     // ---------- alerts ----------
@@ -603,7 +705,7 @@ object Hub {
     private fun editAlerts(f: (List<AlertRow>) -> List<AlertRow>) {
         val list = f(_state.value.alerts)
         _state.value = _state.value.copy(alerts = list)
-        store.saveAlerts(list)
+        saveAlerts(list)
     }
 
     // ---------- demo options ----------
@@ -683,6 +785,174 @@ object Hub {
         _history.value = _history.value + bins.filter { it.demo }.associate { it.id to Demo.history(it, now) }
     }
 
+    // ---------- demo mode and the demo tour ----------
+
+    /**
+     * Demo mode, from the start page only. On adds the three demo bins with a
+     * day of made-up history and alerts; off takes them away with everything
+     * the demo options changed.
+     */
+    fun setDemo(on: Boolean) {
+        val s = _state.value
+        if (on == s.demoOn) return
+        val now = System.currentTimeMillis()
+        holds.clear()
+        tourStep = 0
+        tourNext = now + 6_000
+        tourPauseUntil = 0L
+        if (on) {
+            val demo = Demo.bins()
+            val alerts = (Demo.alerts(demo, now).map { it.copy(id = ++alertSeq) } + s.alerts).sortedByDescending { it.at }
+            val bins = s.bins.filterNot { it.demo } + demo
+            _state.value = s.copy(bins = bins, alerts = alerts, demoOn = true, link = linkOf(bins), tourMsg = null)
+            _history.value = _history.value + demo.associate { it.id to Demo.history(it, now) }
+        } else {
+            Demo.speed = Demo.NORMAL_SPEED
+            demoQuiet.clear()
+            demoAnswer.clear()
+            val gone = s.bins.filter { it.demo }.map { it.id }.toSet()
+            val bins = s.bins.filterNot { it.demo }
+            _state.value = s.copy(
+                bins = bins, alerts = s.alerts.filterNot { it.demo }, demoOn = false, link = linkOf(bins, Routes()),
+                demoLinks = Routes(), demoNoConfirm = false, tourMsg = null,
+                pending = s.pending - gone, calibBin = s.calibBin.takeIf { it !in gone },
+            )
+            _history.value = _history.value - gone
+            gone.forEach { prev.remove(it) }
+        }
+    }
+
+    /** A key pressed on a demo bin, or a demo option changed: the tour waits a minute. */
+    fun pauseTour() {
+        tourPauseUntil = System.currentTimeMillis() + 60_000
+        if (_state.value.tourMsg != null) _state.value = _state.value.copy(tourMsg = null)
+    }
+
+    private fun hold(id: String, f: ((Reading) -> Reading)?) {
+        if (f == null) holds.remove(id) else holds[id] = f
+    }
+
+    /** A command acted out by the tour: the card changes and its sound plays, as if a key was pressed. */
+    private fun tourCmd(b: Bin, cmd: String) {
+        update(b.id) { it.copy(reading = effect(it.reading, cmd)) }
+        TOUR_SFX[cmd]?.let { _events.tryEmit(HubEvent.Sound(it)) }
+    }
+
+    /**
+     * With demo mode on and nobody pressing anything on a demo bin, the demo
+     * bins act out every outcome in turn, about every 10 s: full, pickup,
+     * tamper, lock, bad air, heat, humidity, a sensor fault, warm-up, the
+     * links changing, a bin going quiet, and calibration.
+     */
+    private fun tour(now: Long) {
+        val s = _state.value
+        val demo = s.bins.filter { it.demo }
+        if (!s.demoOn || demo.isEmpty() || !inMain || !foreground) {
+            tourNext = maxOf(tourNext, now + 6_000)
+            return
+        }
+        if (now < tourPauseUntil || now < tourNext) return
+        tourNext = now + 10_000
+        val a = demo[0]
+        val b = demo[1 % demo.size]
+        val c = demo[2 % demo.size]
+        val step = tourStep
+        tourStep = (tourStep + 1) % TOUR_STEPS
+        val msg: String = when (step) {
+            0 -> { demoEvent(a.id, DemoEvent.FULL); "${a.name} fills past its ${a.cal.v("fill_th").toInt()}% limit." }
+            1 -> { if (bin(a.id)?.reading?.status == BinStatus.LOCKED) tourCmd(a, "UNLOCK"); tourCmd(a, "COLLECT"); "A collector starts the pickup at ${a.name}. The lid opens." }
+            2 -> { tourCmd(a, "COLLECT_DONE"); "${a.name} is emptied and back to normal." }
+            3 -> { hold(b.id) { r -> r.copy(tilt = 40.0, status = BinStatus.TAMPER, lidOpen = false, tamperPhase = "LATCHED") }; "${b.name} is tipped over. Tamper alert." }
+            4 -> { hold(b.id, null); tourCmd(b, "CLEAR_TAMPER"); "The tamper alert on ${b.name} is reset." }
+            5 -> { tourCmd(c, "LOCK"); "${c.name} is locked from the app." }
+            6 -> { tourCmd(c, "UNLOCK"); "${c.name} is unlocked again." }
+            7 -> { val g = c.cal.v("gas_th") + 45; hold(c.id) { r -> r.copy(gas = g) }; "The air in ${c.name} goes bad." }
+            8 -> {
+                hold(c.id, null); update(c.id) { it.copy(reading = it.reading.copy(gas = 60.0)) }
+                val t = b.cal.v("temp_th") + 3.5
+                hold(b.id) { r -> r.copy(temp = t, tempRaw = t - b.cal.v("temp_off")) }
+                "${b.name} gets too hot."
+            }
+            9 -> {
+                val h = b.cal.v("hum_th") + 5
+                hold(b.id) { r -> r.copy(hum = h) }
+                update(b.id) { it.copy(reading = it.reading.copy(temp = 29.0, tempRaw = 29.0 - it.cal.v("temp_off"))) }
+                "${b.name} gets too humid."
+            }
+            10 -> {
+                hold(b.id, null); update(b.id) { it.copy(reading = it.reading.copy(hum = 62.0)) }
+                hold(a.id) { r -> r.copy(faults = listOf("HX711"), weight = 0.0) }
+                "The weight sensor of ${a.name} stops answering."
+            }
+            11 -> { hold(a.id, null); "The weight sensor of ${a.name} answers again." }
+            12 -> { tourCmd(c, "RESET_GAS"); "The air sensor of ${c.name} warms up. Its score is held until it settles." }
+            13 -> { demoLinks(Routes(firebase = true)); "${b.name} and the others lose Wi-Fi, so they are read through Firebase." }
+            14 -> { demoLinks(Routes(thingspeak = true)); "Firebase is down too, so the bins are read through ThingSpeak." }
+            15 -> { setDemoQuiet(b.id, true); "${b.name} stops answering on every link." }
+            16 -> { setDemoQuiet(b.id, false); demoLinks(Routes(local = true)); "${b.name} is back, and the bins answer on Wi-Fi again." }
+            17 -> { demoLinks(Routes()); scope.launch { setCalibration(b.id) }; TOUR_SFX["CALIBRATE_START"]?.let { _events.tryEmit(HubEvent.Sound(it)) }; "${b.name} is being calibrated." }
+            else -> { scope.launch { setCalibration(null) }; "Calibration of ${b.name} is done. The tour starts again." }
+        }
+        _state.value = _state.value.copy(tourMsg = msg)
+    }
+
+    // ---------- Firebase watchers and alerts ----------
+
+    /**
+     * While the app is open and reads a bin through Firebase, it tells the bins
+     * every 10 s, so they write every 5 s instead of every minute. Going to
+     * the background takes the note away.
+     */
+    private suspend fun watchers(bins: List<Bin>, now: Long) {
+        if (!cloud.ready) return
+        val want = foreground && bins.any { !it.demo && it.source == Source.CLOUD }
+        if (want && now - watchedAt >= 10_000) {
+            watchedAt = now
+            if (runCatching { cloud.watch(watcherId, android.os.Build.MODEL ?: "phone") }.isSuccess) watching = true
+        } else if (!want && watching) {
+            watching = false
+            watchedAt = 0L
+            cloud.unwatch(watcherId)
+        }
+    }
+
+    /**
+     * The alerts each bin wrote to Firebase while the app was closed, read once
+     * per bin after the app starts. Alerts while the app is open come from the
+     * readings themselves, so they are not read twice.
+     */
+    private suspend fun cloudAlerts(bins: List<Bin>, now: Long) {
+        if (!cloud.ready || !foreground || now - alertsCheck < 30_000) return
+        alertsCheck = now
+        bins.filter { !it.demo && it.cloudId.isNotBlank() && it.cloudId !in alertsRead }.forEach { b ->
+            val list = runCatching { cloud.alerts(b.cloudId) }.getOrNull() ?: return@forEach
+            alertsRead.add(b.cloudId)
+            val seenKey = "fb_alerts_" + b.cloudId
+            val seen = store.string(seenKey, "0").toLongOrNull() ?: 0L
+            val fresh = list.filter { it.optLong("ts") in (seen + 1) until startedAt }
+            if (fresh.isNotEmpty()) {
+                val rows = fresh.map { o ->
+                    val kind = when (o.optString("kind")) {
+                        "full" -> AlertKind.FULL; "sensor" -> AlertKind.SENSOR; "tamper" -> AlertKind.TAMPER
+                        "lock" -> AlertKind.LOCK; "pickup" -> AlertKind.PICKUP; else -> AlertKind.SETUP
+                    }
+                    val sev = when (o.optString("sev")) {
+                        "critical" -> Severity.CRITICAL; "warning" -> Severity.WARNING; "success" -> Severity.SUCCESS; else -> Severity.INFO
+                    }
+                    val icon = when (kind) {
+                        AlertKind.FULL -> "fill"; AlertKind.SENSOR -> "gas"; AlertKind.TAMPER -> "tamper"
+                        AlertKind.LOCK -> "lock"; AlertKind.PICKUP -> "truck"; else -> "calib"
+                    }
+                    AlertRow(++alertSeq, sev, icon, kind, o.optString("title", "Bin alert"), o.optString("meta", b.name), o.optLong("ts"))
+                }
+                val all = (rows + _state.value.alerts).sortedByDescending { it.at }.take(200)
+                _state.value = _state.value.copy(alerts = all)
+                saveAlerts(all)
+            }
+            list.maxOfOrNull { it.optLong("ts") }?.let { store.putString(seenKey, it.toString()) }
+        }
+    }
+
     // ---------- ThingSpeak ----------
 
     fun thingSpeakUrl() = ts.url
@@ -738,6 +1008,14 @@ object Hub {
     }
 
     private const val KEY_TS_URL = "ts_url"
+    private const val KEY_V2 = "v2_bins"
+    private const val KEY_WATCHER = "watcher_id"
+    private const val TOUR_STEPS = 19
+    /** The sound each tour command plays, the same as its key in the app. */
+    private val TOUR_SFX = mapOf(
+        "LOCK" to "LOCK", "UNLOCK" to "UNLOCK", "COLLECT" to "PICKUP", "COLLECT_DONE" to "DONE",
+        "CLEAR_TAMPER" to "CONFIRM", "RESET_GAS" to "CONFIRM", "CALIBRATE_START" to "CALIB",
+    )
     /** Pretend cloud commands: confirmed after 4 s, or given up after 8 s, as in Garbage-Guard's demo. */
     private const val DEMO_CONFIRM = 4_000L
     private const val DEMO_TIMEOUT = 8_000L
