@@ -128,6 +128,11 @@ header.top:after{content:"";display:block;height:3px;border-radius:3px;backgroun
   background:var(--base);box-shadow:var(--o1)}
 .link .ico{color:var(--accent)}
 #demoBtn[aria-pressed="true"]{color:var(--warn)}
+.btnets{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.btnets:empty{display:none}
+.btnets .btn{font-size:12.5px;padding:8px 12px;display:flex;gap:8px;align-items:center}
+.btnets .btn small{opacity:.65;font-weight:600}
+.btnets .btn[aria-pressed="true"]{color:var(--accent)}
 .modechip{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;letter-spacing:.6px;
   padding:8px 14px;border-radius:999px;background:var(--accentBar);color:var(--onAccent);box-shadow:var(--o1)}
 
@@ -1130,7 +1135,8 @@ table.sim th .ico{width:14px;height:14px}
         <div class="field"><label for="bt_ssid">Wi-Fi name (2.4 GHz)</label>
           <div class="withbtn"><input id="bt_ssid" type="text" list="bt_nets" spellcheck="false" placeholder="HomeWiFi-2G" disabled>
           <button class="btn sm" id="btScan" disabled></button></div>
-          <datalist id="bt_nets"></datalist></div>
+          <datalist id="bt_nets"></datalist>
+          <div class="btnets" id="btNetList"></div></div>
         <div class="field"><label for="bt_pass">Password</label>
           <div class="withbtn"><input id="bt_pass" type="password" spellcheck="false" disabled>
           <button class="btn sm" id="btEye" disabled></button></div></div>
@@ -1514,6 +1520,7 @@ function btRender(){
   const paired=bt.step>0,op=state.role==='operator';
   ['bt_ssid','bt_pass'].forEach(id=>{const e=$('#'+id);if(e)e.disabled=!paired||!op});
   ['btScan','btEye'].forEach(id=>{const e=$('#'+id);if(e)e.disabled=!paired});
+  $$('#btNetList [data-ssid]').forEach(x=>{x.disabled=!op});
   $('#btSend').disabled=!paired||!op;
   $('#btOff').disabled=bt.step<3||!op;
   const note=$('#btRoleNote');
@@ -1618,19 +1625,32 @@ async function btPair(){
     bt.dev.addEventListener('gattserverdisconnected',()=>{bt.step=0;btRender();$('#btMsg').textContent='The bin disconnected from Bluetooth.';});
     bt.step=1;btRender();
     $('#btMsg').textContent='Paired with '+(bt.dev.name||'the bin')+'. Pick the Wi-Fi network next.';
+    btScan();
   }catch(e){$('#btMsg').textContent='Pairing cancelled or failed: '+(e.message||e);}
 }
+function btShowNets(nets){
+  const list=nets.map(n=>typeof n==='string'?{ssid:n}:n).filter(n=>n&&n.ssid);
+  $('#bt_nets').innerHTML=list.map(n=>'<option value="'+esc(n.ssid)+'">').join('');
+  const cur=$('#bt_ssid').value.trim(),op=state.role==='operator';
+  $('#btNetList').innerHTML=list.map(n=>'<button type="button" class="btn sm" data-ssid="'+esc(n.ssid)+'" aria-pressed="'+(n.ssid===cur)+'"'+(op?'':' disabled')+'>'+
+    icon('wifi',true)+esc(n.ssid)+(Number.isFinite(+n.rssi)&&n.rssi!==undefined?' <small>'+n.rssi+' dBm</small>':'')+'</button>').join('');
+}
 function btFakeNets(){
-  $('#bt_nets').innerHTML=['HomeWiFi-2G','TUP-Manila','Smart_Bin_Lab','PLDTHOMEFIBR24'].map(n=>'<option value="'+n+'">').join('');
-  $('#bt_ssid').value='HomeWiFi-2G';
+  btShowNets([{ssid:'HomeWiFi-2G',rssi:-48},{ssid:'TUP-Manila',rssi:-61},{ssid:'Smart_Bin_Lab',rssi:-70},{ssid:'PLDTHOMEFIBR24',rssi:-79}]);
 }
 async function btScan(){
-  if(bt.demo||!bt.ch.SCAN){btFakeNets();$('#btMsg').textContent=(bt.demo?'Demo networks listed.':'This bin does not expose a scan list, so type the name yourself.');return;}
+  const op=state.role==='operator',tail=op?' Tap one to fill in the name, or type it yourself.':' Switch to OPERATOR in the top bar to choose one and send it.';
+  if(bt.demo||!bt.ch.SCAN){
+    if(bt.demo){btFakeNets();$('#btMsg').textContent='Demo networks listed.'+tail;}
+    else $('#btMsg').textContent='This bin does not share a network list, so type the name yourself.';
+    return;
+  }
   try{
     const v=await bt.ch.SCAN.readValue();
     const nets=JSON.parse(new TextDecoder().decode(v));
-    $('#bt_nets').innerHTML=nets.map(n=>'<option value="'+esc(n.ssid||n)+'">').join('');
-    $('#btMsg').textContent='Found '+nets.length+' networks. Only 2.4 GHz ones will work.';
+    btShowNets(nets);
+    $('#btMsg').textContent=nets.length?'Found '+nets.length+' networks (strongest first). Only 2.4 GHz ones work.'+tail
+      :'The bin has not finished scanning yet. Press SCAN again in a few seconds, or type the name yourself.';
   }catch(e){$('#btMsg').textContent='Could not read the network list: '+(e.message||e);}
 }
 function btStatus(txt){
@@ -3495,6 +3515,13 @@ $('#btnExport').addEventListener('click',()=>{
 });
 $('#btPair').addEventListener('click',btPair);
 $('#btScan').addEventListener('click',btScan);
+$('#btNetList').addEventListener('click',e=>{
+  const b=e.target.closest('[data-ssid]');if(!b||b.disabled)return;
+  const i=$('#bt_ssid');i.value=b.dataset.ssid;i.dispatchEvent(new Event('input',{bubbles:true}));
+  $$('#btNetList [data-ssid]').forEach(x=>x.setAttribute('aria-pressed',x===b?'true':'false'));
+  sfx('pin_key');$('#bt_pass').focus();
+  $('#btMsg').textContent=b.dataset.ssid+' chosen. Type its password, then press SEND WI-FI.';
+});
 $('#btSend').addEventListener('click',btSend);
 $('#btOff').addEventListener('click',btOff);
 $('#btEye').addEventListener('click',()=>{

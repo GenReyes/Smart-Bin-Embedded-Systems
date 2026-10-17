@@ -115,7 +115,7 @@ static void collectScan() {
   int n = WiFi.scanComplete();
   if (n < 0) return;
   struct Net { String s; int r; };
-  Net best[3];
+  Net best[6];
   int k = 0;
   for (int i = 0; i < n; i++) {
     String s = WiFi.SSID(i);
@@ -124,10 +124,10 @@ static void collectScan() {
     for (int j = 0; j < k; j++) if (best[j].s == s) dup = true;
     if (dup) continue;
     int r = WiFi.RSSI(i);
-    if (k < 3) best[k++] = {s, r};
+    if (k < 6) best[k++] = {s, r};
     else {
       int w = 0;
-      for (int j = 1; j < 3; j++) if (best[j].r < best[w].r) w = j;
+      for (int j = 1; j < 6; j++) if (best[j].r < best[w].r) w = j;
       if (r > best[w].r) best[w] = {s, r};
     }
   }
