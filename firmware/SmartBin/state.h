@@ -26,7 +26,7 @@ struct Sim {
 };
 
 struct Reading {
-  float fill = 0, distance_cm = 0, weight_g = 0, temp = 0, temp_raw = 0, humidity = 0, pressure = 0, iaq = 0, tilt = 0;
+  float fill = 0, distance_cm = 0, weight_g = 0, temp = 0, temp_raw = 0, humidity = 0, pressure = 0, iaq = 0, tilt = 0, gas_k = 0;
   uint8_t iaq_acc = 0;
   bool motion = false;
 };

@@ -325,6 +325,7 @@ void sensorTask(void*) {
         st.raw.temp = bme.temperature + c.temp_off;
         st.raw.humidity = hum;
         st.raw.pressure = bme.pressure / 100.0f + c.press_off;
+        st.raw.gas_k = bme.gas_resistance / 1000.0f;
         if (!isnan(iaq)) st.raw.iaq = constrain(iaq, 0.0f, 500.0f);
         st.raw.iaq_acc = acc;
         unlockState();
