@@ -184,21 +184,78 @@ private fun RowScope.BigSwitch(icon: ImageVector, label: String, on: Boolean, cc
     }
 }
 
+/** One key of the sound test: the sound, its name, and an icon and colour of its own. */
+private class Snd(val sfx: Sfx, val label: String, val icon: ImageVector, val color: (SbColors) -> Color)
+
 /**
- * The sound test, the same groups and names as the dashboard's. Each key plays
- * its sound and vibration even with sound off, so people can learn them.
+ * The sound test, the same groups, names, icons and colours as the dashboard's.
+ * Each key plays its sound and vibration even with sound off, so people can learn them.
  */
-private val SOUND_GROUPS: List<Pair<String, List<Pair<Sfx, String>>>> = listOf(
-    "Alerts" to listOf(Sfx.ALERT_FULL to "Bin full", Sfx.ALERT_TAMPER to "Tamper", Sfx.ALERT_SENSOR to "Sensor limit", Sfx.ALERT_LOCK to "Bin locked", Sfx.ALERT_PICKUP to "Pickup alert", Sfx.ALERT_INFO to "Info"),
-    "Bins and links" to listOf(Sfx.LINK_UP to "Wi-Fi link", Sfx.CLOUD to "Cloud link", Sfx.LINK_LOST to "Link lost", Sfx.BIN_LOST to "Bin quiet", Sfx.BIN_BACK to "Bin back", Sfx.CMD_OK to "Command OK", Sfx.CMD_FAIL to "Command failed"),
-    "Lid and pickup" to listOf(Sfx.LOCK to "Lock", Sfx.UNLOCK to "Unlock", Sfx.PICKUP to "Pickup start", Sfx.DONE to "Pickup finished"),
-    "Setup" to listOf(Sfx.CALIB to "Calibrate", Sfx.SIM to "Simulation", Sfx.SAVED to "Saved", Sfx.DENIED to "Not allowed"),
-    "Bluetooth Wi-Fi setup" to listOf(Sfx.BT_PAIRED to "Paired", Sfx.BT_WRONG to "Wrong code", Sfx.BT_BLOCKED to "Pairing stopped", Sfx.WIFI_JOINED to "Wi-Fi joined", Sfx.WIFI_FAILED to "Wi-Fi failed", Sfx.BT_OFF to "Bluetooth off"),
-    "Operator PIN" to listOf(Sfx.OP_IN to "Operator in", Sfx.OP_OUT to "Operator out", Sfx.PIN_KEY to "PIN key", Sfx.PIN_WRONG to "Wrong PIN", Sfx.PIN_LOCKOUT to "PIN lockout", Sfx.PIN_SET to "PIN saved"),
-    "App" to listOf(Sfx.BOOT to "Start", Sfx.LOGO to "Logo", Sfx.DEMO to "Demo on", Sfx.THEME_LIGHT to "Light theme", Sfx.THEME_DARK to "Dark theme"),
+private val SOUND_GROUPS: List<Pair<String, List<Snd>>> = listOf(
+    "Alerts" to listOf(
+        Snd(Sfx.ALERT_FULL, "Bin full", Ic.fill) { it.bad },
+        Snd(Sfx.ALERT_TAMPER, "Tamper", Ic.tamper) { it.tamper },
+        Snd(Sfx.ALERT_SENSOR, "Sensor limit", Ic.temp(41.0)) { it.temp },
+        Snd(Sfx.ALERT_LOCK, "Bin locked", Ic.lock(true)) { it.sim },
+        Snd(Sfx.ALERT_PICKUP, "Pickup alert", Ic.truck) { it.cal },
+        Snd(Sfx.ALERT_INFO, "Info", Ic.bell) { it.bt },
+    ),
+    "Bins and links" to listOf(
+        Snd(Sfx.LINK_UP, "Wi-Fi link", Ic.wifi(true)) { it.link },
+        Snd(Sfx.CLOUD, "Cloud link", Ic.cloud) { it.cloud },
+        Snd(Sfx.LINK_LOST, "Link lost", Ic.wifi(false)) { it.bad },
+        Snd(Sfx.BIN_LOST, "Bin quiet", Ic.radar) { it.warn },
+        Snd(Sfx.BIN_BACK, "Bin back", Ic.bins) { it.ok },
+        Snd(Sfx.CMD_OK, "Command OK", Ic.check) { it.ok },
+        Snd(Sfx.CMD_FAIL, "Command failed", Ic.cross) { it.bad },
+    ),
+    "Lid and pickup" to listOf(
+        Snd(Sfx.LOCK, "Lock", Ic.lock(true)) { it.sim },
+        Snd(Sfx.UNLOCK, "Unlock", Ic.lock(false)) { it.lid },
+        Snd(Sfx.PICKUP, "Pickup start", Ic.truck) { it.cal },
+        Snd(Sfx.DONE, "Pickup finished", Ic.check) { it.fill },
+    ),
+    "Setup" to listOf(
+        Snd(Sfx.CALIB, "Calibrate", Ic.calib) { it.cal },
+        Snd(Sfx.SIM, "Simulation", Ic.flask) { it.sim },
+        Snd(Sfx.SAVED, "Saved", Ic.save) { it.ok },
+        Snd(Sfx.DENIED, "Not allowed", Ic.cross) { it.warn },
+    ),
+    "Bluetooth Wi-Fi setup" to listOf(
+        Snd(Sfx.BT_PAIRED, "Paired", Ic.bluetooth) { it.bt },
+        Snd(Sfx.BT_WRONG, "Wrong code", Ic.key) { it.warn },
+        Snd(Sfx.BT_BLOCKED, "Pairing stopped", Ic.lock(true)) { it.bad },
+        Snd(Sfx.WIFI_JOINED, "Wi-Fi joined", Ic.wifi(true)) { it.ok },
+        Snd(Sfx.WIFI_FAILED, "Wi-Fi failed", Ic.wifi(false)) { it.tamper },
+        Snd(Sfx.BT_OFF, "Bluetooth off", Ic.power) { it.motion },
+    ),
+    "Operator PIN" to listOf(
+        Snd(Sfx.OP_IN, "Operator in", Ic.sliders) { it.accent },
+        Snd(Sfx.OP_OUT, "Operator out", Ic.undo) { it.weight },
+        Snd(Sfx.PIN_KEY, "PIN key", Ic.pin) { it.humid },
+        Snd(Sfx.PIN_WRONG, "Wrong PIN", Ic.key) { it.bad },
+        Snd(Sfx.PIN_LOCKOUT, "PIN lockout", Ic.stopwatch) { it.tamper },
+        Snd(Sfx.PIN_SET, "PIN saved", Ic.save) { it.gas },
+    ),
+    "App" to listOf(
+        Snd(Sfx.BOOT, "Start", Ic.power) { it.ok },
+        Snd(Sfx.LOGO, "Logo", Ic.bins) { it.gas },
+        Snd(Sfx.DEMO, "Demo on", Ic.flask) { it.warn },
+        Snd(Sfx.THEME_LIGHT, "Light theme", Ic.sunmoon(false)) { it.lid },
+        Snd(Sfx.THEME_DARK, "Dark theme", Ic.sunmoon(true)) { it.humid },
+    ),
     "Keys" to listOf(
-        Sfx.TAP to "Tap", Sfx.CHOICE to "Choice", Sfx.TAB to "Tab", Sfx.OPEN to "Open", Sfx.BACK to "Back", Sfx.CONFIRM to "Confirm",
-        Sfx.DANGER to "Danger", Sfx.SWITCH_ON to "Switch on", Sfx.SWITCH_OFF to "Switch off", Sfx.STEP_UP to "Step up", Sfx.STEP_DOWN to "Step down",
+        Snd(Sfx.TAP, "Tap", Ic.capture) { it.humid },
+        Snd(Sfx.CHOICE, "Choice", Ic.sliders) { it.gas },
+        Snd(Sfx.TAB, "Tab", Ic.layers) { it.motion },
+        Snd(Sfx.OPEN, "Open", Ic.eye) { it.fill },
+        Snd(Sfx.BACK, "Back", Ic.undo) { it.weight },
+        Snd(Sfx.CONFIRM, "Confirm", Ic.check) { it.ok },
+        Snd(Sfx.DANGER, "Danger", Ic.trash) { it.bad },
+        Snd(Sfx.SWITCH_ON, "Switch on", Ic.power) { it.link },
+        Snd(Sfx.SWITCH_OFF, "Switch off", Ic.power) { it.ink2 },
+        Snd(Sfx.STEP_UP, "Step up", Ic.plus) { it.temp },
+        Snd(Sfx.STEP_DOWN, "Step down", Ic.percent) { it.press },
     ),
 )
 
@@ -219,9 +276,9 @@ private fun SoundTest() {
             T(group, size = 0.78f, spacing = 0.06f, weight = FontWeight.Bold, color = c.ink2)
             sounds.chunked(3).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    row.forEach { (sfx, label) ->
+                    row.forEach { k ->
                         // The key itself plays the sound and its buzz; with sound off, play it anyway.
-                        Btn(label, { if (!Feel.sounds) Sounds.play(sfx, force = true) }, Modifier.weight(1f), Ic.speaker, Look.TINT, c.accent, small = true, sound = sfx, textSize = 0.7f)
+                        Btn(k.label, { if (!Feel.sounds) Sounds.play(k.sfx, force = true) }, Modifier.weight(1f), k.icon, Look.TINT, k.color(c), small = true, sound = k.sfx, textSize = 0.7f)
                     }
                     repeat(3 - row.size) { Box(Modifier.weight(1f)) }
                 }

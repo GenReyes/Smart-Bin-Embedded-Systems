@@ -16,8 +16,8 @@ android {
         applicationId = "edu.tup.smartbin"
         minSdk = 26
         targetSdk = 37
-        versionCode = 4
-        versionName = "2.0"
+        versionCode = 5
+        versionName = "2.1"
 
         // The team's Firebase account, read from local.properties (git-ignored) so the
         // password never reaches the public repository. Missing values become empty.
