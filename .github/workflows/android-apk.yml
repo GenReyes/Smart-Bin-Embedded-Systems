@@ -28,11 +28,12 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      - uses: android-actions/setup-android@v3
+      # The runner image already has the Android SDK; AGP fetches any missing platform.
       - name: Point Gradle at the SDK
         run: |
-          yes | sdkmanager --licenses > /dev/null || true
-          echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+          sdk="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          yes | "$sdk/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          echo "sdk.dir=$sdk" > local.properties
       - name: Build
         run: |
           chmod +x gradlew
