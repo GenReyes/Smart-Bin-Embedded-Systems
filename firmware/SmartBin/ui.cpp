@@ -88,6 +88,22 @@ static void txt(int x, int y, int w, const char* s, int px, uint16_t col, char a
   tft.print(s);
 }
 
+static void txtFit(int x, int y, int w, const char* s, int px, uint16_t col, char align = 'l', bool regular = false) {
+  char b[40];
+  strlcpy(b, s, sizeof(b));
+  Ft f = fontFor(px, regular);
+  size_t n = strlen(b);
+  if (textW(b, f) > w) {
+    while (n > 2) {
+      b[--n] = 0;
+      char t[44];
+      snprintf(t, sizeof(t), "%s..", b);
+      if (textW(t, f) <= w) { strlcpy(b, t, sizeof(b)); break; }
+    }
+  }
+  txt(x, y, w, b, px, col, align, regular);
+}
+
 static void wrapTxt(int x, int y, int w, const char* s, int px, uint16_t col, int lh) {
   char line[64] = "", word[40];
   const char* p = s;
@@ -877,45 +893,45 @@ static void drawBt(uint32_t now) {
       }
       case BT_LOCKOUT:
         box(8, 48, 224, 130, P->r, 3, 4);
-        txt(8, 62, 224, "PAIRING STOPPED", 22, P->on_r, 'c');
-        txt(8, 98, 224, "3 wrong codes", 20, P->on_r, 'c');
+        txt(16, 62, 208, "PAIRING STOPPED", 22, P->on_r, 'c');
+        txt(16, 98, 208, "3 wrong codes", 20, P->on_r, 'c');
         wrapTxt(16, 192, 208, "Only someone who can see this screen can pair. The phone that tried was turned away.", 13, P->tx2, 17);
         break;
       case BT_PAIRED:
-        box(88, 46, 64, 64, P->g, 3, 4);
-        icon(I_CHECK, 96, 54, 48, P->on_g, P->g);
-        txt(8, 120, 224, "PAIRED", 24, P->tx, 'c');
-        wrapTxt(20, 150, 200, "Choose the Wi-Fi network on the dashboard.", 14, P->tx2, 18);
-        for (int i = 0; i < v.netCount; i++) {
-          int y = 192 + i * 24;
-          frame(8, y, 224, 21, P->surf, 2, P->bd);
-          txt(14, y + 3, 150, v.nets[i], 13, P->tx);
+        box(96, 44, 48, 48, P->g, 3, 4);
+        icon(I_CHECK, 102, 50, 36, P->on_g, P->g);
+        txt(8, 98, 224, "PAIRED", 22, P->tx, 'c');
+        wrapTxt(16, 126, 208, "Pick the network on the dashboard.", 13, P->tx2, 17);
+        for (int i = 0; i < min<int>(v.netCount, 3); i++) {
+          int y = 168 + i * 27;
+          frame(8, y, 224, 23, P->surf, 2, P->bd);
+          txtFit(14, y + 4, 156, v.nets[i], 13, P->tx);
           char r[12];
           snprintf(r, sizeof(r), "%d dBm", v.rssi[i]);
-          txt(158, y + 3, 66, r, 12, P->tx2, 'r');
+          txt(172, y + 4, 54, r, 12, P->tx2, 'r');
         }
         break;
       case BT_CONN:
         txt(8, 128, 224, "CONNECTING...", 22, P->tx, 'c');
         box(24, 166, 192, 34, P->surf, 3, 3);
-        txt(24, 174, 192, v.ssid, 16, P->tx, 'c');
+        txtFit(32, 174, 176, v.ssid, 16, P->tx, 'c');
         txt(20, 214, 200, "Password received.", 13, P->tx2, 'c', true);
         break;
       case BT_OK:
-        box(8, 48, 224, 152, P->g, 3, 4);
-        txt(8, 60, 224, "CONNECTED", 22, P->on_g, 'c');
-        txt(8, 94, 224, "IP ADDRESS", 12, P->on_g, 'c');
-        txt(8, 110, 224, v.ip, 28, P->on_g, 'c');
-        txt(8, 152, 224, v.ssid, 14, P->on_g, 'c', true);
-        txt(8, 172, 224, "Enter this in the dashboard.", 13, P->on_g, 'c', true);
-        wrapTxt(16, 214, 208, "Bluetooth stays on until you turn it off on the dashboard, or in 5 minutes.", 13, P->tx2, 17);
+        box(8, 48, 224, 140, P->g, 3, 4);
+        txt(16, 58, 208, "CONNECTED", 22, P->on_g, 'c');
+        txt(16, 88, 208, "IP ADDRESS", 12, P->on_g, 'c');
+        txt(16, 102, 208, v.ip, 28, P->on_g, 'c');
+        txtFit(16, 140, 208, v.ssid, 14, P->on_g, 'c', true);
+        txt(16, 162, 208, "Type it in the dashboard.", 13, P->on_g, 'c', true);
+        wrapTxt(16, 200, 208, "Bluetooth turns off by itself in 5 minutes.", 13, P->tx2, 17);
         btn(8, 266, 224, 44, "DONE", P->surf, P->tx, 18, I_CHECK, 20, B_BT_DONE);
         break;
       case BT_FAIL:
         box(8, 48, 224, 126, P->r, 3, 4);
-        txt(8, 62, 224, "FAILED", 28, P->on_r, 'c');
-        txt(8, 102, 224, v.why, 20, P->on_r, 'c');
-        txt(8, 132, 224, "Check it and try again.", 14, P->on_r, 'c', true);
+        txt(16, 62, 208, "FAILED", 28, P->on_r, 'c');
+        txt(16, 102, 208, v.why, 20, P->on_r, 'c');
+        txt(16, 132, 208, "Check it and try again.", 14, P->on_r, 'c', true);
         wrapTxt(16, 190, 208, "Other reasons: network not found, or a 5 GHz network.", 13, P->tx2, 17);
         btn(8, 266, 108, 44, "RETRY", P->bl, P->on_bl, 16, -1, 0, B_BT_RETRY);
         btn(124, 266, 108, 44, "CANCEL", P->surf, P->tx, 16, -1, 0, B_BT_CANCEL);
