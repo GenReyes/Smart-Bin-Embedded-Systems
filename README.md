@@ -41,7 +41,7 @@ Collection priority ranks the fullest bin first, with an estimated time to full.
 | `Web Dashboard/` | Operator web dashboard (`smartbin-dashboard.html`, single HTML file) and the integration guides. See its README |
 | `Mockups/` | The UI mockups the dashboard, app and touchscreen follow |
 | `Android App/` | Android app for operators and collectors (Kotlin, Compose). See its README |
-| `hardware/` | Schematic |
+| `hardware/` | Schematic, and `PCB-NOTES.md`: changes for the PCB from bench testing (pins, servo power, capacitors) |
 | `Documents/` | Paper, figures, implementation plan, UI mockups compilation, references |
 
 ## Secrets
