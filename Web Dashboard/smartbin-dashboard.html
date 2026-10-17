@@ -1765,6 +1765,8 @@ function normalise(b,j){
   d.pressure=n(j.pressure??j.pressure_hpa,d.pressure);
   d.gas=n(j.iaq??j.gas??j.gas_level,d.gas);
   d.iaq_acc=n(j.iaq_acc,d.iaq_acc);
+  d.gas_k=n(j.gas_k,d.gas_k);
+  d.warmEnd=Number.isFinite(+j.iaq_warm_s)&&j.iaq_warm_s!==null?Date.now()+j.iaq_warm_s*1000:null;
   d.tilt=n(j.tilt??j.tilt_deg,d.tilt);
   if(j.motion!==undefined||j.pir!==undefined)d.motion=!!(j.motion??j.pir);
   if(j.lid!==undefined||j.lid_state!==undefined)d.lid=(j.lid??j.lid_state)===1||String(j.lid??j.lid_state).toUpperCase()==='OPEN'?'OPEN':'CLOSED';
@@ -2683,6 +2685,13 @@ function renderCard(b){
     weight:[(d.weight_g/1000).toFixed(2)+'kg',d.weight_g>=c.weight_cap,band(d.weight_g/(c.weight_cap||4500))],
     gas:[String(Math.round(d.gas)),d.gas>=c.gas_th,band(d.gas/(c.gas_th||200))]
   };
+  const warming=isLive(b)&&d.iaq_acc===0&&!(b.sim.mask&4);
+  if(warming){
+    const l=d.warmEnd?Math.max(0,Math.round((d.warmEnd-Date.now())/1000)):null;
+    vals.gas=[l?Math.floor(l/60)+':'+String(l%60).padStart(2,'0'):'...',false,'low'];
+  }
+  const gk=host.querySelector('[data-s="gas"] .k');
+  if(gk){const t=warming?'Air warming up':'Air quality';if(gk.textContent!==t)gk.textContent=t;}
   host.querySelectorAll('[data-s]').forEach(el=>{
     const v=vals[el.dataset.s];if(!v)return;
     const t=el.querySelector('.v');if(t.textContent!==v[0])t.textContent=v[0];
@@ -3252,7 +3261,10 @@ function updateSettingsLive(){
   if(tl)tl.textContent=fmt(b.data.temp_raw,1)+' / '+fmt(b.data.temp,1)+' \u00B0C';
   if(iq){
     const st=['Stabilizing','Low accuracy','Medium accuracy','Calibrated'][clamp(Math.round(b.data.iaq_acc),0,3)];
-    iq.textContent=st+', IAQ '+Math.round(b.data.gas);
+    const l=b.data.warmEnd?Math.max(0,Math.round((b.data.warmEnd-Date.now())/1000)):null;
+    iq.textContent=isLive(b)&&b.data.iaq_acc===0
+      ?'Warming up'+(l?', '+Math.floor(l/60)+':'+String(l%60).padStart(2,'0')+' left':', almost ready')+(Number.isFinite(b.data.gas_k)?' \u00B7 gas '+Math.round(b.data.gas_k)+' k\u03A9':'')
+      :st+', IAQ '+Math.round(b.data.gas);
   }
 }
 async function saveSettings(){

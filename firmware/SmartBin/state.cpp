@@ -1,4 +1,5 @@
 #include "state.h"
+#include "sensors.h"
 #include <Preferences.h>
 #include <WiFi.h>
 #include <sys/time.h>
@@ -298,6 +299,7 @@ void statusToJson(const BinState& s, const Cal& c, const Sim& sm, JsonObject o, 
   }
   if (s.okBME) o["pressure"] = r1(v.pressure);
   if (s.okBME) o["gas_k"] = r1(v.gas_k);
+  if (s.okBME && v.iaq_acc == 0 && !(sm.mask & 4)) o["iaq_warm_s"] = airWarmLeft();
   if (s.okBME || (sm.mask & 4)) {
     o["iaq"] = (long)lround(v.iaq);
     o["iaq_acc"] = v.iaq_acc;

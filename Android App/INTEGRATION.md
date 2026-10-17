@@ -75,6 +75,7 @@ STAT messages:
 | `faults` | Array of sensors not answering, e.g. `["HX711","HC-SR04"]` | Show "--" and a fault mark for those readings instead of 0 |
 | `iaq_acc` | 0 = air sensor warming up (5 min after power-on), 1 to 3 = accuracy | While 0, do not show the air score |
 | `gas_k` | Raw gas reading in kOhm | While `iaq_acc` is 0, show "Warming 142k" so people see it works |
+| `iaq_warm_s` | Seconds left in the air sensor warm-up (only sent while `iaq_acc` is 0) | Show a countdown; an "Air sensor ready" alert comes when it ends |
 | `tamper_phase` | `COUNTDOWN` or `LATCHED` | Countdown: 10 s, clears by itself. Latched: needs CLEAR_TAMPER |
 | `touch` | `{swap,x0,x1,y0,y1,custom}` | Step 3 |
 | `last_cmd` | `{cmd,ts,ok}` | Optional: show the last command result |

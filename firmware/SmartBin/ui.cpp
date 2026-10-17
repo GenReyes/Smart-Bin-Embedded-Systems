@@ -2,6 +2,7 @@
 #include "state.h"
 #include "buzzer.h"
 #include "ble_setup.h"
+#include "sensors.h"
 #include <SPI.h>
 #include <WiFi.h>
 #include <Adafruit_GFX.h>
@@ -502,9 +503,11 @@ static void drawMain(const BinState& s, const Cal& c, const Sim& sm, uint32_t no
   Lv al = gp >= 80 ? LR : gp >= 50 ? LA : LG;
   snprintf(val, sizeof(val), "%s %d", gp >= 80 ? "Poor" : gp >= 50 ? "Moderate" : "Good", (int)roundf(s.v.iaq));
   if (bmeGas && s.v.iaq_acc == 0) {
-    if (s.v.gas_k > 0) snprintf(val, sizeof(val), "Warming %.0fk", s.v.gas_k);
-    else strcpy(val, "Warming up");
-    reading(9, 200, "Air", val, false, false, -1, tint);
+    int left = airWarmLeft();
+    if (left > 0) snprintf(val, sizeof(val), "%d:%02d  %.0fk", left / 60, left % 60, s.v.gas_k);
+    else if (s.v.gas_k > 0) snprintf(val, sizeof(val), "Starting %.0fk", s.v.gas_k);
+    else strcpy(val, "No gas reading");
+    reading(9, 200, "Air (warm)", val, false, false, -1, tint);
   }
   else reading(9, 200, "Air", val, gasOk && gp >= 100, !gasOk, al, tint);
 
