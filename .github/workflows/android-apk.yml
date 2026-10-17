@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
   push:
     branches: ['claude/**']
-    paths: ['Android App/app/**', 'Android App/*.kts', 'Android App/gradle/**']
+    paths: ['Android App/app/**', 'Android App/*.kts', 'Android App/gradle/**', '.github/workflows/android-apk.yml']
 
 permissions:
   contents: write
