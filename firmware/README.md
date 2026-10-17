@@ -129,7 +129,7 @@ The bin writes every 30 s (sooner for a new alert, never faster than 15 s), skip
 
 The sun/moon key switches light and dark and is remembered. Info and PIN screens go back to the main screen after 30 s untouched.
 
-**Wi-Fi setup over Bluetooth:** Info > WI-FI SETUP > Collect PIN. The bin advertises as `SmartBin-01`. When the dashboard or app connects, the bin shows a random 6-digit code; type it when the phone or computer asks. Three wrong codes stop pairing for 60 s. After the code matches, the link is encrypted, the dashboard sends the network name and password, and the bin shows its new IP. Bluetooth switches itself off after 5 minutes unused, or when the dashboard presses TURN BT OFF (which also forgets paired phones).
+**Wi-Fi setup over Bluetooth:** Info > WI-FI SETUP > Collect PIN. The bin advertises as `SmartBin-01`. When the dashboard or app connects, the bin shows a random 6-digit code; type it when the phone or computer asks. Three wrong codes stop pairing for 60 s. After the code matches, the link is encrypted, the dashboard sends the network name and password, and the bin shows its new IP. Bluetooth switches itself off after 5 minutes unused, or when the dashboard presses TURN BT OFF. The bin remembers laptops and phones it has paired with, so the next setup from the same device skips the 6-digit code (the Collect PIN is still needed on the bin). If a device was removed on one side only, remove SmartBin-01 from that device's Bluetooth settings and pair again. Collectors and operators can both do Wi-Fi setup.
 
 ## 7. Local API
 
