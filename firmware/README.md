@@ -40,7 +40,6 @@ It follows `Web Dashboard/ESP32-Integration-Guide.md` (the API, Firebase and Thi
 | Adafruit ILI9341 | Adafruit | 1.6.x (also installs Adafruit GFX and BusIO) |
 | XPT2046_Touchscreen | Paul Stoffregen | 1.4 |
 | Adafruit BME680 Library | Adafruit | 2.0.x (also installs Adafruit Unified Sensor) |
-| DFRobot_BMI160 | DFRobot | 1.0.0 (the one already tested on our board) |
 | HX711 Arduino Library | Bogdan Necula | 0.7.x |
 | ESP32Servo | Kevin Harrington | 3.x |
 | NimBLE-Arduino | h2zero | **2.x** (not the 3.0 preview) |
