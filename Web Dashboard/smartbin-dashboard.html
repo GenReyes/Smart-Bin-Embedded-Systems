@@ -127,6 +127,7 @@ header.top:after{content:"";display:block;height:3px;border-radius:3px;backgroun
 .link{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:700;padding:8px 15px;border-radius:999px;
   background:var(--base);box-shadow:var(--o1)}
 .link .ico{color:var(--accent)}
+#demoBtn[aria-pressed="true"]{color:var(--warn)}
 .modechip{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:800;letter-spacing:.6px;
   padding:8px 14px;border-radius:999px;background:var(--accentBar);color:var(--onAccent);box-shadow:var(--o1)}
 
@@ -921,6 +922,7 @@ table.sim th .ico{width:14px;height:14px}
     <div class="spacer"></div>
     <div class="modechip" id="modechip"><span id="modeico"></span><span id="modetext">NORMAL</span></div>
     <div class="link" id="link"><span id="wifiico"></span><span id="linktext">Demo data</span></div>
+    <button class="btn sm" id="demoBtn" aria-pressed="false" title="Show made-up demo bins next to your real ones">DEMO OFF</button>
     <button class="btn sm" id="rolechip">COLLECTOR</button>
     <button class="iconbtn" id="sound" title="Sounds on or off" aria-pressed="true"><span id="soundIco"></span></button>
     <button class="iconbtn" id="theme" title="Switch light or dark"><span id="themeIco"></span></button>
@@ -1115,7 +1117,14 @@ table.sim th .ico{width:14px;height:14px}
         <h2 class="ph" style="--cc:var(--c-bt)" id="btHead"></h2>
         <span class="btstate" id="btState">Not paired</span>
       </div>
-      <p class="hint" style="margin:-6px 0 16px">Hand the Wi-Fi name and password to a bin over Bluetooth, read back the address it gets, then switch its Bluetooth off so only Wi-Fi stays on. Pairing asks for the 6-digit code the bin shows on its touchscreen: it keeps strangers out and encrypts the link, so the Wi-Fi password cannot be overheard.</p>
+      <p class="hint" style="margin:-6px 0 8px">Gives a bin a new Wi-Fi name and password over Bluetooth. The bin keeps its current Wi-Fi until the new one works, and your laptop can stay on Wi-Fi too.</p>
+      <ol class="hint" style="margin:0 0 16px;padding-left:20px;line-height:1.6">
+        <li><b>On the bin:</b> tap <b>i</b> (top left), then <b>WI-FI SETUP</b>, and type the <b>Collect PIN</b> (the same 4 digits as for COLLECT).</li>
+        <li><b>Here:</b> press <b>PAIR A BIN</b> and pick <b>SmartBin-01</b> (or 02) in the list the browser shows.</li>
+        <li>The bin shows a <b>6-digit pairing code</b>. Windows or your phone opens its own pairing window: type the code <b>there</b>, not on this page.</li>
+        <li>Pick the network, type its password, press <b>SEND WI-FI</b>. The bin shows its new IP address, and so does this page.</li>
+        <li>Press <b>TURN BT OFF</b> when you are done.</li>
+      </ol>
       <div class="btsteps" id="btSteps"></div>
       <div class="fields" style="margin-top:18px">
         <div class="field"><label for="bt_ssid">Wi-Fi name (2.4 GHz)</label>
@@ -1358,16 +1367,24 @@ function newBin(seed){
     hist:[],prev:{}};
 }
 const saved=store.read();
+const DEMO_SEEDS=[
+  {id:'demo1',name:'Demo Bin 1',place:'Main Hall',fill:34},
+  {id:'demo2',name:'Demo Bin 2',place:'Cafeteria',fill:62},
+  {id:'demo3',name:'Demo Bin 3',place:'Library',fill:88}
+];
+const mkDemo=s=>Object.assign(newBin(s),{demo:true});
+const fbSaved=(()=>{try{const v=JSON.parse(localStorage.getItem('smartbin.fb')||'null');return !!(v&&v.url)}catch(e){return false}})();
+const isRealSeed=s=>!!(s&&(s.ip||(s.tsCh&&s.tsKey)||(s.cloud&&fbSaved)));
+const realStart=(saved||[]).filter(isRealSeed).map(newBin);
+let demoPref=null;try{demoPref=localStorage.getItem('smartbin.demo')}catch(e){}
+const demoStart=demoPref===null?realStart.length===0:demoPref==='1';
 const state={
   role:'collector',view:'overview',rangeMin:60,alerts:[],calib:null,envBin:null,addCount:1,chartPick:[],envMode:'both',
   ovView:'list',ovFilter:'all',collectShowAll:false,akind:'all',arange:'any',ovTile:null,
-  bins:(saved&&saved.length?saved:[
-    {id:'b1',name:'Bin 01',place:'Main Hall',ip:'',fill:34,cloud:'bin01'},
-    {id:'b2',name:'Bin 02',place:'Cafeteria',ip:'',fill:62,cloud:'bin02'}
-  ]).map(newBin),
-  selSet:null,selSim:null
+  bins:demoStart?realStart.concat(DEMO_SEEDS.map(mkDemo)):realStart,
+  demo:demoStart,selSet:null,selSim:null
 };
-state.selSet=state.selSim=state.envBin=state.bins[0].id;
+state.selSet=state.selSim=state.envBin=state.bins[0]?state.bins[0].id:null;
 
 const $=s=>document.querySelector(s);
 const $$=s=>Array.from(document.querySelectorAll(s));
@@ -1375,7 +1392,9 @@ const byId=id=>state.bins.find(b=>b.id===id);
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const fmt=(v,d=1)=>Number.isFinite(v)?v.toFixed(d):'--';
 const colorOf=i=>binColor(i);
-function persist(){store.write(state.bins.map(b=>({id:b.id,name:b.name,place:b.place,ip:b.ip,fill:b.data.fill,
+function persist(){
+  state.bins.forEach(b=>{if(b.demo&&(b.ip||(b.tsCh&&b.tsKey)))b.demo=false;});
+  store.write(state.bins.filter(b=>!b.demo).map(b=>({id:b.id,name:b.name,place:b.place,ip:b.ip,fill:b.data.fill,
   cloud:b.cloud,tsCh:b.tsCh,tsKey:b.tsKey,tbId:b.tbId,tbKey:b.tbKey})))}
 
 function seedHistory(b,i){
@@ -1585,7 +1604,7 @@ async function btPair(){
     bt.demo=true;btCodeStart();return;
   }
   try{
-    $('#btMsg').textContent='Tap Pair phone on the bin\u2019s touchscreen, choose the bin in the browser prompt, then type the 6-digit code it shows when your computer asks.';
+    $('#btMsg').textContent='Pick the bin in the browser list. When the bin shows a 6-digit code, type it into the pairing window Windows or your phone opens.';
     bt.dev=await navigator.bluetooth.requestDevice({filters:[{services:[BT.SVC]}],optionalServices:[BT.SVC]});
     const srv=await bt.dev.gatt.connect();
     const svc=await srv.getPrimaryService(BT.SVC);
@@ -2068,9 +2087,15 @@ async function liveStart(){
       if(r.ok){
         const j=await r.json(),here=location.host;
         if(j&&j.id&&!state.bins.some(b=>b.ip===here)){
-          const b=state.bins.find(x=>x.cloud===j.id&&!x.ip)||state.bins.find(x=>!x.ip);
-          if(b){b.ip=here;if(!b.cloud)b.cloud=j.id;relink(b);persist();cardSig='';render();
-            toast(b.name+' is the bin serving this page, so it is read live at '+here+'.');}
+          let b=state.bins.find(x=>!x.demo&&x.cloud===j.id&&!x.ip)||state.bins.find(x=>!x.demo&&!x.ip&&!x.cloud);
+          if(!b){
+            b=newBin({id:'b'+Date.now().toString(36),name:String(j.name||j.id).replace(/^BIN\b/i,'Bin'),place:'',ip:here,cloud:j.id});
+            state.bins.unshift(b);
+          }
+          b.ip=here;if(!b.cloud)b.cloud=j.id;relink(b);persist();
+          if(!byId(state.selSet))state.selSet=state.selSim=state.envBin=b.id;
+          cardSig='';render();loadSettings();buildSim();
+          toast(b.name+' is the bin serving this page, so it is read live at '+here+'.');
         }
       }
     }catch(e){}
@@ -2509,7 +2534,10 @@ function makeTile(b,i){
 }
 function buildCards(){
   const op=state.role==='operator';
-  $('#bins').innerHTML=state.bins.map((b,i)=>cardHTML(b)+makeTile(b,i)).join('');
+  $('#bins').innerHTML=state.bins.length?state.bins.map((b,i)=>cardHTML(b)+makeTile(b,i)).join('')
+    :'<div class="nm" style="grid-column:1/-1;padding:28px 24px;border-radius:24px"><h2 style="margin:0 0 8px">No bins linked yet</h2>'+
+     '<p class="hint" style="margin:0">Open this page from the bin itself (type its IP address in the browser, for example http://192.168.0.112) and it links automatically. '+
+     'Or switch to operator, add a bin and type its IP address. Press DEMO in the top bar to look around with made-up bins.</p></div>';
   $('#addRow').classList.toggle('hide',!op);
   $('#addNote').textContent=state.bins.length?'':'No bins yet.';
   const bt=$('#binsTitle');
@@ -2708,7 +2736,11 @@ function collectUrgency(b){
   return 9999-p;
 }
 function renderCollectNext(){
-  if(!state.bins.length)return;
+  if(!state.bins.length){
+    const h=$('#collectNext');if(h&&collectSig!=='empty'){h.innerHTML='<p class="hint">No bins to collect from yet.</p>';collectSig='empty';}
+    const t=$('#collectToggle');if(t)t.classList.add('hide');
+    return;
+  }
   const rows=state.bins.slice().sort((a,b2)=>collectUrgency(a)-collectUrgency(b2));
   const sig=rows.map(b=>b.id+Math.round(b.data.fill)+b.cal.fill_th).join(',')+'|'+state.collectShowAll;
   if(sig===collectSig)return;
@@ -2745,8 +2777,9 @@ function renderBanners(){
   if(tam.length)out.push(ban('red','tamper','TAMPER: '+tam.map(b=>b.name).join(', '),'Check the bin before resetting the alert.'));
   if(full.length)out.push(ban('red','truck','COLLECT NOW: '+full.map(b=>b.name+' at '+Math.round(b.data.fill)+'%').join(', '),''));
   if(sim.length)out.push(ban('purple','flask','SIMULATION MODE','Some readings are set by hand, not by the sensors.'));
-  if(!state.bins.some(isLive))out.push(ban('amber','wifi','Showing demo data','Open a bin card, add its IP address, and it switches to live readings.'));
-  else{const down=state.bins.filter(b=>isLive(b)&&!b.live);
+  if(!state.bins.length)out.push(ban('amber','wifi','No bins linked yet','Add a bin and type its IP address, or switch DEMO on to look around with made-up bins.'));
+  else if(state.demo)out.push(ban('amber','wifi','Demo mode','Bins marked DEMO show made-up readings. Switch DEMO off to see only your real bins.'));
+  if(state.bins.some(isLive)){const down=state.bins.filter(b=>isLive(b)&&!b.live);
     if(down.length)out.push(ban('red','wifi',down.length===1?down[0].name+' is not answering':down.length+' bins are not answering','Readings shown are the last ones received. Check that the bin is on and on the same Wi-Fi, or set up Firebase or ThingSpeak.'));}
 
   const unread=unreadCount(),pending=state.alerts.filter(a=>!a.read);
@@ -2870,7 +2903,7 @@ function renderLink(){
   link.style.setProperty('--lc',names.length?ROUTE[names[0]][1]:'var(--ink2)');
   link.style.color=names.length?ROUTE[names[0]][1]:'';
   link.title=names.map(k=>ROUTE[k][0]+': '+used[k]+' bin'+(used[k]>1?'s':'')).join(', ');
-  $('#linktext').textContent=!cfg?'Demo data':!live?'Not connected':
+  $('#linktext').textContent=!state.bins.length?'No bins':!cfg?'Demo data':!live?'Not connected':
     names.length===3?'All 3 links':names.map(k=>ROUTE[k][0]).join(' + ')+(live<cfg?' ('+live+' of '+cfg+')':'');
 }
 
@@ -3405,6 +3438,35 @@ document.addEventListener('click',async e=>{
     }
     setAddCount(1);return;}
 });
+let demoStash=[];
+function demoBtnRender(){
+  const d=$('#demoBtn');if(!d)return;
+  d.setAttribute('aria-pressed',state.demo?'true':'false');
+  d.textContent=state.demo?'DEMO ON':'DEMO OFF';
+}
+function setDemo(on){
+  state.demo=on;
+  try{localStorage.setItem('smartbin.demo',on?'1':'0')}catch(e){}
+  if(on){
+    const extra=demoStash.length?demoStash:DEMO_SEEDS.map(mkDemo);
+    extra.forEach((b,i)=>{if(!b.hist.length)seedHistory(b,i)});
+    state.bins=state.bins.filter(b=>!b.demo).concat(extra);
+    demoStash=[];
+  }else{
+    demoStash=state.bins.filter(b=>b.demo);
+    state.bins=state.bins.filter(b=>!b.demo);
+  }
+  const first=state.bins[0]?state.bins[0].id:null;
+  if(!byId(state.selSet))state.selSet=first;
+  if(!byId(state.selSim))state.selSim=state.selSet;
+  if(!byId(state.envBin))state.envBin=state.selSet;
+  state.chartPick=state.chartPick.filter(id=>byId(id));
+  if(state.calib&&!byId(state.calib.bin))state.calib=null;
+  demoBtnRender();cardSig='';render();loadSettings();buildSim();
+  toast(on?'Demo on: bins marked DEMO show made-up readings.':'Demo off: only your real bins are shown.');
+}
+$('#demoBtn').addEventListener('click',()=>setDemo(!state.demo));
+demoBtnRender();
 $('#rolechip').addEventListener('click',()=>{
   if(state.role==='operator'){setRole('collector');toast('Back to collector. Operator needs the PIN again.');}
   else askOperator(false);
@@ -3798,7 +3860,7 @@ function pinRender(){
     set:[pinUI.change?'New operator PIN':'Create the operator PIN',again?'Type it once more to be sure.':
       OPLOCK.MIN+' to '+OPLOCK.MAX+' digits. Anyone without it stays a collector. Only an operator can change it later.',again?'SAVE':'NEXT'],
     change:['Change operator PIN','Enter the current PIN first.','NEXT'],
-    bt:['Type the pairing code','Tap Pair phone on the bin\u2019s touchscreen, then type the 6 digits it shows. The code changes every time.','PAIR']}[m];
+    bt:['Type the pairing code','Demo: this box stands in for the pairing window Windows or your phone opens. Type the 6 digits the bin shows.','PAIR']}[m];
   $('#pinIco').innerHTML=m==='set'?KEY_SVG:m==='bt'?icon('bluetooth'):icon('lock',true);
   $('#pinTitle').textContent=T[0];$('#pinText').textContent=T[1];
   const lo=m==='bt'?btc.LEN:OPLOCK.MIN,n=Math.max(lo,pinUI.pin.length);

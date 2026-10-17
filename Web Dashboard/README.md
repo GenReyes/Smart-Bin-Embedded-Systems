@@ -8,7 +8,7 @@
 
 LOCK, UNLOCK and COLLECT work over all three. Calibration, simulation, tare and the other operator commands need the bin's Wi-Fi, the same as in the app.
 
-A bin is **live** once it has an IP address, a Firebase cloud name (with Firebase saved), or a ThingSpeak channel and read key. A live bin never shows made-up numbers: when it stops answering it keeps its last real reading, shows OFFLINE and a red banner. A bin with none of these keeps the demo data, so the class demo still works with no hardware.
+A bin is **live** once it has an IP address, a Firebase cloud name (with Firebase saved), or a ThingSpeak channel and read key. A live bin never shows made-up numbers: when it stops answering it keeps its last real reading, shows OFFLINE and a red banner. Made-up bins only appear with the **DEMO** button in the top bar switched on. With DEMO off (the default once a real bin is linked) the dashboard shows only real bins, and a bin with no link is not kept. DEMO on adds three "Demo Bin" cards next to the real ones, so the class demo still works with no hardware. Opening the page from a bin (`http://<bin IP>`) links that bin automatically.
 
 ## Open it
 

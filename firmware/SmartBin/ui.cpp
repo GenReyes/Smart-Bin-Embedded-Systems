@@ -566,7 +566,7 @@ static void drawPin(uint32_t now) {
     icon(I_X, 13, 10, 13, P->on_r, P->r);
     txt(30, 11, 56, "CANCEL", 12, P->on_r);
     addHit(0, 0, 96, 36, B_PIN_CANCEL);
-    txt(98, 9, 134, "ENTER PIN", 16, P->tx, 'r');
+    txt(98, 9, 134, "COLLECT PIN", 16, P->tx, 'r');
     const char* keys[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "<", "0", "OK"};
     const uint8_t ids[] = {B_K1, B_K2, B_K3, B_K4, B_K5, B_K6, B_K7, B_K8, B_K9, B_KDEL, B_K0, B_KOK};
     for (int i = 0; i < 12; i++) {
@@ -862,8 +862,8 @@ static void drawBt(uint32_t now) {
     switch (v.phase) {
       case BT_IDLE:
       case BT_WAIT:
-        txt(8, 124, 224, BIN_BLE_NAME, 22, P->tx, 'c');
-        wrapTxt(20, 154, 200, "On the app or dashboard press PAIR A BIN and choose this name. A pairing code shows next.", 14, P->tx2, 18);
+        txt(8, 120, 224, BIN_BLE_NAME, 22, P->tx, 'c');
+        wrapTxt(16, 152, 208, "On the dashboard or app press PAIR A BIN and pick this name.", 13, P->tx2, 17);
         break;
       case BT_CODE: {
         txt(8, 46, 224, "PAIRING CODE", 14, P->tx2, 'c');
@@ -871,8 +871,8 @@ static void drawBt(uint32_t now) {
         char code[12];
         snprintf(code, sizeof(code), "%03lu %03lu", (unsigned long)(v.code / 1000), (unsigned long)(v.code % 1000));
         txt(8, 76, 224, code, 46, P->tx, 'c');
-        wrapTxt(16, 148, 208, "Type this code on the phone or the dashboard when it asks.", 14, P->tx2, 18);
-        txt(8, 232, 224, "3 wrong codes stop pairing for 60 s.", 12, P->tx2, 'c');
+        wrapTxt(16, 146, 208, "Type it in the pairing window that pops up on the laptop or phone.", 13, P->tx2, 17);
+        txt(8, 242, 224, "3 wrong codes stop pairing for 60 s.", 12, P->tx2, 'c');
         break;
       }
       case BT_LOCKOUT:
@@ -941,16 +941,18 @@ static void drawBt(uint32_t now) {
         icon(I_BT, 96 + o, 56 + o, 48 - 2 * o, P->bl, P->surf);
         mmss(mm, sizeof(mm), (int32_t)(v.offAtMs - now));
         snprintf(t, sizeof(t), "BT OFF IN %s", mm);
-        box(40, 214, 160, 30, P->surf, 3, 3);
-        txt(40, 221, 160, t, 14, P->tx, 'c');
+        tft.fillRect(20, 220, 204, 36, P->bg);
+        box(24, 222, 192, 30, P->surf, 3, 3);
+        txt(32, 229, 176, t, 14, P->tx, 'c');
       }
       break;
     case BT_CODE:
       mmss(mm, sizeof(mm), (int32_t)(v.phaseMs + BT_CODE_MS - now));
       if (dirty(5, mm)) {
         snprintf(t, sizeof(t), "NEW CODE IN %s", mm);
-        box(36, 192, 168, 30, P->surf, 3, 3);
-        txt(36, 199, 168, t, 14, P->tx, 'c');
+        tft.fillRect(20, 202, 204, 34, P->bg);
+        box(24, 204, 192, 28, P->surf, 3, 3);
+        txt(32, 210, 176, t, 14, P->tx, 'c');
       }
       break;
     case BT_LOCKOUT:
