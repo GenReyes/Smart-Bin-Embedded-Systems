@@ -277,7 +277,7 @@ static bool dirty(uint8_t id, const char* sig) {
   return false;
 }
 
-enum Screen : uint8_t { S_BOOT, S_CAL, S_MAIN, S_URGENT, S_PIN, S_COLLECT, S_DONE, S_TAMPER, S_LOCKED, S_INFO, S_BT };
+enum Screen : uint8_t { S_BOOT, S_CAL, S_MAIN, S_URGENT, S_PIN, S_COLLECT, S_DONE, S_TAMPER, S_LOCKED, S_INFO, S_BT, S_TOUCHCAL };
 enum Overlay : uint8_t { O_NONE, O_INFO, O_PIN, O_BT };
 static Screen cur = S_BOOT;
 static Overlay overlay = O_NONE;
@@ -983,7 +983,50 @@ static void drawBt(uint32_t now) {
   }
 }
 
+static volatile bool tcReq = false, tcResetReq = false;
+static bool tcActive = false, tcWaitUp = false;
+static uint8_t tcStep = 0;
+static uint32_t tcLastMs = 0, tcDoneMs = 0;
+static long tcSx = 0, tcSy = 0;
+static int tcN = 0;
+static int tcRaw[4][2];
+static const int TC_X[4] = {20, 219, 20, 219};
+static const int TC_Y[4] = {20, 20, 299, 299};
+
+void uiStartTouchCal() {
+  tcReq = true;
+  if (hUi) xTaskNotify(hUi, EV_STATE, eSetBits);
+}
+
+void uiResetTouchCal() {
+  tcResetReq = true;
+  if (hUi) xTaskNotify(hUi, EV_STATE, eSetBits);
+}
+
+static void drawTouchCal() {
+  char sig[16];
+  snprintf(sig, sizeof(sig), "tc%d%d", tcStep, darkTheme);
+  if (!dirty(4, sig)) return;
+  fullDraw = true;
+  tft.fillScreen(P->bg);
+  if (tcStep < 4) {
+    txt(8, 112, 224, "TOUCH CALIBRATION", 16, P->tx, 'c');
+    char b[32];
+    snprintf(b, sizeof(b), "Press the cross  %d of 4", tcStep + 1);
+    txt(8, 142, 224, b, 14, P->tx, 'c', true);
+    wrapTxt(20, 170, 200, "Press firmly on the center, then let go. Wait 30 s to cancel.", 13, P->tx2, 17);
+    int x = TC_X[tcStep], y = TC_Y[tcStep];
+    tft.drawFastHLine(x - 14, y, 29, P->r);
+    tft.drawFastVLine(x, y - 14, 29, P->r);
+    tft.drawCircle(x, y, 7, P->r);
+  } else {
+    txt(8, 120, 224, "TOUCH SAVED", 22, P->tx, 'c');
+    txt(8, 160, 224, "Buttons should line up now", 14, P->tx2, 'c', true);
+  }
+}
+
 static Screen pickScreen(const BinState& s, const Cal& c, const Sim& sm, uint32_t now) {
+  if (tcActive) return S_TOUCHCAL;
   if (s.booting) return S_BOOT;
   if (s.calibrating) return S_CAL;
   if (overlay == O_BT) return S_BT;
@@ -1029,6 +1072,7 @@ static void render(uint32_t now) {
     case S_LOCKED: drawLocked(s); break;
     case S_INFO: drawInfo(s); break;
     case S_BT: drawBt(now); break;
+    case S_TOUCHCAL: drawTouchCal(); break;
   }
 }
 
@@ -1145,19 +1189,106 @@ static void onPress(uint8_t id) {
   (void)s;
 }
 
-static bool readTouch(int& x, int& y) {
+static bool readTouch(int& x, int& y, int& rawX, int& rawY) {
   if (!touch.touched()) return false;
   TS_Point p = touch.getPoint();
+  rawX = p.x;
+  rawY = p.y;
   int rx = p.x, ry = p.y;
-#if TS_SWAP_XY
-  int tmp = rx; rx = ry; ry = tmp;
-#endif
+  if (touchCal.swap) { rx = p.y; ry = p.x; }
 #if TOUCH_DEBUG
   Serial.printf("[touch] raw %d %d z %d\n", rx, ry, p.z);
 #endif
-  x = constrain(map(rx, TS_RAW_X0, TS_RAW_X1, 0, 239), 0, 239);
-  y = constrain(map(ry, TS_RAW_Y0, TS_RAW_Y1, 0, 319), 0, 319);
+  x = constrain(map(rx, touchCal.x0, touchCal.x1, 0, 239), 0, 239);
+  y = constrain(map(ry, touchCal.y0, touchCal.y1, 0, 319), 0, 319);
   return p.z > 200;
+}
+
+static void tcBegin(uint32_t now) {
+  tcActive = true;
+  tcWaitUp = true;
+  tcStep = 0;
+  tcN = 0;
+  tcSx = tcSy = 0;
+  tcLastMs = now;
+  overlay = O_NONE;
+  resetScreen();
+  buzz(T_CAL_START);
+}
+
+static void tcEnd() {
+  tcActive = false;
+  resetScreen();
+}
+
+static void tcFinish(uint32_t now) {
+  float dxx = (tcRaw[1][0] + tcRaw[3][0]) / 2.0f - (tcRaw[0][0] + tcRaw[2][0]) / 2.0f;
+  float dxy = (tcRaw[1][1] + tcRaw[3][1]) / 2.0f - (tcRaw[0][1] + tcRaw[2][1]) / 2.0f;
+  bool sw = fabsf(dxy) > fabsf(dxx);
+  float px[4], py[4];
+  for (int i = 0; i < 4; i++) {
+    px[i] = sw ? tcRaw[i][1] : tcRaw[i][0];
+    py[i] = sw ? tcRaw[i][0] : tcRaw[i][1];
+  }
+  float left = (px[0] + px[2]) / 2, right = (px[1] + px[3]) / 2;
+  float top = (py[0] + py[1]) / 2, bottom = (py[2] + py[3]) / 2;
+  if (fabsf(right - left) < 800 || fabsf(bottom - top) < 800) {
+    Serial.println("[touch] calibration rejected, presses too close together");
+    buzz(T_CAL_CANCEL);
+    raiseAlert("setup", "warning", "Touch calibration failed", "Presses were too close together. Try again.");
+    tcEnd();
+    return;
+  }
+  float kx = (right - left) / (TC_X[1] - TC_X[0]);
+  float ky = (bottom - top) / (TC_Y[2] - TC_Y[0]);
+  TouchCal t;
+  t.swap = sw;
+  t.x0 = lroundf(left - kx * TC_X[0]);
+  t.x1 = lroundf(right + kx * (239 - TC_X[1]));
+  t.y0 = lroundf(top - ky * TC_Y[0]);
+  t.y1 = lroundf(bottom + ky * (319 - TC_Y[2]));
+  touchCal = t;
+  saveTouchCal();
+  Serial.printf("[touch] saved swap %d x %d..%d y %d..%d\n", t.swap, t.x0, t.x1, t.y0, t.y1);
+  buzz(T_SAVED);
+  char meta[72];
+  snprintf(meta, sizeof(meta), "%s touchscreen calibrated", BIN_LABEL);
+  raiseAlert("setup", "success", "Touch calibrated", meta);
+  publish(EV_CAL);
+  tcStep = 4;
+  tcDoneMs = now;
+}
+
+static void tcHandle(bool pressed, int rx, int ry, uint32_t now) {
+  if (tcStep >= 4) {
+    if (now - tcDoneMs > 2500) tcEnd();
+    return;
+  }
+  if (tcWaitUp) {
+    if (!pressed) tcWaitUp = false;
+    tcLastMs = now;
+    return;
+  }
+  if (pressed) {
+    tcSx += rx;
+    tcSy += ry;
+    tcN++;
+    tcLastMs = now;
+    return;
+  }
+  if (tcN >= 3) {
+    tcRaw[tcStep][0] = tcSx / tcN;
+    tcRaw[tcStep][1] = tcSy / tcN;
+    tcStep++;
+    if (tcStep == 4) tcFinish(now);
+    else buzz(T_CAL_STEP);
+  }
+  tcSx = tcSy = 0;
+  tcN = 0;
+  if (tcActive && tcStep < 4 && now - tcLastMs > 30000) {
+    buzz(T_CAL_CANCEL);
+    tcEnd();
+  }
 }
 
 void uiInit() {
@@ -1176,7 +1307,7 @@ void uiInit() {
 
 void uiTask(void*) {
   bool down = false;
-  uint32_t lastDraw = 0;
+  uint32_t lastDraw = 0, holdSince = 0;
   for (;;) {
     uint32_t ev = 0;
     xTaskNotifyWait(0, UINT32_MAX, &ev, pdMS_TO_TICKS(down ? 30 : 100));
@@ -1187,10 +1318,29 @@ void uiTask(void*) {
     }
     spin = (now / 120) % 24;
 
+    if (tcReq) {
+      tcReq = false;
+      tcBegin(now);
+    }
+    if (tcResetReq) {
+      tcResetReq = false;
+      resetTouchCal();
+      buzz(T_SAVED);
+      publish(EV_CAL);
+    }
     {
-      int x, y;
-      bool pressed = readTouch(x, y);
-      if (pressed && !down && now - lastTouchMs > 220) {
+      int x, y, rx = 0, ry = 0;
+      bool pressed = readTouch(x, y, rx, ry);
+      if (!pressed) holdSince = 0;
+      else if (!holdSince) holdSince = now;
+      if (tcActive) {
+        tcHandle(pressed, rx, ry, now);
+        down = pressed;
+        holdSince = 0;
+      } else if (pressed && holdSince && now - holdSince > 5000) {
+        holdSince = 0;
+        tcBegin(now);
+      } else if (pressed && !down && now - lastTouchMs > 220) {
         down = true;
         lastTouchMs = now;
         for (int i = hitN - 1; i >= 0; i--) {

@@ -123,6 +123,9 @@ The bin writes every 30 s (sooner for a new alert, never faster than 15 s), skip
 | A8 Calibrating | While the operator calibrates, with CANCEL |
 | A9 Info | IP, Wi-Fi, signal, cloud, Bluetooth, firmware, uptime, theme |
 | A10 Wi-Fi setup | Bluetooth on, pairing code, paired, connecting, connected or failed, Bluetooth off |
+| Touch calibration | Four crosses, one at a time; saved on the bin when the last one is pressed |
+
+**Touch calibration:** start it from the dashboard (Settings > Touchscreen > CALIBRATE TOUCH), from the app (command `TOUCH_CAL`), or on the bin by holding a finger anywhere on the screen for 5 seconds. Press each cross firmly, then let go. The result is kept on the bin (it survives uploads and restarts) and replaces the `TS_*` defaults in `config.h`. `TOUCH_CAL_RESET` goes back to those defaults. No press for 30 s cancels without changing anything.
 
 The sun/moon key switches light and dark and is remembered. Info and PIN screens go back to the main screen after 30 s untouched.
 
@@ -137,9 +140,11 @@ Everything in Integration Guide section 4 (`/api/status`, `/api/command`, `/api/
 | `GET /api/events` | Server-Sent Events: a `status` event on every change (at most 4 a second), a `ping` every 10 s. The dashboard uses it; `/api/status` stays for the app. |
 | `POST /api/cloud` | `{"url","key","email","pass"}` stores the Firebase account on the bin (the dashboard's SEND TO BINS) |
 | `POST /api/command {"cmd":"BUZZ_TEST","sound":"full"}` | Plays any tune by name (`full`, `tamper`, `lock`, `bt_paired`, ...) |
+| `POST /api/command {"cmd":"TOUCH_CAL"}` | Shows the touch calibration screen on the bin |
+| `POST /api/command {"cmd":"TOUCH_CAL_RESET"}` | Clears the saved touch calibration |
 | `GET /` | The web dashboard |
 
-Extra status fields: `faults` (sensors not answering, whose readings are left out rather than sent as 0), `tamper_phase` (`COUNTDOWN` or `LATCHED`), `last_cmd`, `uptime_s`, `rssi`, `fw`, `name`.
+Extra status fields: `faults` (sensors not answering, whose readings are left out rather than sent as 0), `tamper_phase` (`COUNTDOWN` or `LATCHED`), `last_cmd`, `uptime_s`, `rssi`, `fw`, `name`, `gas_k` (raw gas resistance in kOhm), and `touch` (`swap`, `x0`, `x1`, `y0`, `y1`, `custom`: true once calibrated on the bin).
 
 The buzzer settings `buzz_on`, `buzz_vol` (1 to 3), `buzz_ui`, `buzz_lid`, `buzz_repeat_s`, `quiet_on`, `quiet_from`, `quiet_to` (minutes after midnight, Manila time) are part of `cal`.
 

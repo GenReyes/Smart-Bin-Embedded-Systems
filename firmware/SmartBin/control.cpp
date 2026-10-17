@@ -2,6 +2,7 @@
 #include "state.h"
 #include "sensors.h"
 #include "buzzer.h"
+#include "ui.h"
 #include <ESP32Servo.h>
 
 static Servo lid;
@@ -125,6 +126,10 @@ static void runCommand(const Command& c) {
   } else if (!strcmp(k, "RESET_GAS")) {
     requestGasReset();
     buzz(T_CAL_STEP);
+  } else if (!strcmp(k, "TOUCH_CAL")) {
+    uiStartTouchCal();
+  } else if (!strcmp(k, "TOUCH_CAL_RESET")) {
+    uiResetTouchCal();
   } else if (!strcmp(k, "BUZZ_TEST")) {
     if (!buzzByName(c.sound[0] ? c.sound : "full")) {
       finish(c, false, "Unknown sound");

@@ -25,6 +25,7 @@ void stateInit() {
   alertQueue = xQueueCreate(8, sizeof(AlertEv));
   cal.collect_pin = (uint16_t)atoi(COLLECT_PIN);
   loadCal();
+  loadTouchCal();
   loadNet();
 }
 
@@ -85,6 +86,33 @@ void loadCal() {
   prefsBegin(true);
   if (prefs.getBytesLength("cal") == sizeof(Cal)) prefs.getBytes("cal", &cal, sizeof(Cal));
   prefsEnd();
+}
+
+TouchCal touchCal;
+bool touchCalCustom = false;
+
+void saveTouchCal() {
+  prefsBegin(false);
+  prefs.putBytes("touch", &touchCal, sizeof(touchCal));
+  prefsEnd();
+  touchCalCustom = true;
+}
+
+void loadTouchCal() {
+  prefsBegin(true);
+  if (prefs.getBytesLength("touch") == sizeof(TouchCal)) {
+    prefs.getBytes("touch", &touchCal, sizeof(TouchCal));
+    touchCalCustom = true;
+  }
+  prefsEnd();
+}
+
+void resetTouchCal() {
+  touchCal = TouchCal();
+  prefsBegin(false);
+  prefs.remove("touch");
+  prefsEnd();
+  touchCalCustom = false;
 }
 
 void saveNet() {
@@ -286,6 +314,15 @@ void statusToJson(const BinState& s, const Cal& c, const Sim& sm, JsonObject o, 
   if (!s.okBME) f.add("BME680");
   if (!s.okIMU) f.add("BMI160");
   if (withCal) calToJson(c, o["cal"].to<JsonObject>());
+  if (withCal) {
+    JsonObject t = o["touch"].to<JsonObject>();
+    t["swap"] = touchCal.swap;
+    t["x0"] = touchCal.x0;
+    t["x1"] = touchCal.x1;
+    t["y0"] = touchCal.y0;
+    t["y1"] = touchCal.y1;
+    t["custom"] = touchCalCustom;
+  }
   if (s.last.cmd[0]) {
     JsonObject lc = o["last_cmd"].to<JsonObject>();
     lc["cmd"] = s.last.cmd;
@@ -315,7 +352,8 @@ String statusJson(bool withCal, bool forCloud) {
 }
 
 static const char* const KNOWN[] = {"LOCK", "UNLOCK", "CLEAR_TAMPER", "COLLECT", "COLLECT_DONE", "CALIBRATE_START",
-                                    "CALIBRATE_END", "TARE", "CAL_WEIGHT", "RESET_GAS", "BUZZ_TEST"};
+                                    "CALIBRATE_END", "TARE", "CAL_WEIGHT", "RESET_GAS", "BUZZ_TEST",
+                                    "TOUCH_CAL", "TOUCH_CAL_RESET"};
 
 bool validateCommand(const char* cmd, const BinState& s, String& why) {
   bool known = false;
