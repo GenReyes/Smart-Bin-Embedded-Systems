@@ -417,7 +417,7 @@ private fun SensorTile(icon: ImageVector, cc: Color, value: String, label: Strin
     }
 }
 
-// ---------- collect next ----------
+// ---------- collection priority ----------
 
 /** Time to full from how fast the bin has been filling. Returns the text and how near it is: 0 near, 1 mid, 2 far, 3 none. */
 fun etaOf(b: Bin): Pair<String, Int> {
@@ -436,7 +436,7 @@ private fun CollectNext(vm: AppViewModel, bins: List<Bin>) {
     val rows = bins.sortedByDescending { it.reading.fill }
     val show = if (vm.prioAll) rows else rows.take(3)
     Card {
-        Sh(Ic.rank, "Collect next", c.fill)
+        Sh(Ic.rank, "Collection priority", c.fill)
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             show.forEachIndexed { k, b ->
                 val p = Math.round(b.reading.fill)
