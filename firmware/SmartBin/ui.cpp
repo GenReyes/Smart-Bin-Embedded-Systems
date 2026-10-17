@@ -240,13 +240,20 @@ static void btn(int x, int y, int w, int h, const char* label, uint16_t fill, ui
   int o = pressed ? 4 : 0;
   if (pressed) tft.fillRect(x, y, w + 4, h + 4, P->bg == fill ? P->surf : P->bg);
   box(x + o, y + o, w, h, fill, 3, pressed ? 0 : 4);
-  int tw = textW(label, fontFor(px)) + (ic >= 0 ? isz + 5 : 0);
+  int lw = textW(label, fontFor(px));
+  int gap = 5;
+  while (ic >= 0 && lw + isz + gap > w - 12 && isz > 14) {
+    isz -= 2;
+    gap = 3;
+  }
+  if (ic >= 0 && lw + isz + gap > w - 12) ic = -1;
+  int tw = lw + (ic >= 0 ? isz + gap : 0);
   int sx = x + o + (w - tw) / 2;
   if (ic >= 0) {
     icon((Icon)ic, sx, y + o + (h - isz) / 2, isz, on, fill);
-    sx += isz + 5;
+    sx += isz + gap;
   }
-  txt(sx, y + o + (h - px) / 2, w, label, px, on);
+  txt(sx, y + o + (h - px) / 2, x + o + w - 6 - sx, label, px, on);
   if (id) addHit(x, y, w + 4, h + 4, id);
 }
 
@@ -468,7 +475,7 @@ static void drawMain(const BinState& s, const Cal& c, const Sim& sm, uint32_t no
   }
 
   char val[24];
-  bool hx = s.okHX || (sm.mask & 2), bme = s.okBME || (sm.mask & 8), gasOk = (s.okBME || (sm.mask & 4)) && s.v.iaq_acc > 0;
+  bool hx = s.okHX || (sm.mask & 2), bme = s.okBME || (sm.mask & 8), bmeGas = s.okBME || (sm.mask & 4), gasOk = bmeGas && s.v.iaq_acc > 0;
   snprintf(val, sizeof(val), "%.2f kg", s.v.weight_g / 1000.0f);
   reading(6, 146, "Weight", val, hx && s.v.weight_g >= c.weight_cap, !hx, -1, tint);
   snprintf(val, sizeof(val), "%.1f C", s.v.temp);
@@ -478,7 +485,8 @@ static void drawMain(const BinState& s, const Cal& c, const Sim& sm, uint32_t no
   float gp = s.v.iaq / max(1.0f, c.gas_th) * 100;
   Lv al = gp >= 80 ? LR : gp >= 50 ? LA : LG;
   snprintf(val, sizeof(val), "%s %d", gp >= 80 ? "Poor" : gp >= 50 ? "Moderate" : "Good", (int)roundf(s.v.iaq));
-  reading(9, 200, "Air", val, gasOk && gp >= 100, !gasOk, al, tint);
+  if (bmeGas && s.v.iaq_acc == 0) reading(9, 200, "Air", "Warming up", false, false, -1, tint);
+  else reading(9, 200, "Air", val, gasOk && gp >= 100, !gasOk, al, tint);
 
   bool lr = lidRowActive(s), br = buzzRowActive(s, now);
   if (lr && br) {
@@ -1175,7 +1183,7 @@ void uiTask(void*) {
     }
     spin = (now / 120) % 24;
 
-    if ((ev & EV_TOUCH) || down || digitalRead(PIN_TOUCH_IRQ) == LOW) {
+    {
       int x, y;
       bool pressed = readTouch(x, y);
       if (pressed && !down && now - lastTouchMs > 220) {

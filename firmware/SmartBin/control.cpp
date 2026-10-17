@@ -258,7 +258,7 @@ void controlTask(void*) {
       buzz(left <= 3 ? T_TAMPER_TICK_END : T_TAMPER_TICK);
       changed = true;
     }
-    if (s.tamperPhase == 2 && now - lastTamperTick >= 10000) {
+    if (s.tamperPhase == 2 && now - lastTamperTick >= TAMPER_ALARM_EVERY_MS) {
       lastTamperTick = now;
       buzz(T_TAMPER_LATCHED);
     }

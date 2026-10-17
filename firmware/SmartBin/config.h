@@ -56,6 +56,7 @@ constexpr uint32_t TB_WATCHED_MS = 5000;
 constexpr uint32_t TB_IDLE_MS = 15000;
 constexpr uint32_t CMD_MAX_AGE_MS = 60000;
 constexpr uint32_t TAMPER_COUNTDOWN_S = 10;
+constexpr uint32_t TAMPER_ALARM_EVERY_MS = 2000;   // latched tamper siren repeats this often
 constexpr uint32_t SCREEN_TIMEOUT_MS = 30000;
 constexpr uint32_t BT_IDLE_OFF_MS = 300000;
 constexpr uint32_t BT_CODE_MS = 60000;
