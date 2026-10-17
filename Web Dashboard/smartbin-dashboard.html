@@ -1518,14 +1518,12 @@ function btRender(){
   $('#btSteps').innerHTML=BT_STEPS.map((s,i)=>
     '<div class="btstep '+(bt.step>i?'done':bt.step===i?'on':'')+'">'+icon(bt.step>i?'check':s[0])+'<b>'+s[1]+'</b></div>').join('');
   const paired=bt.step>0,op=state.role==='operator';
-  ['bt_ssid','bt_pass'].forEach(id=>{const e=$('#'+id);if(e)e.disabled=!paired||!op});
+  ['bt_ssid','bt_pass'].forEach(id=>{const e=$('#'+id);if(e)e.disabled=!paired});
   ['btScan','btEye'].forEach(id=>{const e=$('#'+id);if(e)e.disabled=!paired});
-  $$('#btNetList [data-ssid]').forEach(x=>{x.disabled=!op});
-  $('#btSend').disabled=!paired||!op;
-  $('#btOff').disabled=bt.step<3||!op;
+  $('#btSend').disabled=!paired;
+  $('#btOff').disabled=bt.step<3;
   const note=$('#btRoleNote');
-  if(note)note.textContent=op?''
-    :'You are signed in as a collector. You can pair a bin and read the address it is using, but only an operator can send new Wi-Fi credentials or switch the bin\u2019s Bluetooth off.';
+  if(note)note.textContent='';
   if($('#cloudHead')&&$('#cloudHead').innerHTML)cloudRender();
   const st=$('#btState');
   st.dataset.on=paired?'1':'0';
@@ -1613,8 +1611,20 @@ async function btPair(){
   try{
     $('#btMsg').textContent='Pick the bin in the browser list. When the bin shows a 6-digit code, type it into the pairing window Windows or your phone opens.';
     bt.dev=await navigator.bluetooth.requestDevice({filters:[{services:[BT.SVC]}],optionalServices:[BT.SVC]});
-    const srv=await bt.dev.gatt.connect();
-    const svc=await srv.getPrimaryService(BT.SVC);
+    let svc=null,lastErr=null;
+    for(let i=0;i<3&&!svc;i++){
+      try{
+        if(i)$('#btMsg').textContent='The bin dropped the link, trying again ('+(i+1)+' of 3)...';
+        const srv=await bt.dev.gatt.connect();
+        await new Promise(r=>setTimeout(r,400));
+        svc=await srv.getPrimaryService(BT.SVC);
+      }catch(e){lastErr=e;try{bt.dev.gatt.disconnect()}catch(_){};await new Promise(r=>setTimeout(r,1200));}
+    }
+    if(!svc){
+      $('#btMsg').textContent='The bin keeps dropping the Bluetooth link. Windows (or the phone) most likely still remembers the bin from an earlier pairing. '+
+        'Open Settings > Bluetooth & devices, remove '+(bt.dev.name||'SmartBin-01')+', then press PAIR A BIN again. On the bin, cancel and open WI-FI SETUP again first.';
+      return;
+    }
     for(const k of ['SSID','PASS','CTRL','STAT','SCAN']){
       try{bt.ch[k]=await svc.getCharacteristic(BT[k]);}catch(e){}
     }
@@ -1631,15 +1641,15 @@ async function btPair(){
 function btShowNets(nets){
   const list=nets.map(n=>typeof n==='string'?{ssid:n}:n).filter(n=>n&&n.ssid);
   $('#bt_nets').innerHTML=list.map(n=>'<option value="'+esc(n.ssid)+'">').join('');
-  const cur=$('#bt_ssid').value.trim(),op=state.role==='operator';
-  $('#btNetList').innerHTML=list.map(n=>'<button type="button" class="btn sm" data-ssid="'+esc(n.ssid)+'" aria-pressed="'+(n.ssid===cur)+'"'+(op?'':' disabled')+'>'+
+  const cur=$('#bt_ssid').value.trim();
+  $('#btNetList').innerHTML=list.map(n=>'<button type="button" class="btn sm" data-ssid="'+esc(n.ssid)+'" aria-pressed="'+(n.ssid===cur)+'">'+
     icon('wifi',true)+esc(n.ssid)+(Number.isFinite(+n.rssi)&&n.rssi!==undefined?' <small>'+n.rssi+' dBm</small>':'')+'</button>').join('');
 }
 function btFakeNets(){
   btShowNets([{ssid:'HomeWiFi-2G',rssi:-48},{ssid:'TUP-Manila',rssi:-61},{ssid:'Smart_Bin_Lab',rssi:-70},{ssid:'PLDTHOMEFIBR24',rssi:-79}]);
 }
 async function btScan(){
-  const op=state.role==='operator',tail=op?' Tap one to fill in the name, or type it yourself.':' Switch to OPERATOR in the top bar to choose one and send it.';
+  const tail=' Tap one to fill in the name, or type it yourself.';
   if(bt.demo||!bt.ch.SCAN){
     if(bt.demo){btFakeNets();$('#btMsg').textContent='Demo networks listed.'+tail;}
     else $('#btMsg').textContent='This bin does not share a network list, so type the name yourself.';

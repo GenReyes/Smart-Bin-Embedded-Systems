@@ -189,7 +189,6 @@ static void doJoin() {
 
 static void shutdown(bool remote, bool automatic) {
   NimBLEDevice::stopAdvertising();
-  if (remote) NimBLEDevice::deleteAllBonds();
   NimBLEDevice::deinit(true);
   server = nullptr;
   chStat = chScan = nullptr;
