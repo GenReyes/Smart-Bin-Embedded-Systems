@@ -485,7 +485,11 @@ static void drawMain(const BinState& s, const Cal& c, const Sim& sm, uint32_t no
   float gp = s.v.iaq / max(1.0f, c.gas_th) * 100;
   Lv al = gp >= 80 ? LR : gp >= 50 ? LA : LG;
   snprintf(val, sizeof(val), "%s %d", gp >= 80 ? "Poor" : gp >= 50 ? "Moderate" : "Good", (int)roundf(s.v.iaq));
-  if (bmeGas && s.v.iaq_acc == 0) reading(9, 200, "Air", "Warming up", false, false, -1, tint);
+  if (bmeGas && s.v.iaq_acc == 0) {
+    if (s.v.gas_k > 0) snprintf(val, sizeof(val), "Warming %.0fk", s.v.gas_k);
+    else strcpy(val, "Warming up");
+    reading(9, 200, "Air", val, false, false, -1, tint);
+  }
   else reading(9, 200, "Air", val, gasOk && gp >= 100, !gasOk, al, tint);
 
   bool lr = lidRowActive(s), br = buzzRowActive(s, now);

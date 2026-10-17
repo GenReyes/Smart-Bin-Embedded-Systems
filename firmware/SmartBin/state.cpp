@@ -269,6 +269,7 @@ void statusToJson(const BinState& s, const Cal& c, const Sim& sm, JsonObject o, 
     o["humidity"] = r1(v.humidity);
   }
   if (s.okBME) o["pressure"] = r1(v.pressure);
+  if (s.okBME) o["gas_k"] = r1(v.gas_k);
   if (s.okBME || (sm.mask & 4)) {
     o["iaq"] = (long)lround(v.iaq);
     o["iaq_acc"] = v.iaq_acc;
