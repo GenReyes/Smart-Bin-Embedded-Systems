@@ -338,6 +338,7 @@ table.sim tr{box-shadow:var(--o1)}
 .sect[data-sec="lid"]{--cc:var(--sim)}
 .sect[data-sec="weight"]{--cc:var(--c-weight)}
 .sect[data-sec="air"]{--cc:var(--c-gas)}
+.sect[data-sec="touch"]{--cc:var(--cal)}
 .sect h2{display:flex;align-items:center;gap:10px;color:var(--cc)}
 .sect h2:before{content:"";width:4px;height:15px;border-radius:2px;background:var(--cc)}
 .sect input:focus{box-shadow:var(--i1), 0 0 0 2px var(--accentSoft)}
@@ -1088,6 +1089,18 @@ table.sim th .ico{width:14px;height:14px}
         </div>
       </fieldset>
 
+      <div class="sect" data-sec="touch">
+      <h2 style="margin-top:24px">Touchscreen</h2>
+      <div class="fields">
+        <div class="field span2"><label>Touch calibration</label><div class="readout nm-in" id="s_touch">--</div></div>
+        <div class="field span2" style="display:flex;align-items:flex-end;gap:10px">
+          <button class="btn" id="btnTouchCal">CALIBRATE TOUCH</button>
+          <button class="btn" id="btnTouchReset">RESET TOUCH</button>
+        </div>
+      </div>
+      <p class="hint">If presses land in the wrong place, press CALIBRATE TOUCH. The bin shows four crosses one after another: press each one firmly, then let go. The result is saved on the bin straight away. It can also be started on the bin itself by holding a finger anywhere on the screen for 5 seconds. Needs the bin&rsquo;s Wi-Fi.</p>
+      </div>
+
       <div class="actions" style="margin-top:26px">
         <button class="btn" id="btnSave" style="flex:0 0 auto" disabled>SAVE SETTINGS</button>
         <button class="btn" id="btnCancel" style="flex:0 0 auto" disabled>CANCEL CHANGES</button>
@@ -1507,7 +1520,7 @@ function fbCheck(f){
 }
 function cloudRender(){
   const op=state.role==='operator';
-  ['fb_url','fb_key','fb_email','fb_pass','fbSave','fbRestore','fbSend','ts_server'].forEach(id=>{const e=$('#'+id);if(e)e.disabled=!op});
+  ['fb_url','fb_key','fb_email','fb_pass','fbSave','fbRestore','fbSend','ts_server','btnTouchCal','btnTouchReset'].forEach(id=>{const e=$('#'+id);if(e)e.disabled=!op});
   const st=$('#cloudState');st.dataset.on=cloud.tested?'1':'0';
   st.innerHTML=icon('cloud')+'<span>'+(cloud.tested?'Working':'Not tested')+'</span>';
   const m=$('#cloudMsg');m.classList.toggle('hide',!cloud.msg);if(cloud.msg){m.className='cloudmsg '+cloud.msg[0];m.textContent=cloud.msg[1];}
@@ -1709,6 +1722,7 @@ function normalise(b,j){
   const sm=['OK','LOCKED','TAMPER','COLLECTING','CALIBRATING'];
   d.status=typeof j.status==='number'?(sm[j.status]||'OK'):String(j.status||j.bin_status||'OK').toUpperCase();
   if(j.cal)Object.assign(b.cal,j.cal);
+  if(j.touch)b.touch=j.touch;
   if(Number.isFinite(+j.sim_mask))b.sim.mask=+j.sim_mask;
   d.faults=Array.isArray(j.faults)?j.faults:[];
   d.tamper_phase=j.tamper_phase||'';
@@ -3164,6 +3178,13 @@ function updateSettingsLive(){
   const live=$('#s_live'),dist=$('#s_dist');
   if(live)live.textContent=(b.data.weight_g/1000).toFixed(2)+' kg';
   if(dist)dist.textContent=fmt(b.data.distance_cm,1)+' cm';
+  const tc=$('#s_touch');
+  if(tc){
+    const t=b.touch;
+    tc.textContent=!isLive(b)?'Demo bin, no touchscreen'
+      :!t?'Waiting for the bin'
+      :(t.custom?'Calibrated on the bin':'Default values')+' \u00B7 X '+t.x0+'\u2013'+t.x1+' \u00B7 Y '+t.y0+'\u2013'+t.y1+(t.swap?' \u00B7 axes swapped':'');
+  }
   const tl=$('#s_tlive'),iq=$('#s_iaq');
   if(tl)tl.textContent=fmt(b.data.temp_raw,1)+' / '+fmt(b.data.temp,1)+' \u00B0C';
   if(iq){
@@ -3450,6 +3471,18 @@ $('#btnRefT').addEventListener('click',()=>{
   o.value=off;o.dispatchEvent(new Event('input',{bubbles:true}));
   $('#setMsg').textContent='Offset set to '+off+' C (reference '+ref+' minus raw '+fmt(raw,1)+'). Press SAVE SETTINGS to keep it.';
 });
+$('#btnTouchCal').addEventListener('click',()=>{
+  const b=byId(state.selSet);if(!b)return;
+  if(!isLive(b)){$('#setMsg').textContent=b.name+' is a demo bin, so there is no touchscreen to calibrate.';return;}
+  command(b.id,'TOUCH_CAL');
+  $('#setMsg').textContent=b.name+' is showing the touch calibration screen. Press each of the 4 crosses firmly, then let go. It saves by itself.';
+});
+$('#btnTouchReset').addEventListener('click',()=>{
+  const b=byId(state.selSet);if(!b)return;
+  if(!isLive(b)){$('#setMsg').textContent=b.name+' is a demo bin, so there is no touchscreen to reset.';return;}
+  command(b.id,'TOUCH_CAL_RESET');
+  $('#setMsg').textContent='Touch calibration on '+b.name+' is back to the firmware defaults.';
+});
 $('#btnGasReset').addEventListener('click',()=>{
   const b=byId(state.selSet);if(!b)return;
   command(b.id,'RESET_GAS');
@@ -3580,7 +3613,7 @@ const SOUNDS={
   alert_info:['alert',[[988,90],[1319,170]]]
 };
 const SND_LEVEL={ui:.5,event:.72,alert:.85},SND_TIMBRE={ui:[.18,0],event:[.22,.05],alert:[.35,.22]};
-const CMD_SFX={LOCK:'lock',UNLOCK:'unlock',COLLECT:'pickup',COLLECT_DONE:'done',CALIBRATE_START:'calib',CALIBRATE_END:'switch_off',CLEAR_TAMPER:'confirm',TARE:'confirm',CAL_WEIGHT:'confirm',RESET_GAS:'confirm'};
+const CMD_SFX={LOCK:'lock',UNLOCK:'unlock',COLLECT:'pickup',COLLECT_DONE:'done',CALIBRATE_START:'calib',CALIBRATE_END:'switch_off',CLEAR_TAMPER:'confirm',TARE:'confirm',CAL_WEIGHT:'confirm',RESET_GAS:'confirm',TOUCH_CAL:'calib',TOUCH_CAL_RESET:'confirm'};
 var SND={on:true,ctx:null,armed:false};
 try{SND.on=localStorage.getItem('smartbin.sound')!=='0'}catch(e){}
 function sfx(name){

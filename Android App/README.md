@@ -73,11 +73,20 @@ Over Firebase and ThingSpeak only LOCK, UNLOCK and COLLECT work. Calibration and
 | Call | Body | What it does |
 |---|---|---|
 | `GET /api/status` | | Readings, status, `cal` object and `sim_mask` |
-| `POST /api/command` | `{"cmd": "LOCK"}` | LOCK, UNLOCK, CLEAR_TAMPER, COLLECT, COLLECT_DONE, CALIBRATE_START, CALIBRATE_END, RESET_GAS, TARE, CAL_WEIGHT (`"grams"`) |
+| `POST /api/command` | `{"cmd": "LOCK"}` | LOCK, UNLOCK, CLEAR_TAMPER, COLLECT, COLLECT_DONE, CALIBRATE_START, CALIBRATE_END, RESET_GAS, TARE, CAL_WEIGHT (`"grams"`), TOUCH_CAL, TOUCH_CAL_RESET, BUZZ_TEST (`"sound"`) |
 | `POST /api/calibrate` | calibration values | Stores them in EEPROM |
 | `POST /api/simulate` | `{"mask": 5, "values": {...}}` | Holds the chosen sensors at the given values |
 
-Status fields the app reads: `fill`, `distance_cm`, `weight_g`, `temp`, `temp_raw`, `humidity`, `pressure`, `iaq`, `iaq_acc`, `tilt`, `motion`, `lid` (`OPEN` or `CLOSED`), `status` (`OK`, `LOCKED`, `TAMPER`, `COLLECTING`, `CALIBRATING`), `cal`, `sim_mask`. The dashboard's older names (`fill_percentage`, `weight_grams` and so on) also work. Simulation mask bits: 0 fill, 1 weight, 2 air quality, 3 temperature and humidity, 4 tamper, 5 motion, 6 lid.
+Status fields the app reads: `fill`, `distance_cm`, `weight_g`, `temp`, `temp_raw`, `humidity`, `pressure`, `iaq`, `iaq_acc`, `tilt`, `motion`, `lid` (`OPEN` or `CLOSED`), `status` (`OK`, `LOCKED`, `TAMPER`, `COLLECTING`, `CALIBRATING`), `cal`, `sim_mask`, and `touch` (`swap`, `x0`, `x1`, `y0`, `y1`, `custom`). The dashboard's older names (`fill_percentage`, `weight_grams` and so on) also work. Simulation mask bits: 0 fill, 1 weight, 2 air quality, 3 temperature and humidity, 4 tamper, 5 motion, 6 lid.
+
+### Touch calibration (to add to the app)
+
+The dashboard has this under Settings > Touchscreen; the app can copy it:
+
+1. Read `touch` from `/api/status`. Show "Calibrated on the bin" when `custom` is true, otherwise "Default values".
+2. A CALIBRATE TOUCH button sends `{"cmd":"TOUCH_CAL"}`. The bin shows four crosses; the person presses them on the bin itself. When it finishes, `touch.custom` turns true and a "Touch calibrated" alert arrives (or "Touch calibration failed" if the presses were too close together).
+3. A RESET TOUCH button sends `{"cmd":"TOUCH_CAL_RESET"}`.
+4. Operator only, and local Wi-Fi only, like the other calibration commands.
 
 ### Firebase layout
 

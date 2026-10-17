@@ -4,3 +4,5 @@
 void uiInit();
 void uiTask(void*);
 void isrTouch();
+void uiStartTouchCal();
+void uiResetTouchCal();

@@ -19,6 +19,16 @@ struct Cal {
   uint16_t quiet_from = 1320, quiet_to = 360;
 };
 
+struct TouchCal {
+  uint8_t swap = TS_SWAP_XY;
+  int16_t x0 = TS_RAW_X0, x1 = TS_RAW_X1, y0 = TS_RAW_Y0, y1 = TS_RAW_Y1;
+};
+extern TouchCal touchCal;
+extern bool touchCalCustom;
+void saveTouchCal();
+void loadTouchCal();
+void resetTouchCal();
+
 struct Sim {
   uint8_t mask = 0;
   float fill = 60, weight = 2000, gas = 120, temp = 28, humidity = 60;
