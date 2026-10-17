@@ -4,6 +4,8 @@ The phone app for the Smart-Bin system, for both the operator and the collector.
 
 It runs with no hardware. Bins without an address show demo data that fills and drifts the way real bins do, so every screen can be shown in class. Give a bin an IP address and it switches to live readings over Wi-Fi.
 
+**Connecting to the real bins:** see [INTEGRATION.md](INTEGRATION.md) for what the firmware now does and what the app needs to add (Bluetooth Wi-Fi setup, new status fields, touch calibration, Firebase command results and watchers).
+
 Version 1.2. Kotlin and Jetpack Compose, the same stack as Garbage-Guard (AGP 9.4.1, Gradle 9.6.0, compile and target SDK 37, minimum Android 8.0).
 
 ## Build and run
