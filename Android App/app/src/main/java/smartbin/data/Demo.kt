@@ -5,8 +5,8 @@ import kotlin.math.roundToInt
 import kotlin.random.Random
 
 /**
- * Invented readings for bins that have no address yet, so the whole app
- * works with no hardware. The numbers move the way the dashboard's demo
+ * Invented readings for the demo bins that DEMO on the start page adds, so the
+ * whole app works with no hardware. The numbers move the way the dashboard's demo
  * moves them, and stay inside what the HC-SR04, HX711 and BME680 can report.
  * One demo minute fills a bin as much as one real hour would.
  */
@@ -15,16 +15,19 @@ object Demo {
     const val NORMAL_SPEED = 60.0
     var speed = NORMAL_SPEED
 
+    /** The three demo bins, named as on the dashboard. */
     fun bins(): List<Bin> = listOf(
-        bin(0, "Bin 01", "Main Hall", fill = 34.0, weight = 1430.0, temp = 28.0, hum = 62.0, gas = 72.0, rate = 0.38),
-        bin(1, "Bin 02", "Cafeteria", fill = 62.0, weight = 2570.0, temp = 28.1, hum = 63.0, gas = 118.0, rate = 3.1),
-    )
+        bin(0, "Demo Bin 1", "Main Hall", fill = 34.0, weight = 1430.0, temp = 28.0, hum = 62.0, gas = 72.0, rate = 0.38, id = "demo1"),
+        bin(1, "Demo Bin 2", "Cafeteria", fill = 62.0, weight = 2570.0, temp = 28.1, hum = 63.0, gas = 118.0, rate = 3.1, id = "demo2"),
+        bin(2, "Demo Bin 3", "Library", fill = 88.0, weight = 3650.0, temp = 28.4, hum = 61.0, gas = 96.0, rate = 0.9, id = "demo3"),
+    ).map { it.copy(isDemo = true, cloudId = "demo%02d".format(it.id.last().digitToInt())) }
 
     private val PLACES = listOf("Main Hall", "Cafeteria", "Library", "Gym", "Lobby", "Parking", "Admin", "Lab A", "Lab B", "Clinic", "Chapel", "Field")
 
-    /** A new bin from the Add sheet: empty, demo data until it gets an address. */
+    /** A new real bin from the Add sheet. It shows "not answering" until it gets an address or a cloud link. */
     fun newBin(index: Int, id: String): Bin =
         bin(index, "Bin %02d".format(index + 1), "New location", fill = 0.0, weight = 0.0, temp = 27.6, hum = 58.0, gas = 40.0, rate = 0.0, id = id)
+            .copy(source = Source.STALE)
 
     fun placeFor(index: Int) = PLACES[index % PLACES.size]
 
@@ -66,8 +69,17 @@ object Demo {
             hum = (r.hum + (Random.nextDouble() - 0.5) * 0.6).coerceIn(35.0, 95.0)
         }
         val press = (r.press + (Random.nextDouble() - 0.5) * 0.06).coerceIn(985.0, 1030.0)
-        val iaqAcc = r.iaqAcc.let { if (it < 3 && Random.nextDouble() < 0.05) it + 1 else it }
-        val base = r.copy(gas = gas, temp = temp, tempRaw = tempRaw, hum = hum, press = press, iaqAcc = iaqAcc, at = now)
+        // After RESET_GAS the air sensor warms up for 20 demo seconds, counting down as the real one does.
+        val warm = if (r.iaqAcc == 0) ((r.iaqWarmS ?: 20) - 1).coerceAtLeast(0) else null
+        val iaqAcc = when {
+            r.iaqAcc == 0 -> if (warm == 0) 1 else 0
+            r.iaqAcc < 3 && Random.nextDouble() < 0.05 -> r.iaqAcc + 1
+            else -> r.iaqAcc
+        }
+        val base = r.copy(
+            gas = gas, temp = temp, tempRaw = tempRaw, hum = hum, press = press, iaqAcc = iaqAcc, at = now,
+            iaqWarmS = if (iaqAcc == 0) warm else null, gasK = if (iaqAcc == 0) 140.0 + Random.nextDouble() * 6 else null,
+        )
 
         if (calibrating) {
             return base.copy(status = BinStatus.CALIBRATING, lidOpen = false, distance = c.v("d_empty") - Random.nextDouble() * 0.4)
@@ -119,7 +131,7 @@ object Demo {
         return out.asReversed()
     }
 
-    /** The mockup's example history, so the alert tools have something to act on. Only when no bin has an address. */
+    /** The mockup's example history for the demo bins, so the alert tools have something to act on. */
     fun alerts(bins: List<Bin>, now: Long): List<AlertRow> {
         val a = bins.getOrNull(0)?.name ?: "Bin 01"
         val b = bins.getOrNull(1)?.name ?: a
@@ -143,7 +155,7 @@ object Demo {
             val shown = when (icon) { "unlock" -> "check"; "save" -> "check"; else -> icon }
             AlertRow(
                 id = (i + 1).toLong(), sev = sev, icon = shown, kind = kindFor(icon), title = x[1], meta = x[2],
-                at = now - mins * m, read = i >= 3,
+                at = now - mins * m, read = i >= 3, demo = true,
             )
         }
     }

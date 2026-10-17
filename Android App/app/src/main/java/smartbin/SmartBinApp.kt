@@ -36,18 +36,22 @@ class SmartBinApp : Application() {
 
         scope.launch {
             Hub.events.collect { e ->
+                // Nothing sounds or posts on the start page: only once the user is in the main screens.
+                if (!Hub.inMain) return@collect
+                val onScreen = Hub.foreground
                 when (e) {
                     is HubEvent.NewAlert ->
-                        if (Hub.foreground) Feel.event(Alerts.sfxFor(e.type))
-                        else if (Hub.inMain) Alerts.post(this@SmartBinApp, e.row, e.type, e.binId)
-                    is HubEvent.LinkChanged -> if (Hub.foreground) when (e.to) {
+                        if (onScreen) Feel.event(Alerts.sfxFor(e.type))
+                        else if (!e.row.demo) Alerts.post(this@SmartBinApp, e.row, e.type, e.binId)
+                    is HubEvent.LinkChanged -> if (onScreen) when (e.to) {
                         Link.LIVE -> Feel.event(Sfx.LINK_UP)
                         Link.CLOUD, Link.THINGSPEAK -> Feel.event(Sfx.CLOUD)
                         Link.OFFLINE -> Feel.event(Sfx.LINK_LOST)
                         Link.DEMO -> {}
                     }
-                    is HubEvent.BinLost -> if (Hub.foreground) Feel.event(Sfx.BIN_LOST)
-                    is HubEvent.BinBack -> if (Hub.foreground) Feel.event(Sfx.BIN_BACK)
+                    is HubEvent.BinLost -> if (onScreen) Feel.event(Sfx.BIN_LOST)
+                    is HubEvent.BinBack -> if (onScreen) Feel.event(Sfx.BIN_BACK)
+                    is HubEvent.Sound -> if (onScreen) runCatching { Sfx.valueOf(e.name) }.getOrNull()?.let(Feel::event)
                     // The screens tell the user; nothing to post.
                     is HubEvent.CommandResult -> {}
                 }

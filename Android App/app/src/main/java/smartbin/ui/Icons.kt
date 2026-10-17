@@ -211,7 +211,7 @@ object Ic {
     /** The icon names alert rows carry. */
     fun named(n: String): ImageVector = when (n) {
         "fill" -> fill; "gas" -> gas; "tamper" -> tamper; "humid" -> humid; "lock" -> lock(true)
-        "check" -> check; "truck" -> truck; "calib" -> calib; "temp" -> temp(41.0); "save" -> save
+        "check" -> check; "truck" -> truck; "calib" -> calib; "temp" -> temp(41.0); "save" -> save; "gear" -> gear
         else -> bell
     }
 }

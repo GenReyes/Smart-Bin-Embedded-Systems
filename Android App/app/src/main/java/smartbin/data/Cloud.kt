@@ -18,6 +18,9 @@ import java.net.URLEncoder
  * Data layout (the firmware writes the same paths):
  *   /sb/bins/<cloudId>/status    the /api/status JSON plus "ts" (ms) and "local_ip"
  *   /sb/commands/<cloudId>       the app pushes {"cmd": "LOCK", "ts": ...}; the bin runs and removes it
+ *   /sb/results/<push key>       the bin's answer to that command: {"ok", "cmd", "why", "ts"}
+ *   /sb/watchers/<id>            written every 10 s while the app reads bins over Firebase, so they send faster
+ *   /sb/alerts/<cloudId>         the bin's own alert list, newest 50
  *   /sb/usage/bytes_month        optional, the month's download total for the meter
  *   /sb_users/<uid>              the accounts allowed in; Test reads this
  *
@@ -44,10 +47,38 @@ class Cloud(private var config: FirebaseConfig) {
         return CloudStatus(LocalApi.parse(o), o.optLong("ts", 0L), o.optString("local_ip").takeIf { it.isNotBlank() })
     }
 
-    suspend fun command(cloudId: String, cmd: String) {
+    /** Pushes a command and returns its push key, under which the bin writes its answer. */
+    suspend fun command(cloudId: String, cmd: String): String? {
         require(cmd in CLOUD_COMMANDS) { "$cmd needs the bins' Wi-Fi" }
         val body = JSONObject().put("cmd", cmd).put("ts", System.currentTimeMillis()).put("from", "app")
-        rest("POST", "sb/commands/$cloudId", body.toString())
+        val raw = rest("POST", "sb/commands/$cloudId", body.toString()) ?: return null
+        return runCatching { JSONObject(raw).optString("name") }.getOrNull()?.takeIf { it.isNotBlank() }
+    }
+
+    /** The bin's answer to a command, or null while it has not answered. */
+    suspend fun result(key: String): JSONObject? = rest("GET", "sb/results/$key")?.let { runCatching { JSONObject(it) }.getOrNull() }
+
+    suspend fun dropResult(key: String) {
+        runCatching { rest("DELETE", "sb/results/$key") }
+    }
+
+    /** Tells the bins someone is watching, so they write every 5 s instead of every minute. */
+    suspend fun watch(id: String, device: String) {
+        val body = JSONObject()
+            .put("ts", JSONObject().put(".sv", "timestamp"))
+            .put("kind", "app").put("device", device).put("mode", "foreground").put("bin", "all")
+        rest("PUT", "sb/watchers/$id", body.toString())
+    }
+
+    suspend fun unwatch(id: String) {
+        runCatching { rest("DELETE", "sb/watchers/$id") }
+    }
+
+    /** The alerts a bin wrote to the cloud, oldest first. */
+    suspend fun alerts(cloudId: String): List<JSONObject> {
+        val raw = rest("GET", "sb/alerts/$cloudId") ?: return emptyList()
+        val o = runCatching { JSONObject(raw) }.getOrNull() ?: return emptyList()
+        return o.keys().asSequence().mapNotNull { o.optJSONObject(it) }.sortedBy { it.optLong("ts") }.toList()
     }
 
     suspend fun usageBytes(): Long? = rest("GET", "sb/usage/bytes_month")?.trim()?.toLongOrNull()

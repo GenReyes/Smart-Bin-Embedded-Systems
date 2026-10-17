@@ -25,6 +25,7 @@ import smartbin.SmartBinApp
 import smartbin.data.AlertKind
 import smartbin.data.AlertRow
 import smartbin.data.Bin
+import smartbin.data.BinBle
 import smartbin.data.Cal
 import smartbin.data.Cloud
 import smartbin.data.DEFAULT_SIM
@@ -71,6 +72,8 @@ sealed interface Overlay {
     data class PinSet(val first: Boolean, val change: Boolean) : Overlay
     data object PinChange : Overlay
     data class BtCode(val id: String) : Overlay
+    /** Bins found over Bluetooth, to pick the one to set up. */
+    data object BtDevices : Overlay
 }
 
 /**
@@ -107,7 +110,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         say("${e.name} confirmed ${e.cmd}.")
                     } else {
                         Feel.event(Sfx.CMD_FAIL)
-                        say("${e.name} did not confirm ${e.cmd}. Check the bin, then try again.")
+                        say(e.why?.let { "${e.name} refused ${e.cmd}: $it." } ?: "${e.name} did not confirm ${e.cmd}. Check the bin, then try again.")
                     }
                 }
             }
@@ -116,9 +119,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ---------- whole app ----------
 
-    // Operator is never remembered: every start, and every return after a while
-    // away, is as a collector until the operator PIN is entered again.
-    var role by mutableStateOf(store.string(SmartBinApp.KEY_ROLE, "").let { r -> Role.entries.firstOrNull { it.name == r } }?.let { Role.COLLECTOR })
+    // Every start opens on the start page with no role picked. Operator is never
+    // remembered, and a return after a while away drops it to collector.
+    var role by mutableStateOf<Role?>(null)
         private set
     val lock = OperatorLock(store)
     val operator get() = role != Role.COLLECTOR
@@ -126,12 +129,34 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** The tab the gear key was pressed on, so back returns there. */
     private var beforeApp = Screen.OVERVIEW
     /**
-     * False until the start page lets go. A new view model means the app was
-     * closed or Android ended it, so the start page shows while the bins are
-     * reached. Coming back from the background keeps this one, and the page
-     * the user left.
+     * False on the start page. A new view model means the app was closed or
+     * Android ended it, so the start page shows again. Coming back from the
+     * background keeps this one, and the page the user left.
      */
     var started by mutableStateOf(false)
+
+    /** Back to the start page, where demo mode is turned on or off. Operator needs the PIN again after. */
+    fun toStart() {
+        if (role == Role.OPERATOR) Feel.event(Sfx.OP_OUT)
+        if (editing) viewModelScope.launch { Hub.setCalibration(null) }
+        edit = null
+        dirty = false
+        overlay = null
+        fullscreen = null
+        screen = Screen.OVERVIEW
+        role = null
+        started = false
+        syncInMain()
+    }
+
+    /** The DEMO key on the start page. */
+    fun toggleDemo() {
+        val on = !Hub.state.value.demoOn
+        Hub.setDemo(on)
+        demoSpeed = Demo.speed
+        demoTick++
+        Feel.event(if (on) Sfx.DEMO else Sfx.SWITCH_OFF)
+    }
 
     /** Tells [Hub] whether the user is inside the main screens, which is when alerts may be posted. */
     fun syncInMain() {
@@ -141,6 +166,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     override fun onCleared() {
         // The app was closed for good (back out of it, or the activity finished).
         Hub.inMain = false
+        ble.release()
         super.onCleared()
     }
     var overlay by mutableStateOf<Overlay?>(null)
@@ -205,6 +231,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val had = role != null
         if (role == Role.OPERATOR && r == Role.COLLECTOR) Feel.event(Sfx.OP_OUT)
         role = r
+        started = true
+        syncInMain()
         // Only "a role was picked" is kept; the next start is always collector.
         store.putString(SmartBinApp.KEY_ROLE, Role.COLLECTOR.name)
         if (r == Role.COLLECTOR) {
@@ -428,6 +456,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun command(id: String, cmd: String) {
         viewModelScope.launch {
             val b = Hub.bin(id) ?: return@launch
+            if (b.demo) Hub.pauseTour()
             val problem = Hub.command(id, cmd)
             if (problem != null) {
                 Feel.event(Sfx.DENIED)
@@ -599,8 +628,42 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun binCommand(b: Bin, cmd: String, extra: Map<String, Any>, ok: String) {
         viewModelScope.launch {
+            if (b.demo) Hub.pauseTour()
             val problem = Hub.command(b.id, cmd, extra)
+            if (problem != null) Feel.event(Sfx.DENIED)
             say(problem ?: ok)
+        }
+    }
+
+    /** The bin's touchscreen: four crosses to press on the bin, or back to the firmware's values. Wi-Fi only. */
+    fun touchCal(b: Bin, reset: Boolean) {
+        if (!b.demo && b.source != Source.LIVE) {
+            Feel.event(Sfx.DENIED)
+            say("Touch calibration needs ${b.name} on the same Wi-Fi as the phone.")
+            return
+        }
+        Feel.event(if (reset) Sfx.CONFIRM else Sfx.CALIB)
+        binCommand(
+            b, if (reset) "TOUCH_CAL_RESET" else "TOUCH_CAL", emptyMap(),
+            if (reset) "${b.name}'s touchscreen is back to the default values."
+            else "${b.name} shows 4 crosses. Press the centre of each one on the bin.",
+        )
+    }
+
+    /** Gives every bin on Wi-Fi the saved Firebase account, so they write to the same database. */
+    fun sendCloudToBins() {
+        if (!operator) {
+            Feel.event(Sfx.DENIED)
+            say("Only an operator can send the cloud account to the bins.")
+            return
+        }
+        viewModelScope.launch {
+            val (ok, tried) = Hub.sendCloudToBins()
+            when {
+                tried == 0 -> { Feel.event(Sfx.DENIED); say("No bin is on Wi-Fi with an address, so nothing was sent.") }
+                ok == tried -> { Feel.event(Sfx.SAVED); say("Sent the cloud account to $ok bin${if (ok == 1) "" else "s"}.") }
+                else -> { Feel.event(Sfx.CMD_FAIL); say("$ok of $tried bins took the cloud account. Check the others are on.") }
+            }
         }
     }
 
@@ -633,7 +696,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun reload(b: Bin) {
         viewModelScope.launch {
             if (b.ip.isBlank()) {
-                say("${b.name} shows demo data. Give it an address first.")
+                say(if (b.demo) "${b.name} is a demo bin." else "Give ${b.name} an address first.")
                 return@launch
             }
             val problem = Hub.reload(b.id)
@@ -667,18 +730,38 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    // ---------- Bluetooth setup (simulated until the bins have BLE firmware) ----------
+    // ---------- Bluetooth Wi-Fi setup ----------
 
+    /** 0 not paired, 1 paired, 2 joining, 3 joined, 4 Bluetooth off on the bin. */
     var bt by mutableIntStateOf(0)
     var ssid by mutableStateOf("")
     var pass by mutableStateOf("")
     var showPass by mutableStateOf(false)
+    /** What is happening now, under the keys. */
+    var btNote by mutableStateOf<String?>(null)
+    var btBusy by mutableStateOf(false)
+    /** The bins found nearby, and whether the search still runs. */
+    val btFound = androidx.compose.runtime.mutableStateListOf<BinBle.Found>()
+    var btScanning by mutableStateOf(false)
+    /** The networks the bin can see. */
+    var btNets by mutableStateOf<List<BinBle.Net>>(emptyList())
+    /** The address and network the bin joined. */
+    var btIp by mutableStateOf("")
+    var btJoined by mutableStateOf("")
+    /** The bin being set up: its Bluetooth name, and whether it is the demo stand-in. */
+    var btName by mutableStateOf("")
+    var btDemo by mutableStateOf(false)
+    /** Set when the phone and the bin disagree about an old pairing. */
+    var btStale by mutableStateOf(false)
+
+    private val ble by lazy { BinBle(getApplication()) }
+    private var btJob: Job? = null
+    private var btWait: Job? = null
 
     /**
-     * Pairing needs the 6-digit code the bin shows on its touchscreen, as
-     * Bluetooth passkey pairing does: a fresh random code each time, gone after
-     * 60 s, and 3 wrong codes stop pairing for 60 s. The stand-in bin shows
-     * its code in the sheet until the firmware has Bluetooth.
+     * Pairing a demo bin uses a stand-in for its screen: a fresh random code
+     * each time, gone after 60 s, and 3 wrong codes stop pairing for 60 s, the
+     * same rules the bin's firmware keeps.
      */
     var btCode by mutableStateOf("")
         private set
@@ -689,18 +772,148 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private var btFails = 0
     private var btWaitUntil = 0L
 
-    fun btPair(b: Bin) {
-        val wait = btWaitUntil - System.currentTimeMillis()
-        if (wait > 0) {
-            Feel.event(Sfx.DENIED)
-            say("${b.name} stopped pairing after 3 wrong codes. Try again in ${(wait + 999) / 1000} s.")
+    fun btPermissions() = ble.permissions()
+    fun btAllowed() = ble.allowed()
+
+    private fun btReset() {
+        btWait?.cancel()
+        bt = 0
+        btIp = ""
+        btJoined = ""
+        btNets = emptyList()
+        btStale = false
+    }
+
+    /** PAIR A BIN. A demo bin walks through the stand-in; anything else looks for real bins nearby. */
+    fun btPair(b: Bin?) {
+        btReset()
+        if (b != null && b.demo) {
+            val wait = btWaitUntil - System.currentTimeMillis()
+            if (wait > 0) {
+                Feel.event(Sfx.DENIED)
+                say("${b.name} stopped pairing after 3 wrong codes. Try again in ${(wait + 999) / 1000} s.")
+                return
+            }
+            btDemo = true
+            btName = b.name
+            btFails = 0
+            btEntry = ""
+            btMsg = null
+            btNewCode()
+            overlay = Overlay.BtCode(b.id)
             return
         }
-        btFails = 0
-        btEntry = ""
-        btMsg = null
-        btNewCode()
-        overlay = Overlay.BtCode(b.id)
+        btDemo = false
+        when {
+            !ble.present -> { Feel.event(Sfx.DENIED); btNote = "This phone has no Bluetooth." }
+            !ble.allowed() -> { Feel.event(Sfx.DENIED); btNote = "Allow Nearby devices (Bluetooth) for Smart-Bin, then press PAIR A BIN again." }
+            !ble.on -> { Feel.event(Sfx.DENIED); btNote = "Turn Bluetooth on, then press PAIR A BIN again." }
+            else -> btSearch()
+        }
+    }
+
+    /** Looks for bins for 8 s and lists them in a sheet. */
+    fun btSearch() {
+        btFound.clear()
+        btScanning = true
+        overlay = Overlay.BtDevices
+        btNote = "Looking for bins nearby. On the bin, tap i, then WI-FI SETUP, and type the Collect PIN."
+        btJob?.cancel()
+        btJob = viewModelScope.launch {
+            try {
+                ble.scan(8_000) { f -> if (btFound.none { it.address == f.address }) btFound.add(f) }
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                btNote = e.message ?: "Could not look for bins."
+            } finally {
+                btScanning = false
+            }
+            if (btFound.isEmpty()) btNote = "No bin found. Check that the bin shows WI-FI SETUP and stands close by" +
+                (if (Build.VERSION.SDK_INT < 31) ", and that Location is on." else ".")
+        }
+    }
+
+    /** A bin picked in the sheet: connect, pair with the code Android asks for, then read its networks. */
+    fun btConnect(f: BinBle.Found) {
+        overlay = null
+        btJob?.cancel()
+        btName = f.name
+        btBusy = true
+        btNote = "Connecting to ${f.name}..."
+        btJob = viewModelScope.launch {
+            try {
+                ble.onDrop = { viewModelScope.launch { btDropped() } }
+                ble.onStat = { j -> viewModelScope.launch { btStatus(j) } }
+                ble.connect(f.device)
+                btNote = "${f.name} shows a 6-digit code now. Type it in the box Android opens. The code lasts 60 s."
+                ble.secure()
+                ble.listen()
+                Feel.event(Sfx.BT_PAIRED)
+                bt = 1
+                btNote = "Paired with ${f.name}. The link is encrypted. Pick the network next."
+                btLoadNets()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: BinBle.StaleBond) {
+                ble.close()
+                btStale = true
+                Feel.event(Sfx.BT_WRONG)
+                btNote = "${f.name} keeps dropping the link. The phone most likely remembers it from an earlier pairing. Press FORGET AND PAIR AGAIN, then on the bin open WI-FI SETUP again."
+            } catch (e: Exception) {
+                ble.close()
+                Feel.event(Sfx.BT_WRONG)
+                btNote = "Pairing did not finish (${e.message}). If the code was wrong, the bin shows a new one; after 3 wrong codes it waits 60 s."
+            } finally {
+                btBusy = false
+            }
+        }
+    }
+
+    /** Makes the phone forget the bin, then searches again. Opens Android's Bluetooth settings if that is not allowed. */
+    fun btForget() {
+        val d = ble.device ?: btFound.firstOrNull { it.name == btName }?.device
+        btStale = false
+        if (d != null && ble.forget(d)) {
+            Feel.event(Sfx.CONFIRM)
+            say("The phone forgot $btName. Pair it again.")
+            btSearch()
+        } else {
+            say("Remove $btName in Android's Bluetooth settings, then press PAIR A BIN.")
+            runCatching {
+                getApplication<Application>().startActivity(Intent(Settings.ACTION_BLUETOOTH_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+        }
+    }
+
+    /** The bin scans when WI-FI SETUP opens; an empty list means it is not done, so it asks again after 5 s. */
+    private suspend fun btLoadNets() {
+        repeat(3) { k ->
+            val nets = runCatching { ble.networks() }.getOrDefault(emptyList())
+            if (nets.isNotEmpty()) {
+                btNets = nets
+                if (ssid.isBlank()) ssid = nets.first().ssid
+                return
+            }
+            if (k < 2) {
+                btNote = "The bin is still looking for networks. Asking again in 5 s. You can also type the name."
+                delay(5_000)
+                if (bt != 1) return
+            }
+        }
+        btNote = "The bin found no networks. Check the router is on 2.4 GHz and close by, press SCAN, or type the name."
+    }
+
+    fun btScanNets() {
+        if (btDemo) {
+            overlay = Overlay.Wifi
+            return
+        }
+        viewModelScope.launch {
+            btBusy = true
+            btLoadNets()
+            btBusy = false
+            if (btNets.isNotEmpty()) overlay = Overlay.Wifi
+        }
     }
 
     fun btNewCode() {
@@ -729,8 +942,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             btEntry = ""
             btCode = ""
             bt = 1
+            btNets = DEMO_NETS
             Feel.event(Sfx.BT_PAIRED)
-            say("Paired with ${b.name}. The Bluetooth link is encrypted.")
+            btNote = "Paired with ${b.name} (demo). Pick a network. A name with \"fail\" in it shows what a failed join looks like."
             return
         }
         btEntry = ""
@@ -754,31 +968,132 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         btCode = ""
     }
 
+    /** SEND WI-FI: the bin tries the network for up to 15 s and keeps its old one if it fails. */
     fun btSend() {
-        if (ssid.isBlank()) {
-            say("Pick or type the Wi-Fi name first.")
-            return
+        val name = ssid.trim()
+        when {
+            name.isBlank() -> { Feel.event(Sfx.DENIED); say("Pick or type the Wi-Fi name first."); return }
+            name.length > 32 || pass.length > 63 -> { Feel.event(Sfx.DENIED); say("The name can be 32 characters at most and the password 63."); return }
+            pass.isNotEmpty() && pass.length < 8 -> { Feel.event(Sfx.DENIED); say("A Wi-Fi password has at least 8 characters. Leave it empty only for an open network."); return }
         }
         bt = 2
-        viewModelScope.launch {
-            delay(1600)
+        btNote = "Sending the network to $btName and waiting for it to join..."
+        btWait?.cancel()
+        if (btDemo) {
+            btWait = viewModelScope.launch {
+                delay(1800)
+                if (name.contains("fail", true)) btStatus(JSONObject().put("state", "FAILED").put("why", "Network not found"))
+                else btStatus(JSONObject().put("state", "CONNECTED").put("ip", "192.168.1.${101 + (Hub.state.value.bins.indexOfFirst { it.id == selSet }.coerceAtLeast(0))}").put("ssid", name))
+            }
+            return
+        }
+        btWait = viewModelScope.launch {
+            try {
+                ble.join(name, pass)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                bt = 1
+                Feel.event(Sfx.CMD_FAIL)
+                btNote = "Could not send (${e.message}). Press SEND WI-FI again."
+                return@launch
+            }
+            // Notifications can be missed or cut short, so the status is read every 2 s too.
+            val end = System.currentTimeMillis() + 25_000
+            while (bt == 2 && System.currentTimeMillis() < end) {
+                delay(2_000)
+                if (bt == 2 && ble.connected) runCatching { ble.readStat() }.getOrNull()?.let { btStatus(it) }
+            }
             if (bt == 2) {
-                bt = 3
-                Feel.event(Sfx.WIFI_JOINED)
+                bt = 1
+                Feel.event(Sfx.WIFI_FAILED)
+                btNote = "No answer from the bin after 25 s. Its touchscreen shows whether it joined. Press SEND WI-FI again, or PAIR A BIN."
             }
         }
     }
 
-    fun btAddress(bins: List<Bin>, b: Bin) = "192.168.1.${101 + minOf(bins.indexOf(b).coerceAtLeast(0), 2)}"
+    /** One STAT message from the bin. */
+    private fun btStatus(j: JSONObject) {
+        if (bt != 2) return
+        when (j.optString("state").uppercase()) {
+            "CONNECTING" -> btNote = "$btName is joining ${ssid.trim()}. This takes up to 15 s."
+            "CONNECTED" -> {
+                val ip = j.optString("ip")
+                if (ip.isBlank()) return
+                btWait?.cancel()
+                btIp = ip
+                btJoined = j.optString("ssid").ifBlank { ssid.trim() }
+                bt = 3
+                Feel.event(Sfx.WIFI_JOINED)
+                btNote = "Press ${btUseLabel()} to keep this address, then TURN BT OFF."
+            }
+            "FAILED" -> {
+                btWait?.cancel()
+                bt = 1
+                Feel.event(Sfx.WIFI_FAILED)
+                btNote = "$btName could not join: ${j.optString("why").ifBlank { "no reason given" }}. It went back to its old Wi-Fi. Check the name and password, then SEND WI-FI again."
+            }
+        }
+    }
 
-    fun btUse(bins: List<Bin>, b: Bin) {
-        Hub.editBin(b.id, b.name, b.place, btAddress(bins, b), b.cloudId)
-        say("Address saved to ${b.name}.")
+    /** The link dropped. While joining, the answer is read again after reconnecting. */
+    private suspend fun btDropped() {
+        when (bt) {
+            1 -> {
+                bt = 0
+                Feel.event(Sfx.BIN_LOST)
+                btNote = "$btName closed the Bluetooth link. On the bin, open WI-FI SETUP again, then PAIR A BIN."
+            }
+            2 -> {
+                btNote = "The link dropped while $btName joins. Reconnecting to read the result..."
+                val d = btFound.firstOrNull { it.name == btName }?.device ?: return
+                runCatching {
+                    ble.connect(d)
+                    ble.listen()
+                    btStatus(ble.readStat())
+                }
+            }
+        }
+    }
+
+    /** The bin being set up is the picked one if it is real; otherwise it becomes a new bin. */
+    private fun btTarget(): Bin? = Hub.bin(selSet ?: "")?.takeIf { !it.demo }
+
+    fun btUseLabel(): String = when {
+        btDemo -> "USE"
+        btTarget() != null -> "USE FOR ${btTarget()!!.name.uppercase()}"
+        else -> "ADD AS BIN ${btNumber()}".trim()
+    }
+
+    private fun btNumber() = Regex("(\\d+)\\s*$").find(btName)?.groupValues?.get(1) ?: ""
+
+    fun btUse() {
+        if (btIp.isBlank()) return
+        if (btDemo) {
+            Feel.event(Sfx.SAVED)
+            say("$btName is a demo bin, so nothing was stored.")
+            return
+        }
+        val t = btTarget()
+        if (t != null) {
+            Hub.editBin(t.id, t.name, t.place, btIp, t.cloudId)
+            say("${t.name} will now be read at $btIp.")
+        } else {
+            val b = Hub.addRealBin(btNumber().padStart(2, '0').takeIf { btNumber().isNotEmpty() } ?: "", btIp)
+            selSet = b.id
+            say("Added ${b.name} at $btIp.")
+        }
+        Feel.event(Sfx.SAVED)
     }
 
     fun btOff() {
-        bt = 4
-        say("Bluetooth is off on the bin.")
+        btWait?.cancel()
+        viewModelScope.launch {
+            if (!btDemo) ble.off()
+            bt = 4
+            Feel.event(Sfx.BT_OFF)
+            btNote = "Bluetooth is off on $btName. It stays on its Wi-Fi until someone opens WI-FI SETUP again."
+        }
     }
 
     // ---------- simulation ----------
@@ -874,26 +1189,28 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Demo fill speed as a multiple of real life. 60 is the normal demo. */
     var demoSpeed by mutableStateOf(Demo.speed)
         private set
-    var demoLinks by mutableStateOf(Routes())
-        private set
+    /** The pretend links live in [Hub], because the demo tour changes them too. */
+    val demoLinks: Routes get() = Hub.state.value.demoLinks
 
     fun changeDemoSpeed(x: Double) {
+        Hub.pauseTour()
         demoSpeed = x
         Hub.demoSpeed(x)
     }
 
     fun toggleDemoLink(which: Int) {
+        Hub.pauseTour()
         val r = demoLinks
-        demoLinks = when (which) {
+        val next = when (which) {
             0 -> r.copy(local = !r.local)
             1 -> r.copy(firebase = !r.firebase)
             else -> r.copy(thingspeak = !r.thingspeak)
         }
-        Hub.demoLinks(demoLinks)
+        Hub.demoLinks(next)
         val main = when {
-            demoLinks.local -> "Demo bins now answer on Wi-Fi."
-            demoLinks.firebase -> "Demo bins now answer through Firebase. LOCK, UNLOCK and COLLECT wait for the bin."
-            demoLinks.thingspeak -> "Demo bins now answer through ThingSpeak. LOCK, UNLOCK and COLLECT wait for the bin."
+            next.local -> "Demo bins now answer on Wi-Fi."
+            next.firebase -> "Demo bins now answer through Firebase. LOCK, UNLOCK and COLLECT wait for the bin."
+            next.thingspeak -> "Demo bins now answer through ThingSpeak. LOCK, UNLOCK and COLLECT wait for the bin."
             else -> "Demo bins show plain demo data again."
         }
         say(main)
@@ -901,6 +1218,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Pretend cloud commands: false confirms them after 4 s, true lets them time out after 8 s. */
     fun setDemoNoConfirm(no: Boolean) {
+        Hub.pauseTour()
         Hub.setDemoNoConfirm(no)
         say(if (no) "Cloud commands on demo bins will not be confirmed. Their keys give up after 8 s." else "Cloud commands on demo bins are confirmed after 4 s.")
     }
@@ -908,9 +1226,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun demoEvent(b: Bin, e: Hub.DemoEvent) {
         if (!b.demo) {
             Feel.event(Sfx.DENIED)
-            say("${b.name} is a real bin. Demo options only change bins with no address.")
+            say("${b.name} is a real bin. Demo options only change demo bins.")
             return
         }
+        Hub.pauseTour()
         Hub.demoEvent(b.id, e)
         say(
             when (e) {
@@ -925,9 +1244,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun toggleDemoQuiet(b: Bin) {
         if (!b.demo) {
             Feel.event(Sfx.DENIED)
-            say("${b.name} is a real bin. Demo options only change bins with no address.")
+            say("${b.name} is a real bin. Demo options only change demo bins.")
             return
         }
+        Hub.pauseTour()
         val quiet = !Hub.demoQuiet(b.id)
         Hub.setDemoQuiet(b.id, quiet)
         demoTick++
@@ -941,7 +1261,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun resetDemo() {
         Hub.resetDemo()
         demoSpeed = Demo.speed
-        demoLinks = Routes()
         demoTick++
         Feel.event(Sfx.SAVED)
         say("Demo options are back to normal.")
@@ -1021,6 +1340,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         private const val AUTO_LOCK = 2 * 60_000L
         const val BT_CODE_LEN = 6
         const val BT_CODE_LIFE = 60_000L
+        val DEMO_NETS = listOf(BinBle.Net("HomeWiFi-2G", -48), BinBle.Net("TUP-Manila", -61), BinBle.Net("Smart_Bin_Lab", -70), BinBle.Net("PLDTHOMEFIBR24", -79))
         private fun round2(v: Double) = Math.round(v * 100) / 100.0
     }
 }

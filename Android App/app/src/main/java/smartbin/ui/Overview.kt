@@ -230,11 +230,13 @@ fun BinCard(vm: AppViewModel, b: Bin, hub: HubState, inSheet: Boolean = false) {
             BinStatus.TAMPER -> Ic.tamper; BinStatus.LOCKED -> Ic.lock(true); BinStatus.COLLECTING -> Ic.truck; else -> Ic.check
         }
         val stColor = when (stKey) { BinStatus.LOCKED -> c.sim; BinStatus.TAMPER -> c.tamper; BinStatus.COLLECTING -> c.cal; else -> c.ok }
-        val stText = when (stKey) { BinStatus.LOCKED -> "LOCKED"; BinStatus.TAMPER -> "TAMPER"; BinStatus.COLLECTING -> "PICKUP"; else -> "OK" }
+        // While the bin is tipped but not yet latched, the firmware counts down before calling it tamper.
+        val tilting = !calOn && r.tamperPhase == "COUNTDOWN" && stKey != BinStatus.TAMPER
+        val stText = if (tilting) "TILTED" else when (stKey) { BinStatus.LOCKED -> "LOCKED"; BinStatus.TAMPER -> "TAMPER"; BinStatus.COLLECTING -> "PICKUP"; else -> "OK" }
         Column(Modifier.padding(top = 13.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 Chip(Ic.lid(r.lidOpen), if (r.lidOpen) "OPEN" else "CLOSED", r.lidOpen, c.lid, Modifier.weight(1f))
-                Chip(stIcon, stText, true, stColor, Modifier.weight(1f), Modifier.shake(stKey == BinStatus.TAMPER))
+                Chip(if (tilting) Ic.tamper else stIcon, stText, true, if (tilting) c.warn else stColor, Modifier.weight(1f), Modifier.shake(stKey == BinStatus.TAMPER || tilting))
                 Chip(
                     if (cloud) Ic.cloud else if (tsp) Ic.chart else Ic.wifi(live),
                     when { live -> "WI-FI"; cloud -> "CLOUD"; tsp -> "TSPEAK"; stale -> "OFFLINE"; else -> "DEMO" }, true,
@@ -271,6 +273,7 @@ fun BinCard(vm: AppViewModel, b: Bin, hub: HubState, inSheet: Boolean = false) {
                     },
             )
             Ticks(listOf(0.0, 50.0, fillTh, 100.0))
+            if (r.fault("HC-SR04")) T("Fill sensor not answering. The bar shows the last reading.", Modifier.padding(top = 4.dp), size = 0.74f, weight = FontWeight.Bold, color = c.bad)
         }
         // Four sensor tiles
         Row(Modifier.padding(top = 12.dp).alpha(if (stale) 0.42f else 1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -278,11 +281,22 @@ fun BinCard(vm: AppViewModel, b: Bin, hub: HubState, inSheet: Boolean = false) {
             val hTh = cal.v("hum_th")
             val wCap = cal.v("weight_cap")
             val gTh = cal.v("gas_th")
-            SensorTile(Ic.temp(r.temp), c.temp, "${fmt(r.temp, 1)}°", "Temperature", r.temp >= tTh, if (r.temp < 22) 0 else band(r.temp / tTh), Modifier.weight(1f))
-            SensorTile(Ic.humid, c.humid, "${Math.round(r.hum)}%", "Humidity", r.hum >= hTh,
+            // A sensor that stops answering shows -- and says so, instead of an old number.
+            val bme = r.fault("BME680")
+            val hx = r.fault("HX711")
+            val warm = r.warming && (b.sim.mask and 4) == 0
+            if (bme) SensorTile(Ic.temp(r.temp), c.temp, "--", "Not answering", true, 3, Modifier.weight(1f))
+            else SensorTile(Ic.temp(r.temp), c.temp, "${fmt(r.temp, 1)}°", "Temperature", r.temp >= tTh, if (r.temp < 22) 0 else band(r.temp / tTh), Modifier.weight(1f))
+            if (bme) SensorTile(Ic.humid, c.humid, "--", "Not answering", true, 3, Modifier.weight(1f))
+            else SensorTile(Ic.humid, c.humid, "${Math.round(r.hum)}%", "Humidity", r.hum >= hTh,
                 when { r.hum >= hTh - 10 -> 3; r.hum >= 60 -> 2; r.hum <= 35 -> 0; else -> 1 }, Modifier.weight(1f))
-            SensorTile(Ic.weight(r.weight / wCap), c.weight, "%.2fkg".format(r.weight / 1000), "Weight", r.weight >= wCap, band(r.weight / wCap), Modifier.weight(1f))
-            SensorTile(Ic.gas, c.gas, Math.round(r.gas).toString(), "Air quality", r.gas >= gTh, band(r.gas / gTh), Modifier.weight(1f))
+            if (hx) SensorTile(Ic.weight(0.0), c.weight, "--", "Not answering", true, 3, Modifier.weight(1f))
+            else SensorTile(Ic.weight(r.weight / wCap), c.weight, "%.2fkg".format(r.weight / 1000), "Weight", r.weight >= wCap, band(r.weight / wCap), Modifier.weight(1f))
+            when {
+                bme -> SensorTile(Ic.gas, c.gas, "--", "Not answering", true, 3, Modifier.weight(1f))
+                warm -> SensorTile(Ic.gas, c.gas, r.iaqWarmS?.takeIf { it > 0 }?.let { "${it / 60}:%02d".format(it % 60) } ?: "...", "Air warming up", false, 0, Modifier.weight(1f))
+                else -> SensorTile(Ic.gas, c.gas, Math.round(r.gas).toString(), "Air quality", r.gas >= gTh, band(r.gas / gTh), Modifier.weight(1f))
+            }
         }
         // LOCK or UNLOCK, RESET TAMPER (operator), COLLECT or DONE
         // A command sent through Firebase or ThingSpeak holds every key until the bin confirms it.

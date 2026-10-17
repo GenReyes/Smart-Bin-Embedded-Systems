@@ -1,5 +1,7 @@
 package smartbin.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
@@ -226,7 +228,15 @@ private fun Sections(vm: AppViewModel, b: Bin, v: Cal, on: Boolean) {
         Fld(vm, "tref", vm.tref, on, c.gas) { Btn("SET OFFSET", { vm.setOffset(b) }, look = Look.TINT, cc = c.gas, small = true, enabled = on, sound = Sfx.CONFIRM) }
         Fld(vm, "temp_off", v.v("temp_off"), on, c.gas)
         val acc = listOf("Stabilizing", "Low accuracy", "Medium accuracy", "Calibrated")[r.iaqAcc.coerceIn(0, 3)]
-        Field("Gas sensor state", Ic.gas, c.gas) { Readout("$acc, IAQ ${Math.round(r.gas)}") }
+        Field("Gas sensor state", Ic.gas, c.gas) {
+            Readout(
+                when {
+                    r.fault("BME680") -> "Not answering"
+                    r.warming -> "Warming up" + (r.iaqWarmS?.let { " (${it / 60}:%02d)".format(it % 60) } ?: "") + (r.gasK?.let { ", gas ${Math.round(it)}kΩ" } ?: "")
+                    else -> "$acc, IAQ ${Math.round(r.gas)}"
+                },
+            )
+        }
         Fld(vm, "hum_off", v.v("hum_off"), on, c.gas)
         Fld(vm, "press_off", v.v("press_off"), on, c.gas)
         Btn(
@@ -266,6 +276,16 @@ private fun Sections(vm: AppViewModel, b: Bin, v: Cal, on: Boolean) {
             )
         }
         Hint("Tare with the bin empty. Then put the known weight in and press CALIBRATE.")
+    }
+    if (vm.operator) Sect(
+        vm, "touch", "Touchscreen",
+        when (b.touchCustom) { true -> "calibrated"; false -> "default values"; null -> "not reported" }, c.accent, true,
+    ) {
+        Acts {
+            Btn("CALIBRATE TOUCH", { vm.touchCal(b, false) }, Modifier.weight(1f), Ic.capture, Look.TINT, c.accent, sound = Sfx.TAP)
+            Btn("RESET", { vm.touchCal(b, true) }, Modifier.weight(1f), Ic.undo, Look.TINT, c.accent, sound = Sfx.TAP)
+        }
+        Hint("If taps on the bin land in the wrong place, press CALIBRATE TOUCH and press the centre of each of the 4 crosses the bin shows. RESET goes back to the firmware's own values. Needs the bin on the same Wi-Fi as the phone.")
     }
 }
 
@@ -308,6 +328,13 @@ fun Connection(vm: AppViewModel, hub: HubState) {
                         }
                         T(txt, size = 0.72f, weight = FontWeight.Bold, color = cc, maxLines = 1)
                     }
+                    if (!b.isDemo && (b.fw.isNotBlank() || b.rssi != null)) {
+                        val up = b.uptimeS?.let { u -> if (u >= 86_400) "up ${u / 86_400} d" else if (u >= 3600) "up ${u / 3600} h" else "up ${u / 60} min" }
+                        T(
+                            listOfNotNull(b.fw.takeIf { it.isNotBlank() }?.let { "firmware $it" }, b.rssi?.let { "signal $it dBm" }, up).joinToString(" · "),
+                            Modifier.padding(start = 19.dp), size = 0.72f, weight = FontWeight.SemiBold, color = c.ink2, maxLines = 1,
+                        )
+                    }
                 }
                 if (hub.bins.size > 4) T("and ${hub.bins.size - 4} more", size = 0.84f, weight = FontWeight.SemiBold, color = c.ink2)
             }
@@ -338,6 +365,10 @@ fun Connection(vm: AppViewModel, hub: HubState) {
                 Btn("TEST AND SAVE", { vm.fbTest(true) }, Modifier.weight(1f), Ic.save, Look.SOLID, c.cloud, enabled = !vm.fbBusy)
             }
             Btn("RESTORE WORKING", { vm.fbRestore() }, Modifier.fillMaxWidth(), Ic.undo, Look.TINT)
+            if (vm.operator) {
+                Btn("SEND TO BINS", { vm.sendCloudToBins() }, Modifier.fillMaxWidth(), Ic.bins, Look.TINT, c.cloud, sound = Sfx.TAP)
+                Hint("SEND TO BINS gives every bin on Wi-Fi this account, so they write to the same database. Save it with TEST AND SAVE first.")
+            }
             Hint("TEST signs in and reads the list of bins. TEST AND SAVE keeps the details only when the test passes. RESTORE WORKING puts back the last details that passed. The password is stored encrypted on this phone.")
         }
         Card {
@@ -422,16 +453,18 @@ private fun Route(n: Int, icon: ImageVector, cc: Color, on: Boolean, up: Boolean
 @Composable
 fun Bluetooth(vm: AppViewModel, hub: HubState) {
     val c = Sb.c
-    val op = vm.operator
     val b = vm.binFor(vm.selSet, hub.bins)
-    val paired = vm.bt > 0
-    val name = b?.name ?: "this bin"
+    val paired = vm.bt in 1..3
+    val name = vm.btName.ifBlank { b?.takeIf { it.isDemo }?.name ?: "the bin" }
+    // Android asks for Nearby devices (or Location before Android 12) the first time.
+    val ask = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { vm.btPair(b) }
+    val pair = { if (b?.isDemo != true && !vm.btAllowed()) ask.launch(vm.btPermissions()) else vm.btPair(b) }
     ScrollPage {
         BackBar("Bluetooth setup", { vm.back() }) {
-            StatePill(Ic.bluetooth, if (vm.bt >= 4) "Off" else if (paired) "Paired" else "Not paired", c.bt, paired && vm.bt < 4)
+            StatePill(Ic.bluetooth, if (vm.bt >= 4) "Off" else if (paired) "Paired" else "Not paired", c.bt, paired)
         }
         Card {
-            Hint("Hand the Wi-Fi name and password to $name over Bluetooth, read back the address it gets, then switch its Bluetooth off so only Wi-Fi stays on.")
+            Hint("Hand the Wi-Fi name and password to a bin over Bluetooth, read back the address it gets, then switch its Bluetooth off so only Wi-Fi stays on.")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(Ic.bluetooth to "PAIR + CODE", Ic.radar to "PICK NETWORK", Ic.key to "SEND", Ic.power to "BT OFF").forEachIndexed { k, (ic, label) ->
                     val done = vm.bt > k
@@ -447,47 +480,64 @@ fun Bluetooth(vm: AppViewModel, hub: HubState) {
                     }
                 }
             }
-            val canEdit = paired && op && vm.bt < 3
+            vm.btNote?.let { note ->
+                Row(
+                    Modifier.fillMaxWidth().well(c, 12.dp).padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(9.dp),
+                ) {
+                    Ico(if (vm.btBusy || vm.bt == 2) Ic.reload else Ic.bluetooth, 18.dp, c.bt, Modifier.spin(vm.btBusy || vm.bt == 2))
+                    T(note, Modifier.weight(1f), size = 0.82f, weight = FontWeight.SemiBold)
+                }
+            }
+            val canEdit = vm.bt == 1
             Field("Wi-Fi name (2.4 GHz)", Ic.wifi(false)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Inp(vm.ssid, { vm.ssid = it }, Modifier.weight(1f), placeholder = "HomeWiFi-2G", enabled = canEdit)
-                    Btn("SCAN", { vm.overlay = Overlay.Wifi }, icon = Ic.radar, look = Look.TINT, cc = c.bt, small = true, enabled = paired && vm.bt < 3, sound = Sfx.OPEN)
+                    Btn("SCAN", { vm.btScanNets() }, icon = Ic.radar, look = Look.TINT, cc = c.bt, small = true, enabled = canEdit && !vm.btBusy, sound = Sfx.OPEN)
                 }
             }
             Field("Password", Ic.key) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Inp(vm.pass, { vm.pass = it }, Modifier.weight(1f), password = !vm.showPass, enabled = canEdit)
-                    Btn(if (vm.showPass) "HIDE" else "SHOW", { vm.showPass = !vm.showPass }, icon = if (vm.showPass) Ic.eyeoff else Ic.eye, look = Look.TINT, small = true, enabled = paired, sound = Sfx.CHOICE)
+                    Btn(if (vm.showPass) "HIDE" else "SHOW", { vm.showPass = !vm.showPass }, icon = if (vm.showPass) Ic.eyeoff else Ic.eye, look = Look.TINT, small = true, sound = Sfx.CHOICE)
                 }
             }
-            if (vm.bt == 3 && b != null) {
+            if (vm.bt >= 3 && vm.btIp.isNotBlank()) {
                 Column(Modifier.fillMaxWidth().well(c, 14.dp).padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         Ico(Ic.wifi(true), 21.dp, c.ok)
-                        T("Joined the network. Address: ", size = 0.9f, weight = FontWeight.Bold)
-                        T(vm.btAddress(hub.bins, b), size = 1.3f, color = c.ok, tnum = true)
+                        Column(Modifier.weight(1f)) {
+                            T("$name joined ${vm.btJoined}", size = 0.86f, weight = FontWeight.Bold)
+                            T(vm.btIp, size = 1.3f, color = c.ok, tnum = true)
+                        }
                     }
-                    Btn("USE FOR ${b.name.uppercase()}", { vm.btUse(hub.bins, b) }, Modifier.fillMaxWidth(), Ic.check, Look.SOLID, c.ok, small = true, sound = Sfx.SAVED)
+                    Btn(vm.btUseLabel(), { vm.btUse() }, Modifier.fillMaxWidth(), Ic.check, Look.SOLID, c.ok, small = true, sound = Sfx.TAP)
                 }
             }
-            Btn("PAIR A BIN", { b?.let { vm.btPair(it) } }, Modifier.fillMaxWidth(), Ic.bluetooth, Look.TINT, c.bt, enabled = vm.bt == 0 && b != null)
+            if (vm.btStale) {
+                Btn("FORGET AND PAIR AGAIN", { vm.btForget() }, Modifier.fillMaxWidth(), Ic.undo, Look.TINT, c.warn, sound = Sfx.TAP)
+            }
+            Btn(
+                if (vm.btBusy && vm.bt == 0) "PAIRING" else "PAIR A BIN", { pair() }, Modifier.fillMaxWidth(), Ic.bluetooth, Look.TINT, c.bt,
+                enabled = (vm.bt == 0 || vm.bt >= 4) && !vm.btBusy, sound = Sfx.OPEN,
+            )
             Btn(
                 "SEND WI-FI", { vm.btSend() }, Modifier.fillMaxWidth(), if (vm.bt == 2) Ic.reload else Ic.key, Look.SOLID, c.bt,
-                enabled = vm.bt == 1 && op, iconMod = Modifier.spin(vm.bt == 2), sound = Sfx.CONFIRM,
+                enabled = vm.bt == 1, iconMod = Modifier.spin(vm.bt == 2), sound = Sfx.CONFIRM,
             )
-            Btn("TURN BT OFF", { vm.btOff() }, Modifier.fillMaxWidth(), Ic.power, Look.TINT, c.warn, enabled = vm.bt == 3 && op, sound = Sfx.SWITCH_OFF)
+            Btn("TURN BT OFF", { vm.btOff() }, Modifier.fillMaxWidth(), Ic.power, Look.TINT, c.warn, enabled = vm.bt in 1..3, sound = Sfx.TAP)
             Hint(
                 when (vm.bt) {
-                    0 -> "Stand next to the bin, tap Pair phone on its touchscreen, then press PAIR A BIN and type the 6-digit code it shows."
+                    0 -> "On the bin, tap i, then WI-FI SETUP, and type the Collect PIN. Then press PAIR A BIN, pick the bin, and type the 6-digit code its screen shows."
                     1 -> "Pick the 2.4 GHz network the bin should join, then SEND WI-FI."
-                    2 -> "Sending credentials and waiting for the bin to join..."
-                    3 -> "Press USE to store this address, then turn Bluetooth off on the bin."
-                    else -> "Bluetooth is off on the bin. It stays on Wi-Fi until you reset it."
+                    2 -> "The bin tries the network for up to 15 s. If it fails it goes back to its old Wi-Fi."
+                    3 -> "Press ${vm.btUseLabel()} to keep this address, then TURN BT OFF."
+                    else -> "Bluetooth is off on the bin. It stays on Wi-Fi until someone opens WI-FI SETUP on it again."
                 }
             )
-            if (!op) Hint("You are signed in as a collector. You can pair a bin and read its address, but only an operator can send new Wi-Fi details or switch Bluetooth off.")
+            if (b?.isDemo == true) Hint("${b.name} is a demo bin, so pairing uses a stand-in code here. Pick a real bin, or none, to set up a real one.")
             Hint("The code keeps strangers from pairing and encrypts the link, so the Wi-Fi password cannot be overheard. It is new each time, lasts 60 s, and 3 wrong codes stop pairing for 60 s.")
-            Hint("This page walks through the steps with a stand-in for the bin. It talks to a real bin once the firmware has Bluetooth setup.")
         }
     }
 }
