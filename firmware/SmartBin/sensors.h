@@ -9,3 +9,4 @@ void requestTare();
 void requestCalWeight(float grams);
 void requestGasReset();
 void requestImuReference();
+int airWarmLeft();

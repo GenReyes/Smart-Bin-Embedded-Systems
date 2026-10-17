@@ -72,6 +72,12 @@ void requestCalWeight(float grams) { reqGrams = grams; reqCalW = true; }
 void requestGasReset() { reqGas = true; }
 void requestImuReference() { reqImuRef = true; }
 
+int airWarmLeft() {
+  uint32_t burn = baselineFromNvs ? 120 : 300;
+  uint32_t age = (millis() - gasStartMs) / 1000;
+  return age < burn ? (int)(burn - age) : 0;
+}
+
 void recomputeView() {
   Reading v = st.raw;
   const Sim& s = sim;
@@ -329,7 +335,12 @@ void sensorTask(void*) {
         if (!isnan(iaq)) st.raw.iaq = constrain(iaq, 0.0f, 500.0f);
         st.raw.iaq_acc = acc;
         unlockState();
-        if (acc >= 3 && lastAcc < 3) buzz(T_AIR_READY);
+        if (acc >= 1 && lastAcc == 0) {
+          buzz(T_AIR_READY);
+          char meta[72];
+          snprintf(meta, sizeof(meta), "%s air quality readings have started", BIN_LABEL);
+          raiseAlert("sensor", "success", "Air sensor ready", meta);
+        }
         lastAcc = acc;
         if (acc >= 3 && now - lastBaseSave > 3600000UL) {
           lastBaseSave = now;
