@@ -1,5 +1,8 @@
 package smartbin.ui
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
+import androidx.compose.foundation.Canvas
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -274,6 +277,7 @@ fun BinCard(vm: AppViewModel, b: Bin, hub: HubState, inSheet: Boolean = false) {
             )
             Ticks(listOf(0.0, 50.0, fillTh, 100.0))
             if (r.fault("HC-SR04")) T("Fill sensor not answering. The bar shows the last reading.", Modifier.padding(top = 4.dp), size = 0.74f, weight = FontWeight.Bold, color = c.bad)
+            CardFoot(b, barColor)
         }
         // Four sensor tiles
         Row(Modifier.padding(top = 12.dp).alpha(if (stale) 0.42f else 1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -433,6 +437,60 @@ private fun SensorTile(icon: ImageVector, cc: Color, value: String, label: Strin
 
 // ---------- collection priority ----------
 
+/** Lower is more urgent: a full bin, then hours to full, then bins that are not filling. */
+private fun urgency(b: Bin): Double {
+    val p = b.reading.fill
+    val th = b.cal.v("fill_th")
+    if (p >= th) return -1000 + p
+    val rate = if (b.reading.status == BinStatus.COLLECTING) 0.0 else Hub.ratePerHour(b)
+    return if (rate > 0.05) (th - p) / rate else 9999 - p
+}
+
+/** The last hour of fill as a small line, and how long ago the last reading came. */
+@Composable
+private fun CardFoot(b: Bin, cc: Color) {
+    val c = Sb.c
+    val history by Hub.history.collectAsState()
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(1000)
+            now = System.currentTimeMillis()
+        }
+    }
+    val hour = 3_600_000L
+    val pts = history[b.id].orEmpty().filter { now - it.t <= hour }
+    Row(
+        Modifier.fillMaxWidth().padding(top = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        T("1 h", size = 0.68f, weight = FontWeight.Bold, color = c.ink2)
+        Canvas(Modifier.weight(1f).height(22.dp)) {
+            if (pts.size >= 2) {
+                val line = Path()
+                pts.forEachIndexed { k, s ->
+                    val x = ((s.t - (now - hour)).toFloat() / hour * size.width).coerceIn(0f, size.width)
+                    val y = size.height - (s.fill.coerceIn(0f, 100f) / 100f) * size.height
+                    if (k == 0) line.moveTo(x, y) else line.lineTo(x, y)
+                }
+                drawPath(line, cc, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round))
+            }
+        }
+        val age = (now - b.lastSeen) / 1000
+        T(
+            when {
+                b.lastSeen <= 0 -> "No reading yet"
+                age < 5 -> "Updated just now"
+                age < 60 -> "Updated $age s ago"
+                age < 3600 -> "Updated ${age / 60} min ago"
+                else -> "Updated ${age / 3600} h ago"
+            },
+            size = 0.7f, weight = FontWeight.SemiBold, color = if (b.stale) c.bad else c.ink2, maxLines = 1,
+        )
+    }
+}
+
 /** Time to full from how fast the bin has been filling. Returns the text and how near it is: 0 near, 1 mid, 2 far, 3 none. */
 fun etaOf(b: Bin): Pair<String, Int> {
     val left = b.cal.v("fill_th") - b.reading.fill
@@ -447,7 +505,8 @@ fun etaOf(b: Bin): Pair<String, Int> {
 @Composable
 private fun CollectNext(vm: AppViewModel, bins: List<Bin>) {
     val c = Sb.c
-    val rows = bins.sortedByDescending { it.reading.fill }
+    // The same order and tags as the dashboard: full bins, then the soonest to fill.
+    val rows = bins.sortedBy { urgency(it) }
     val show = if (vm.prioAll) rows else rows.take(3)
     Card {
         Sh(Ic.rank, "Collection priority", c.fill)
@@ -455,12 +514,14 @@ private fun CollectNext(vm: AppViewModel, bins: List<Bin>) {
             show.forEachIndexed { k, b ->
                 val p = Math.round(b.reading.fill)
                 val th = b.cal.v("fill_th")
-                val (tag, tagColor) = when {
-                    p >= th -> "URGENT" to c.bad
-                    p >= 50 -> "SOON" to c.warn
-                    else -> "NORMAL" to c.ok
-                }
                 val (eta, near) = etaOf(b)
+                val (tag, tagColor) = when {
+                    p >= th -> "NOW" to c.bad
+                    near == 3 -> "IDLE" to c.ink2
+                    near == 0 -> "SOON" to c.bad
+                    near == 1 -> "TODAY" to c.warn
+                    else -> "LATER" to c.ok
+                }
                 val edge = when (near) { 0 -> c.bad; 1 -> c.warn; 2 -> c.ok; else -> c.ink2 }
                 val src = remember { MutableInteractionSource() }
                 val pressed by src.collectIsPressedAsState()
@@ -491,7 +552,7 @@ private fun CollectNext(vm: AppViewModel, bins: List<Bin>) {
             if (vm.prioAll) "Show top 3" else "Show all ${rows.size} bins", { vm.prioAll = !vm.prioAll },
             Modifier.fillMaxWidth(), if (vm.prioAll) Ic.chev else Ic.rank, small = true,
         )
-        Hint("Fullest bin first. Time to full comes from how fast each bin filled over the last hour. Tap a row to open that bin.")
+        Hint("Full bins first, then the ones that will fill soonest. Time to full comes from how fast each bin filled over the last hour. Tap a row to open that bin.")
     }
 }
 

@@ -66,6 +66,12 @@ fun SettingsPage(vm: AppViewModel, hub: HubState) {
                 PinCard(vm, b)
                 if (vm.operator) CalBar(vm, b, on, hub) else ReadOnlyNote()
                 val v: Cal = if (on) vm.edit!! else b.cal
+                val keys = SECTION_KEYS + if (vm.operator) listOf("touch") else emptyList()
+                val allOpen = keys.all { it in vm.open }
+                Btn(
+                    if (allOpen) "HIDE ALL" else "SHOW ALL", { vm.open = if (allOpen) emptySet() else keys.toSet() },
+                    Modifier.fillMaxWidth(), Ic.layers, Look.TINT, small = true, sound = if (allOpen) Sfx.BACK else Sfx.OPEN,
+                )
                 Sections(vm, b, v, on)
             }
             if (b != null) {
@@ -181,6 +187,9 @@ private fun ReadOnlyNote() {
         }
     }
 }
+
+/** The fold-out groups, in order. Touchscreen is added for operators. */
+private val SECTION_KEYS = listOf("range", "limits", "air", "lid", "weight")
 
 /** .sect: a fold-out group of settings with its summary on the right. */
 @Composable

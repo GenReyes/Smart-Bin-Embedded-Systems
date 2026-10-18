@@ -177,6 +177,13 @@ header.top:after{content:"";display:block;height:3px;border-radius:3px;backgroun
 .bar i{position:absolute;inset:3px auto 3px 3px;border-radius:11px;transition:width .6s ease,background .4s}
 .bar b{position:absolute;top:4px;bottom:4px;width:3px;border-radius:2px;background:var(--ink);opacity:.35}
 .ticks{display:flex;justify-content:space-between;font-size:11px;color:var(--ink2);font-weight:700}
+.faultnote{margin:6px 0 0;font-size:12px;font-weight:800;color:var(--bad)}
+.cardfoot{display:flex;align-items:center;gap:10px;margin:10px 0 2px;font-size:11.5px;font-weight:700;color:var(--ink2)}
+.cardfoot .h1{font-size:11px;font-weight:800}
+.cardfoot svg{flex:1;height:22px;overflow:visible}
+.cardfoot svg path{fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.cardfoot [data-r="ago"]{white-space:nowrap}
+.cardfoot [data-r="ago"].old{color:var(--bad)}
 .sensors{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin-top:17px}
 @media(max-width:520px){.sensors{grid-template-columns:repeat(2,1fr)}}
 .sensor{padding:12px 6px 10px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:5px}
@@ -362,6 +369,8 @@ table.sim tr{box-shadow:var(--o1)}
 .sect[data-sec="air"]{--cc:var(--c-gas)}
 .sect[data-sec="touch"]{--cc:var(--cal)}
 .sect{margin-top:12px;border-radius:16px;background:var(--base);box-shadow:var(--o1)}
+.dhd{margin:6px 0 8px;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--ink2)}
+#demoBody .seg{margin-bottom:12px}
 .shead{all:unset;box-sizing:border-box;width:100%;min-height:54px;padding:0 16px;display:flex;align-items:center;gap:10px;cursor:pointer;border-radius:16px}
 .shead:focus-visible{outline:2px solid var(--cc);outline-offset:2px}
 .shead:before{content:"";width:4px;height:15px;border-radius:2px;background:var(--cc);flex:none}
@@ -1110,6 +1119,7 @@ html[data-theme="dark"]{--onBrand:#13100D;--brand2:#3FC7C2}
         <label class="switch big" for="calToggle"><input type="checkbox" id="calToggle"><span>Calibration mode</span></label>
       </div>
 
+      <div class="actions" style="margin:16px 0 0"><button class="btn sm tint" id="sectAll" style="flex:0 0 auto;--cc:var(--accent)"></button></div>
       <fieldset id="setFields" disabled>
         <div class="sect" data-sec="range">
         <h2 style="margin-top:24px">Fill range</h2>
@@ -1263,13 +1273,19 @@ html[data-theme="dark"]{--onBrand:#13100D;--brand2:#3FC7C2}
         <h2 class="ph" style="--cc:var(--sim)">Operator access</h2>
         <span class="btstate" id="opState"></span>
       </div>
-      <p class="hint" style="margin:-6px 0 16px">The dashboard always opens as a collector, the same as the phone app. Operator needs the PIN, and drops back to collector after 2 min with this tab hidden. After 5 wrong PINs it waits 30 s, longer each time. Only an operator can change the PIN, and only by typing the current one first.</p>
+      <p class="hint" style="margin:-6px 0 16px">The dashboard opens on the start page every time, the same as the phone app. Operator needs the PIN, and drops back to collector after 2 min with this tab hidden. After 5 wrong PINs it waits 30 s, longer each time. Only an operator can change the PIN, and only by typing the current one first.</p>
       <div class="actions">
         <button class="btn" id="opChange" style="flex:0 0 auto">CHANGE OPERATOR PIN</button>
         <button class="btn" id="opLockNow" style="flex:0 0 auto">BACK TO COLLECTOR</button>
         <button class="btn" id="opStart" style="flex:0 0 auto">START PAGE</button>
       </div>
       <p class="hint" id="opNote"></p>
+    </div>
+
+    <div class="panel nm hide" id="demoPanel" style="margin-top:22px">
+      <div class="sechead"><h2 class="ph" style="--cc:var(--sim)" id="demoHead"></h2><span class="btstate" id="demoState"></span></div>
+      <p class="hint" style="margin:-6px 0 14px">Act out what simulation cannot, on the demo bins only, the same as the app's demo options. Any choice here pauses the automatic tour for a minute. RESET puts it all back.</p>
+      <div id="demoBody"></div>
     </div>
 
     <div class="panel nm" id="sndPanel" style="margin-top:22px">
@@ -1999,6 +2015,45 @@ function stepEnv(b){
   d.warmEnd=b._accT&&d.iaq_acc===0?b._accT+20000:null;
   if(d.iaq_acc>=3)b._accT=0;
 }
+const DEMO={speed:1,pick:null};
+const DEMO_SPEEDS=[[0,'Pause'],[1/60,'Real'],[1,'Normal'],[10,'Fast']];
+function demoInUse(){return DEMO.speed!==1||state.bins.some(b=>b.demo&&(b._demoLink||(b._hold&&Object.keys(b._hold).length)))}
+function demoPanelRender(){
+  const p=$('#demoPanel');if(!p)return;
+  const demos=state.bins.filter(b=>b.demo);
+  p.classList.toggle('hide',!state.demo||!demos.length);
+  if(!state.demo||!demos.length)return;
+  if(!demos.some(b=>b.id===DEMO.pick))DEMO.pick=demos[0].id;
+  const b=byId(DEMO.pick),link=b._demoLink||'';
+  const btn=(attr,val,label,ic,cc,on)=>'<button class="btn sm binbtn" style="--cc:'+cc+'" data-'+attr+'="'+val+'" aria-pressed="'+!!on+'">'+icon(ic)+'<span>'+label+'</span></button>';
+  const html='<h3 class="dhd">Fill speed</h3><div class="seg">'+DEMO_SPEEDS.map(x=>btn('dspeed',x[0],x[1].toUpperCase(),'stopwatch','var(--sim)',DEMO.speed===x[0])).join('')+'</div>'+
+    '<h3 class="dhd">Act out on a bin</h3><div class="seg">'+demos.map(x=>btn('dpick',x.id,esc(x.name),'fill','var(--sim)',x.id===DEMO.pick)).join('')+'</div>'+
+    '<div class="seg">'+btn('devent','full','FULL','fill','var(--bad)')+btn('devent','tamper','TAMPER','tamper','var(--c-tamper)')+
+      btn('devent','air','BAD AIR','gas','var(--c-gas)')+btn('devent','empty','EMPTY','truck','var(--cal)')+'</div>'+
+    '<h3 class="dhd">How '+esc(b.name)+' answers</h3><div class="seg">'+btn('dlink','','WI-FI','wifi','var(--c-link)',link==='')+
+      btn('dlink','fb','FIREBASE','cloud','var(--c-cloud)',link==='fb')+btn('dlink','ts','THINGSPEAK','chart','var(--c-ts)',link==='ts')+
+      btn('dlink','down','GO QUIET','power','var(--warn)',link==='down')+'</div>'+
+    '<div class="actions">'+btn('dreset','1','RESET','undo','var(--sim)')+'</div>';
+  const body=$('#demoBody');if(body.dataset.sig!==html){body.dataset.sig=html;body.innerHTML=html;}
+  $('#demoHead').innerHTML=icon('flask')+'<span>DEMO OPTIONS</span>';
+  $('#demoState').textContent=demoInUse()?'In use':'Not in use';
+}
+function demoAct(el){
+  const b=byId(DEMO.pick);tourPause();
+  if(el.dataset.dspeed!=null){DEMO.speed=+el.dataset.dspeed;sfx('choice');}
+  else if(el.dataset.dpick!=null){DEMO.pick=el.dataset.dpick;sfx('choice');}
+  else if(el.dataset.devent&&b){const d=b.data,c=b.cal,e=el.dataset.devent;
+    if(e==='full')d.fill=Math.min(99,c.fill_th+4);
+    if(e==='tamper')tourHold(b,{tilt:40});
+    if(e==='air'){tourHold(b,{gas:c.gas_th+45});setTimeout(()=>{tourDrop(b,['gas']);b.data.gas=60;},20000);}
+    if(e==='empty'){d.fill=0;d.weight_g=0;}
+    sfx('confirm');toast({full:b.name+' is now over its fill limit.',tamper:b.name+' was tipped. Reset it from its card.',
+      air:'Air quality spiked in '+b.name+'. It settles by itself.',empty:b.name+' is empty.'}[e]);}
+  else if(el.dataset.dlink!=null&&b){const v=el.dataset.dlink||null;
+    if(v==='down'&&b._demoLink!=='down')b._quietAt=Date.now();b._demoLink=v;sfx(v==='down'?'link_lost':v?'cloud':'link_up');}
+  else if(el.dataset.dreset){DEMO.speed=1;state.bins.forEach(x=>{if(x.demo){x._demoLink=null;x._hold={};}});sfx('confirm');toast('Demo options reset.');}
+  demoPanelRender();render();
+}
 function stepDemo(b){
   const d=b.data,s=b.sim,on=bit=>(s.mask>>bit)&1,h=b._hold||{};
   stepEnv(b);
@@ -2008,7 +2063,7 @@ function stepDemo(b){
   d.faults=h.faults||[];
   if(d.status==='CALIBRATING'){d.lid='CLOSED';d.distance_cm=+(b.cal.d_empty-Math.random()*0.4).toFixed(1);return;}
   if(on(0))d.fill=clamp(+s.values.fill,0,100);
-  else if(d.status!=='COLLECTING')d.fill=clamp(d.fill+0.022+Math.random()*0.015,0,100);
+  else if(d.status!=='COLLECTING')d.fill=clamp(d.fill+(0.022+Math.random()*0.015)*DEMO.speed,0,100);
   d.weight_g=on(1)?+s.values.weight:Math.round(clamp(d.fill/100*b.cal.weight_cap*0.92+Math.random()*25,0,5000));
   d.tilt=h.tilt!=null?h.tilt:on(4)&&+s.values.tamper?38:clamp(Math.random()*2.2,0,90);
   d.motion=on(5)?!!+s.values.motion:Math.random()<0.025;
@@ -2440,7 +2495,7 @@ async function command(id,cmd,extra){
   const d=b.data;
   if(cmd==='LOCK'){d.status='LOCKED';d.lid='CLOSED';}
   if(cmd==='UNLOCK')d.status='OK';
-  if(cmd==='CLEAR_TAMPER'){d.status='OK';d.tilt=0;}
+  if(cmd==='CLEAR_TAMPER'){d.status='OK';d.tilt=0;tourDrop(b,['tilt']);}
   if(cmd==='COLLECT'){d.status='COLLECTING';d.lid='OPEN';}
   if(cmd==='COLLECT_DONE'){d.status='OK';d.lid='CLOSED';d.fill=0;d.weight_g=0;
     addAlert('success','truck','Collection complete',b.name+' is back to normal');}
@@ -2645,7 +2700,8 @@ function renderOverlayCard(){
 
   /* status chips - use same sig-check as renderCard */
   const simOn=b.sim.mask>0,calOn=binMode(b)==='cal'||binMode(b)==='dual';
-  const csig=[d.lid,d.status,d.motion,simOn,calOn,b.live,b.route,isLive(b),b._demoLink].join('|');
+  const tilting=d.tamper_phase==='COUNTDOWN'&&d.status!=='TAMPER'&&d.status!=='CALIBRATING';
+  const csig=[d.lid,d.status,d.motion,simOn,calOn,b.live,b.route,isLive(b),b._demoLink,tilting].join('|');
   const ch=q('chips');
   if(ch&&ch.dataset.sig!==csig){
     ch.dataset.sig=csig;
@@ -2658,7 +2714,7 @@ function renderOverlayCard(){
     ch.innerHTML=[
       slot(icon('lid',d.lid==='OPEN'),d.lid==='OPEN'?'OPEN':'CLOSED',d.lid==='OPEN','var(--c-lid)',
         d.lid==='OPEN'?'Lid is open':'Lid is closed'),
-      slot(stIco,st[0],true,stCol,st[1]),
+      tilting?slot(icon('tamper'),'TILTED',true,'var(--warn)','Tipped over. Tamper alert if it stays tipped'):slot(stIco,st[0],true,stCol,st[1]),
       slot.apply(null,linkSlot(b)),
       slot(icon('flask'),'SIM',simOn,'var(--sim)',simOn?'Simulation is on':'Simulation is off'),
       slot(icon('calib'),'CAL',calOn,'var(--cal)',calOn?'Calibration mode is on':'Calibration mode is off'),
@@ -2832,6 +2888,8 @@ function cardHTML(b){
     '<div class="chips" data-r="chips"></div>'+
     '<div class="bar nm-deep"><i data-r="bar"></i><b style="left:50%"></b><b data-r="th"></b></div>'+
     '<div class="ticks"><span>0</span><span>50</span><span data-r="tl">80</span><span>100</span></div>'+
+    '<p class="faultnote hide" data-r="fault">Fill sensor not answering. The bar shows the last reading.</p>'+
+    '<div class="cardfoot"><span class="h1">1 h</span><svg data-r="spark" viewBox="0 0 100 22" preserveAspectRatio="none"><path/></svg><span data-r="ago"></span></div>'+
     '<div class="sensors" data-r="sensors"></div>'+
     '<div class="actions" data-r="actions"></div>'+
     '<div class="editrow nm-in hide" data-r="edit">'+
@@ -2843,6 +2901,16 @@ function cardHTML(b){
         '<button class="btn sm danger" data-remove="'+b.id+'">Remove</button></div>'+
     '</div></article>';
 }
+/* The last hour of fill as a small line, and how long ago the last reading came, as in the app. */
+function cardFoot(b,svg,agoEl,col){
+  const now=Date.now(),H=3600000,pts=(b.hist||[]).filter(h=>now-h.t<=H);
+  const d=pts.length>1?pts.map((h,i)=>(i?'L':'M')+((h.t-(now-H))/H*100).toFixed(2)+' '+(22-clamp(h.fill,0,100)/100*22).toFixed(2)).join(''):'';
+  const path=svg.firstChild;if(path.getAttribute('d')!==d)path.setAttribute('d',d);path.style.stroke=col;
+  const at=isLive(b)?b.lastAt:(b._demoLink==='down'?b._quietAt:now);
+  const s=at?Math.round((now-at)/1000):null;
+  agoEl.textContent=s==null?'No reading yet':s<5?'Updated just now':'Updated '+ago(at);
+  agoEl.classList.toggle('old',isLive(b)?!b.live:b._demoLink==='down');
+}
 function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
 
 /* ---------- render ---------- */
@@ -2853,7 +2921,7 @@ function render(){
   state.bins.forEach(renderCard);
   applyMode();renderCollectNext();renderBanners();renderAlerts();renderLink();
   if(state.view==='charts')drawCharts();
-  if(state.view==='settings')updateSettingsLive();
+  if(state.view==='settings'){updateSettingsLive();demoPanelRender();}
   /* live-update overlay clone in place (no re-clone, no flicker) */
   if(state.ovTile){const ov=$('#tileOverlay');if(ov&&!ov.classList.contains('hide'))renderOverlayCard();}
 
@@ -2879,13 +2947,16 @@ function renderCard(b){
   }
 
   tweenPct(q('pct'),b,d.fill);
+  q('fault').classList.toggle('hide',!(d.faults||[]).includes('HC-SR04'));
+  cardFoot(b,q('spark'),q('ago'),levelColor(d.fill,c));
   const bar=q('bar');bar.style.width='calc('+clamp(d.fill,0,100)+'% - 6px)';bar.style.background=levelColor(d.fill,c);
   q('th').style.left=c.fill_th+'%';q('tl').textContent=c.fill_th;
 
   const bm=binMode(b);
   root.dataset.bmode=bm;
   const simOn=b.sim.mask>0,calOn=bm==='cal'||bm==='dual';
-  const csig=[d.lid,d.status,d.motion,simOn,calOn,b.live,b.route,isLive(b),b._demoLink].join('|');
+  const tilting=d.tamper_phase==='COUNTDOWN'&&d.status!=='TAMPER'&&d.status!=='CALIBRATING';
+  const csig=[d.lid,d.status,d.motion,simOn,calOn,b.live,b.route,isLive(b),b._demoLink,tilting].join('|');
   const ch=q('chips');
   if(ch.dataset.sig!==csig){
     ch.dataset.sig=csig;
@@ -2901,7 +2972,7 @@ function renderCard(b){
     ch.innerHTML=[
       slot(icon('lid',d.lid==='OPEN'),d.lid==='OPEN'?'OPEN':'CLOSED',d.lid==='OPEN','var(--c-lid)',
         d.lid==='OPEN'?'Lid is open':'Lid is closed'),
-      slot(stIco,st[0],true,stCol,st[1]),
+      tilting?slot(icon('tamper'),'TILTED',true,'var(--warn)','Tipped over. Tamper alert if it stays tipped'):slot(stIco,st[0],true,stCol,st[1]),
       slot.apply(null,linkSlot(b)),
       slot(icon('flask'),'SIM',simOn,'var(--sim)',simOn?'Simulation is on':'Simulation is off'),
       slot(icon('calib'),'CAL',calOn,'var(--cal)',calOn?'Calibration mode is on':'Calibration mode is off'),
@@ -3439,8 +3510,12 @@ function loadSettings(){
   for(const k in MAP)$('#'+k).value=b.cal[MAP[k]];
   $('#s_autolock').checked=!!b.cal.auto_lock;
   sectSummaries(b);
+  sectAllRender();
   refreshCalGate();
 }
+function allSectsOpen(){return $$('.sect').every(d=>d.classList.contains('open'))}
+function sectAllRender(){const b=$('#sectAll');if(!b)return;const o=allSectsOpen();
+  b.innerHTML=icon('layers')+'<span>'+(o?'HIDE ALL':'SHOW ALL')+'</span>';b.style.display='inline-flex';b.style.alignItems='center';b.style.gap='8px';}
 function sectSummaries(b){
   const c=b.cal,f=(v,d)=>Number(v).toFixed(d),d=b.data||{};
   const sum={range:f(c.d_empty,1)+' to '+f(c.d_full,1)+' cm',
@@ -3955,6 +4030,15 @@ document.addEventListener('pointerdown',e=>{
   setTimeout(()=>sp.remove(),640);
 });
 window.addEventListener('resize',()=>{if(state.view==='charts')drawCharts()});
+/* Number keys open the tabs in their order, M turns sounds on or off. Not while typing. */
+document.addEventListener('keydown',e=>{
+  if(e.ctrlKey||e.metaKey||e.altKey||!inMain())return;
+  const t=e.target;if(t&&(t.matches('input,textarea,select')||t.isContentEditable))return;
+  if(document.querySelector('.modal:not(.hide),.pinwrap:not(.hide)'))return;
+  if(/^[1-9]$/.test(e.key)){const tabs=$$('.tab').filter(x=>x.offsetParent!==null),tb=tabs[+e.key-1];
+    if(tb){e.preventDefault();tb.click();}return;}
+  if(e.key==='m'||e.key==='M'){e.preventDefault();$('#sound').click();}
+});
 document.addEventListener('keydown',e=>{const h=e.target.closest&&e.target.closest('.shead');if(h&&(e.key==='Enter'||e.key===' ')){e.preventDefault();h.click();}});
 
 buildTabs();setAddCount(1);decorateStatics();paintHeadings();btDecorate();cloudDecorate();seedAlerts();setRole('collector');setView('overview');render();liveStart();
@@ -3962,7 +4046,12 @@ buildTabs();setAddCount(1);decorateStatics();paintHeadings();btDecorate();cloudD
 /* overview filter chips */
 document.addEventListener('click',e=>{
   const sh=e.target.closest('.shead');
-  if(sh){const d=sh.closest('.sect'),o=d.classList.toggle('open');sh.setAttribute('aria-expanded',o);sfx(o?'open':'back');return;}
+  if(sh){const d=sh.closest('.sect'),o=d.classList.toggle('open');sh.setAttribute('aria-expanded',o);sfx(o?'open':'back');sectAllRender();return;}
+  const da=e.target.closest('#demoBody [data-dspeed],#demoBody [data-dpick],#demoBody [data-devent],#demoBody [data-dlink],#demoBody [data-dreset]');
+  if(da){demoAct(da);return;}
+  if(e.target.closest('#sectAll')){const open=!allSectsOpen();
+    $$('.sect').forEach(d=>{d.classList.toggle('open',open);const h=d.querySelector('.shead');if(h)h.setAttribute('aria-expanded',open);});
+    sfx(open?'open':'back');sectAllRender();return;}
   const fc=e.target.closest('#filterChips .fchip');
   if(fc){state.ovFilter=fc.dataset.filter;applyOvFilter();return;}
   /* view toggle */

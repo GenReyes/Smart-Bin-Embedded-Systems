@@ -6,7 +6,7 @@ It runs with no hardware. Turn DEMO on at the start page and three made-up bins 
 
 **Connecting to the real bins:** [INTEGRATION.md](INTEGRATION.md) lists what the firmware does. Version 2.0 covers all of it: Bluetooth Wi-Fi setup, the new status fields, touch calibration, Firebase command results and watchers.
 
-Version 2.1. Kotlin and Jetpack Compose, the same stack as Garbage-Guard (AGP 9.4.1, Gradle 9.6.0, compile and target SDK 37, minimum Android 8.0).
+Version 2.2. Kotlin and Jetpack Compose, the same stack as Garbage-Guard (AGP 9.4.1, Gradle 9.6.0, compile and target SDK 37, minimum Android 8.0).
 
 ## Build and run
 
@@ -24,7 +24,7 @@ gradlew :app:assembleDebug
 
 The APK lands in `app/build/outputs/apk/debug/app-debug.apk`. Copy it to a phone to install it there.
 
-A ready-built debug APK, `Smart-Bin v2.1.apk`, sits in this folder for installing on a phone without building.
+A ready-built debug APK, `Smart-Bin v2.2.apk`, sits in this folder for installing on a phone without building.
 
 ## What is in it
 
@@ -38,11 +38,11 @@ A ready-built debug APK, `Smart-Bin v2.1.apk`, sits in this folder for installin
 
 **Link chip.** It shows every route that answers, each in its own colour and icon: Wi-Fi green, Firebase orange, ThingSpeak blue. With one route it names it; with two it shows both names, such as Wi-Fi + Firebase; with all three it says All 3 links. A ring in the colour of the route the readings come from and a strip of all the colours underneath make each mix look different.
 
-**Overview.** With one or two bins, a full card per bin: the bin icon with a moving fill wave, fill percent, six status chips, the fill bar with its limit mark, four sensor tiles that turn red at their limit (a sensor that stops answering shows -- and Not answering; the air tile counts down while the BME680 warms up), and LOCK or UNLOCK, RESET TAMPER (operator) and COLLECT or DONE. With three or more, a grid of tiles with filters (All, Needs action, Sim / Cal) and a legend. Collection priority lists the fullest bins first with a time to full. Operators can add bins (1 to 3 at a time) and edit a bin's name, place, IP address and cloud name with SET, including its Firebase cloud name and its ThingSpeak channel, read key and TalkBack ID and key.
+**Overview.** With one or two bins, a full card per bin: the bin icon with a moving fill wave, fill percent, six status chips, the fill bar with its limit mark, a line of the last hour's fill with how long ago the last reading came (red once the bin stops answering), four sensor tiles that turn red at their limit (a sensor that stops answering shows -- and Not answering; the air tile counts down while the BME680 warms up), and LOCK or UNLOCK, RESET TAMPER (operator) and COLLECT or DONE. With three or more, a grid of tiles with filters (All, Needs action, Sim / Cal) and a legend. Collection priority sorts by urgency, the same as the dashboard: full bins first (NOW), then by time to full (SOON, TODAY, LATER), and bins that are not filling last (IDLE). Tap a row to open that bin; in the bin's sheet, swipe left or right to move between bins. Operators can add bins (1 to 3 at a time) and edit a bin's name, place, IP address and cloud name with SET, including its Firebase cloud name and its ThingSpeak channel, read key and TalkBack ID and key.
 
 **Charts.** Fill level over 15 minutes, 1 hour, 6 hours or 24 hours, for one bin or the five fullest, with the alert line. Environment shows temperature, humidity and air quality as a share of their limits, or one reading in real units (temperature 0 to 85 C, humidity 0 to 100 %, air quality 0 to 500 IAQ, pressure 300 to 1100 hPa). The expand key turns the phone sideways for a full-width chart.
 
-**Settings.** The calibration switch (one bin at a time, Wi-Fi only), then fold-out groups: fill range with USE NOW, alert limits, the BME680 offsets and gas baseline, lid and lock, weight with tare and calibrate, and for operators the touchscreen (CALIBRATE TOUCH and RESET). Every group starts folded, with its summary on the right. Changes wait in a save bar until SAVE. The Collect PIN sits at the top for both roles; collectors see read-only values. Under it are Reload from bin and a row to App settings. Everything about the app itself is behind the gear.
+**Settings.** The calibration switch (one bin at a time, Wi-Fi only), then fold-out groups: fill range with USE NOW, alert limits, the BME680 offsets and gas baseline, lid and lock, weight with tare and calibrate, and for operators the touchscreen (CALIBRATE TOUCH and RESET). Every group starts folded, with its summary on the right. SHOW ALL opens every group at once and HIDE ALL folds them again. Changes wait in a save bar until SAVE. The Collect PIN sits at the top for both roles; collectors see read-only values. Under it are Reload from bin and a row to App settings. Everything about the app itself is behind the gear.
 
 **App settings** (the gear at the top right). Two big keys for Sound and Vibration, vibration strength (Light, Normal, Strong), a sound test with every sound in the same groups, icons and colours as the dashboard's (each plays with its vibration even with sound off), and keep the screen on. Then appearance (Auto, Light, Dark) and role, Connection and Bluetooth setup, push alerts, Unrestricted battery (asks Android to stop pausing the app in the background), Android alert settings, Start page, Export bin list, and the demo options while demo is on.
 
