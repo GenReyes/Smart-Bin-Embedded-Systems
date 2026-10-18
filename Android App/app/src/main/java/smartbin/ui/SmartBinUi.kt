@@ -49,6 +49,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -130,8 +131,7 @@ fun SmartBinUi(vm: AppViewModel, setLandscape: (Boolean) -> Unit) {
             },
         ) {
             when {
-                vm.role == null -> Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) { Gate(vm) }
-                !vm.started -> Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) { StartPage(vm, hub) }
+                vm.role == null || !vm.started -> Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) { Gate(vm, hub) }
                 land -> FullChart(vm, hub)
                 else -> Column(
                     Modifier.align(Alignment.TopCenter).fillMaxHeight().widthIn(max = 520.dp).fillMaxWidth().statusBarsPadding(),
@@ -214,16 +214,24 @@ private fun Header(vm: AppViewModel, hub: HubState, dark: Boolean) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // A tap on the logo plays its little chime, as on Garbage-Guard.
+        // A tap on the logo plays its chime and its build-up again.
+        var logoPlay by remember { androidx.compose.runtime.mutableIntStateOf(1) }
         Row(
-            Modifier.press(true, Sfx.LOGO) {},
+            Modifier.press(true, Sfx.LOGO) { logoPlay++ },
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Ico(Ic.lid(false), 23.dp, c.accent)
+            SmartBinLogo(30.dp, logoPlay)
             T("SMART-BIN", size = 1.12f, spacing = 0.04f, maxLines = 1)
         }
         Spacer(Modifier.weight(1f))
+        // DEMO shows only while demo mode is on. It goes back to the start page, where demo is turned off.
+        if (hub.demoOn) {
+            Box(
+                Modifier.defaultMinSize(minHeight = 36.dp).bump(c, 11.dp).press(true, Sfx.BACK) { vm.toStart() }.padding(horizontal = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) { T("DEMO", size = 0.74f, spacing = 0.04f, color = c.warn, maxLines = 1) }
+        }
         val m = hub.mode
         Row(
             Modifier
@@ -287,9 +295,20 @@ fun liveBanners(hub: HubState): List<Live> {
     if (full.isNotEmpty()) out += Live(Tone.RED, Ic.truck, "COLLECT NOW: " + full.joinToString { "${it.name} at ${Math.round(it.reading.fill)}%" }, null, Ic.truck to c.tamper)
     if (sim.isNotEmpty()) out += Live(Tone.PURPLE, Ic.flask, "SIMULATION MODE", "Some readings are set by hand, not by the sensors.", Ic.flask to c.sim)
     // Pretend links from the demo options say so, so nobody mistakes them for real ones.
+    hub.tourMsg?.let { out += Live(Tone.PURPLE, Ic.flask, "Demo tour: $it", "The tour runs by itself. Press a key on a demo bin and it waits a minute for you.", Ic.flask to c.sim) }
+    val broken = b.filter { it.reading.faults.isNotEmpty() }
+    if (broken.isNotEmpty()) out += Live(
+        Tone.AMBER, Ic.gear, "SENSOR NOT ANSWERING: " + broken.joinToString { "${it.name} (${it.reading.faults.joinToString()})" },
+        "Its readings show -- until the sensor answers again. Check the wiring.", Ic.gear to c.warn,
+    )
+    if (b.isEmpty()) {
+        out += Live(Tone.AMBER, Ic.wifi(false), "No bins linked yet", "Pair a bin over Bluetooth in App settings, or add one with its IP address as operator. Turn DEMO on at the start page to look around.", Ic.wifi(false) to c.warn)
+        return out
+    }
+    if (hub.demoOn) out += Live(Tone.AMBER, Ic.flask, "Demo mode", "Bins named Demo show made-up readings. Press DEMO at the top to go back to the start page and turn it off.", Ic.flask to c.warn)
     val pretend = if (hub.demo) "Pretend link from the demo options. " else ""
     when (hub.link) {
-        Link.DEMO -> out += Live(Tone.AMBER, Ic.wifi(false), "Showing demo data", "Open a bin with SET, add its IP address, and it switches to live readings.", Ic.wifi(false) to c.warn)
+        Link.DEMO -> {}
         Link.OFFLINE -> out += Live(Tone.RED, Ic.wifi(false), "Bins are not answering", "No bin answers on Wi-Fi and the cloud cannot be reached. Check the phone has internet.", Ic.wifi(false) to c.tamper)
         Link.CLOUD -> out += Live(
             Tone.ORANGE, Ic.cloud, "Cloud mode",
@@ -480,17 +499,23 @@ private fun RowScope.NavItem(icon: ImageVector, label: String, selected: Boolean
     }
 }
 
-// ---------- first launch ----------
+// ---------- start page ----------
 
+/**
+ * The start page, on every start of the app and from App settings: the logo,
+ * the two roles, demo mode, and how the bins answer. Nothing sounds or posts
+ * from here; alerts start once a role is picked.
+ */
 @Composable
-private fun Gate(vm: AppViewModel) {
+private fun Gate(vm: AppViewModel, hub: HubState) {
     val c = Sb.c
+    var play by remember { androidx.compose.runtime.mutableIntStateOf(1) }
     ScrollPage {
-        Column(Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Box(Modifier.size(104.dp).well(c, 52.dp).press(true, Sfx.LOGO) {}, contentAlignment = Alignment.Center) {
-                BinIcon(46.0, c.accent, 76.dp)
+        Column(Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(Modifier.size(124.dp).well(c, 62.dp).press(true, Sfx.LOGO) { play++ }, contentAlignment = Alignment.Center) {
+                SmartBinLogo(96.dp, play)
             }
-            T("Smart Bin", size = 1.65f, spacing = 0.02f)
+            T("SMART-BIN", size = 1.65f, spacing = 0.04f)
             Hint("Pick how you are using the system today. Operator asks for a PIN. Collector is the default.", Modifier.widthIn(max = 290.dp), align = androidx.compose.ui.text.style.TextAlign.Center)
         }
         RoleCard(Ic.sliders, "Admin / Operator", listOf("Charts and history", "Lock, unlock, reset tamper", "Calibration", "Simulation controls", "Add and edit bins")) {
@@ -498,6 +523,49 @@ private fun Gate(vm: AppViewModel) {
         }
         RoleCard(Ic.truck, "Collector", listOf("Which bin to empty first", "Charts, alerts and the collect PIN", "Start and finish a pickup", "Lock and unlock a bin", "Pair a bin to Wi-Fi over Bluetooth", "Settings are read only")) {
             vm.pickRole(Role.COLLECTOR, first = true)
+        }
+        // Demo mode is turned on or off only here.
+        Row(
+            Modifier.fillMaxWidth().well(c, 18.dp).padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Btn(
+                if (hub.demoOn) "DEMO ON" else "DEMO OFF", { vm.toggleDemo() }, icon = Ic.flask, look = Look.TINT,
+                cc = if (hub.demoOn) c.warn else c.ink2, small = true, pressedIn = hub.demoOn, sound = Sfx.TAP,
+            )
+            T(
+                if (hub.demoOn) "Three made-up bins sit next to your real ones and act out every alert by themselves."
+                else "Turn DEMO on to add three made-up bins that show every alert by themselves.",
+                Modifier.weight(1f), size = 0.8f, weight = FontWeight.SemiBold, color = c.ink2,
+            )
+        }
+        val real = hub.bins.filter { !it.demo }
+        if (real.isNotEmpty()) {
+            Column(Modifier.fillMaxWidth().well(c, 16.dp).padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                val anyIp = real.any { it.ip.isNotBlank() }
+                StartLine(
+                    Ic.wifi(true), "Local Wi-Fi", c.link,
+                    when { real.any { it.source == smartbin.data.Source.LIVE } -> true; !anyIp -> null; else -> false },
+                    if (anyIp) "Trying" else "No address",
+                )
+                StartLine(Ic.cloud, "Firebase", c.cloud, hub.fbUp, if (hub.fbUp == null) "Not set up" else "Trying")
+                StartLine(Ic.chart, "ThingSpeak", c.ts, hub.tsUp, if (hub.tsUp == null) "Not set up" else "Trying")
+            }
+        }
+    }
+}
+
+@Composable
+private fun StartLine(icon: ImageVector, name: String, cc: Color, up: Boolean?, waiting: String) {
+    val c = Sb.c
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Ico(icon, 19.dp, if (up == true) cc else c.ink2, Modifier.breathe(up == false, 1200))
+        T(name, Modifier.weight(1f), size = 0.9f, weight = FontWeight.Bold)
+        when (up) {
+            true -> Tag("CONNECTED", cc)
+            false -> T(waiting, size = 0.78f, weight = FontWeight.Bold, color = c.ink2)
+            null -> T(waiting, size = 0.78f, weight = FontWeight.SemiBold, color = c.ink2)
         }
     }
 }

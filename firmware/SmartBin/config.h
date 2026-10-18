@@ -11,7 +11,7 @@
 // Pins, from the Implementation Plan v2 pin table.
 constexpr int PIN_TRIG = 5;
 constexpr int PIN_ECHO = 18;
-constexpr int PIN_BUZZER = 12;
+constexpr int PIN_BUZZER = 4;
 constexpr int PIN_SERVO = 13;
 constexpr int PIN_HX_SCK = 14;
 constexpr int PIN_HX_DT = 32;
@@ -40,7 +40,7 @@ constexpr int PIN_IMU_INT = 34;     // optional BMI160 INT1 wire; set USE_IMU_IN
 constexpr int TS_RAW_X0 = 3800, TS_RAW_X1 = 300;   // raw x at screen x = 0 and x = 239
 constexpr int TS_RAW_Y0 = 3800, TS_RAW_Y1 = 300;   // raw y at screen y = 0 and y = 319
 #define TS_SWAP_XY 0
-constexpr uint8_t TFT_ROTATION = 0;                // 0 = portrait 240 x 320
+constexpr uint8_t TFT_ROTATION = 2;                // 0 = portrait 240 x 320
 
 // Timing (ESP32 Integration Guide, sections 3 and 6A).
 constexpr uint32_t FB_WATCHED_MS = 5000;
@@ -56,6 +56,7 @@ constexpr uint32_t TB_WATCHED_MS = 5000;
 constexpr uint32_t TB_IDLE_MS = 15000;
 constexpr uint32_t CMD_MAX_AGE_MS = 60000;
 constexpr uint32_t TAMPER_COUNTDOWN_S = 10;
+constexpr uint32_t TAMPER_ALARM_EVERY_MS = 2000;   // latched tamper siren repeats this often
 constexpr uint32_t SCREEN_TIMEOUT_MS = 30000;
 constexpr uint32_t BT_IDLE_OFF_MS = 300000;
 constexpr uint32_t BT_CODE_MS = 60000;

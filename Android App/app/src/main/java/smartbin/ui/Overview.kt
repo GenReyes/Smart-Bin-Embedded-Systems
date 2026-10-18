@@ -1,5 +1,8 @@
 package smartbin.ui
 
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.collectAsState
+import androidx.compose.foundation.Canvas
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -99,9 +102,9 @@ fun Overview(vm: AppViewModel, hub: HubState) {
             CollectNext(vm, bins)
             head()
             if (n > 2) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 2.dp), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                FilterKey(Ic.bins, "All $n", vm.binFilter == BinFilter.ALL) { vm.binFilter = BinFilter.ALL }
-                FilterKey(Ic.bell, "Needs action ${bins.count { it.needsAction }}", vm.binFilter == BinFilter.ACTION) { vm.binFilter = BinFilter.ACTION }
-                FilterKey(Ic.flask, "Sim / Cal ${bins.count { it.simulating || it.calibrating }}", vm.binFilter == BinFilter.MODES) { vm.binFilter = BinFilter.MODES }
+                FilterKey(Ic.layers, "All $n", vm.binFilter == BinFilter.ALL) { vm.binFilter = BinFilter.ALL }
+                FilterKey(Ic.tamper, "Needs action ${bins.count { it.needsAction }}", vm.binFilter == BinFilter.ACTION, Sb.c.tamper) { vm.binFilter = BinFilter.ACTION }
+                FilterKey(Ic.flask, "Sim / Cal ${bins.count { it.simulating || it.calibrating }}", vm.binFilter == BinFilter.MODES, Sb.c.sim) { vm.binFilter = BinFilter.MODES }
             }
             if (list.isEmpty()) Card { Empty(Ic.check, "No bins match this filter.") }
             else TileGrid(list) { b -> Tile(b) { vm.overlay = Overlay.BinDetail(b.id) } }
@@ -230,11 +233,13 @@ fun BinCard(vm: AppViewModel, b: Bin, hub: HubState, inSheet: Boolean = false) {
             BinStatus.TAMPER -> Ic.tamper; BinStatus.LOCKED -> Ic.lock(true); BinStatus.COLLECTING -> Ic.truck; else -> Ic.check
         }
         val stColor = when (stKey) { BinStatus.LOCKED -> c.sim; BinStatus.TAMPER -> c.tamper; BinStatus.COLLECTING -> c.cal; else -> c.ok }
-        val stText = when (stKey) { BinStatus.LOCKED -> "LOCKED"; BinStatus.TAMPER -> "TAMPER"; BinStatus.COLLECTING -> "PICKUP"; else -> "OK" }
+        // While the bin is tipped but not yet latched, the firmware counts down before calling it tamper.
+        val tilting = !calOn && r.tamperPhase == "COUNTDOWN" && stKey != BinStatus.TAMPER
+        val stText = if (tilting) "TILTED" else when (stKey) { BinStatus.LOCKED -> "LOCKED"; BinStatus.TAMPER -> "TAMPER"; BinStatus.COLLECTING -> "PICKUP"; else -> "OK" }
         Column(Modifier.padding(top = 13.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
             Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 Chip(Ic.lid(r.lidOpen), if (r.lidOpen) "OPEN" else "CLOSED", r.lidOpen, c.lid, Modifier.weight(1f))
-                Chip(stIcon, stText, true, stColor, Modifier.weight(1f), Modifier.shake(stKey == BinStatus.TAMPER))
+                Chip(if (tilting) Ic.tamper else stIcon, stText, true, if (tilting) c.warn else stColor, Modifier.weight(1f), Modifier.shake(stKey == BinStatus.TAMPER || tilting))
                 Chip(
                     if (cloud) Ic.cloud else if (tsp) Ic.chart else Ic.wifi(live),
                     when { live -> "WI-FI"; cloud -> "CLOUD"; tsp -> "TSPEAK"; stale -> "OFFLINE"; else -> "DEMO" }, true,
@@ -271,6 +276,8 @@ fun BinCard(vm: AppViewModel, b: Bin, hub: HubState, inSheet: Boolean = false) {
                     },
             )
             Ticks(listOf(0.0, 50.0, fillTh, 100.0))
+            if (r.fault("HC-SR04")) T("Fill sensor not answering. The bar shows the last reading.", Modifier.padding(top = 4.dp), size = 0.74f, weight = FontWeight.Bold, color = c.bad)
+            CardFoot(b, barColor)
         }
         // Four sensor tiles
         Row(Modifier.padding(top = 12.dp).alpha(if (stale) 0.42f else 1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -278,11 +285,22 @@ fun BinCard(vm: AppViewModel, b: Bin, hub: HubState, inSheet: Boolean = false) {
             val hTh = cal.v("hum_th")
             val wCap = cal.v("weight_cap")
             val gTh = cal.v("gas_th")
-            SensorTile(Ic.temp(r.temp), c.temp, "${fmt(r.temp, 1)}°", "Temperature", r.temp >= tTh, if (r.temp < 22) 0 else band(r.temp / tTh), Modifier.weight(1f))
-            SensorTile(Ic.humid, c.humid, "${Math.round(r.hum)}%", "Humidity", r.hum >= hTh,
+            // A sensor that stops answering shows -- and says so, instead of an old number.
+            val bme = r.fault("BME680")
+            val hx = r.fault("HX711")
+            val warm = r.warming && (b.sim.mask and 4) == 0
+            if (bme) SensorTile(Ic.temp(r.temp), c.temp, "--", "Not answering", true, 3, Modifier.weight(1f))
+            else SensorTile(Ic.temp(r.temp), c.temp, "${fmt(r.temp, 1)}°", "Temperature", r.temp >= tTh, if (r.temp < 22) 0 else band(r.temp / tTh), Modifier.weight(1f))
+            if (bme) SensorTile(Ic.humid, c.humid, "--", "Not answering", true, 3, Modifier.weight(1f))
+            else SensorTile(Ic.humid, c.humid, "${Math.round(r.hum)}%", "Humidity", r.hum >= hTh,
                 when { r.hum >= hTh - 10 -> 3; r.hum >= 60 -> 2; r.hum <= 35 -> 0; else -> 1 }, Modifier.weight(1f))
-            SensorTile(Ic.weight(r.weight / wCap), c.weight, "%.2fkg".format(r.weight / 1000), "Weight", r.weight >= wCap, band(r.weight / wCap), Modifier.weight(1f))
-            SensorTile(Ic.gas, c.gas, Math.round(r.gas).toString(), "Air quality", r.gas >= gTh, band(r.gas / gTh), Modifier.weight(1f))
+            if (hx) SensorTile(Ic.weight(0.0), c.weight, "--", "Not answering", true, 3, Modifier.weight(1f))
+            else SensorTile(Ic.weight(r.weight / wCap), c.weight, "%.2fkg".format(r.weight / 1000), "Weight", r.weight >= wCap, band(r.weight / wCap), Modifier.weight(1f))
+            when {
+                bme -> SensorTile(Ic.gas, c.gas, "--", "Not answering", true, 3, Modifier.weight(1f))
+                warm -> SensorTile(Ic.gas, c.gas, r.iaqWarmS?.takeIf { it > 0 }?.let { "${it / 60}:%02d".format(it % 60) } ?: "...", "Air warming up", false, 0, Modifier.weight(1f))
+                else -> SensorTile(Ic.gas, c.gas, Math.round(r.gas).toString(), "Air quality", r.gas >= gTh, band(r.gas / gTh), Modifier.weight(1f))
+            }
         }
         // LOCK or UNLOCK, RESET TAMPER (operator), COLLECT or DONE
         // A command sent through Firebase or ThingSpeak holds every key until the bin confirms it.
@@ -417,7 +435,61 @@ private fun SensorTile(icon: ImageVector, cc: Color, value: String, label: Strin
     }
 }
 
-// ---------- collect next ----------
+// ---------- collection priority ----------
+
+/** Lower is more urgent: a full bin, then hours to full, then bins that are not filling. */
+private fun urgency(b: Bin): Double {
+    val p = b.reading.fill
+    val th = b.cal.v("fill_th")
+    if (p >= th) return -1000 + p
+    val rate = if (b.reading.status == BinStatus.COLLECTING) 0.0 else Hub.ratePerHour(b)
+    return if (rate > 0.05) (th - p) / rate else 9999 - p
+}
+
+/** The last hour of fill as a small line, and how long ago the last reading came. */
+@Composable
+private fun CardFoot(b: Bin, cc: Color) {
+    val c = Sb.c
+    val history by Hub.history.collectAsState()
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(1000)
+            now = System.currentTimeMillis()
+        }
+    }
+    val hour = 3_600_000L
+    val pts = history[b.id].orEmpty().filter { now - it.t <= hour }
+    Row(
+        Modifier.fillMaxWidth().padding(top = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        T("1 h", size = 0.68f, weight = FontWeight.Bold, color = c.ink2)
+        Canvas(Modifier.weight(1f).height(22.dp)) {
+            if (pts.size >= 2) {
+                val line = Path()
+                pts.forEachIndexed { k, s ->
+                    val x = ((s.t - (now - hour)).toFloat() / hour * size.width).coerceIn(0f, size.width)
+                    val y = size.height - (s.fill.coerceIn(0f, 100f) / 100f) * size.height
+                    if (k == 0) line.moveTo(x, y) else line.lineTo(x, y)
+                }
+                drawPath(line, cc, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round))
+            }
+        }
+        val age = (now - b.lastSeen) / 1000
+        T(
+            when {
+                b.lastSeen <= 0 -> "No reading yet"
+                age < 5 -> "Updated just now"
+                age < 60 -> "Updated $age s ago"
+                age < 3600 -> "Updated ${age / 60} min ago"
+                else -> "Updated ${age / 3600} h ago"
+            },
+            size = 0.7f, weight = FontWeight.SemiBold, color = if (b.stale) c.bad else c.ink2, maxLines = 1,
+        )
+    }
+}
 
 /** Time to full from how fast the bin has been filling. Returns the text and how near it is: 0 near, 1 mid, 2 far, 3 none. */
 fun etaOf(b: Bin): Pair<String, Int> {
@@ -433,20 +505,23 @@ fun etaOf(b: Bin): Pair<String, Int> {
 @Composable
 private fun CollectNext(vm: AppViewModel, bins: List<Bin>) {
     val c = Sb.c
-    val rows = bins.sortedByDescending { it.reading.fill }
+    // The same order and tags as the dashboard: full bins, then the soonest to fill.
+    val rows = bins.sortedBy { urgency(it) }
     val show = if (vm.prioAll) rows else rows.take(3)
     Card {
-        Sh(Ic.rank, "Collect next", c.fill)
+        Sh(Ic.rank, "Collection priority", c.fill)
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             show.forEachIndexed { k, b ->
                 val p = Math.round(b.reading.fill)
                 val th = b.cal.v("fill_th")
-                val (tag, tagColor) = when {
-                    p >= th -> "URGENT" to c.bad
-                    p >= 50 -> "SOON" to c.warn
-                    else -> "NORMAL" to c.ok
-                }
                 val (eta, near) = etaOf(b)
+                val (tag, tagColor) = when {
+                    p >= th -> "NOW" to c.bad
+                    near == 3 -> "IDLE" to c.ink2
+                    near == 0 -> "SOON" to c.bad
+                    near == 1 -> "TODAY" to c.warn
+                    else -> "LATER" to c.ok
+                }
                 val edge = when (near) { 0 -> c.bad; 1 -> c.warn; 2 -> c.ok; else -> c.ink2 }
                 val src = remember { MutableInteractionSource() }
                 val pressed by src.collectIsPressedAsState()
@@ -477,7 +552,7 @@ private fun CollectNext(vm: AppViewModel, bins: List<Bin>) {
             if (vm.prioAll) "Show top 3" else "Show all ${rows.size} bins", { vm.prioAll = !vm.prioAll },
             Modifier.fillMaxWidth(), if (vm.prioAll) Ic.chev else Ic.rank, small = true,
         )
-        Hint("Fullest bin first. Time to full comes from how fast each bin filled over the last hour. Tap a row to open that bin.")
+        Hint("Full bins first, then the ones that will fill soonest. Time to full comes from how fast each bin filled over the last hour. Tap a row to open that bin.")
     }
 }
 

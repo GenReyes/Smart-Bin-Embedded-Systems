@@ -9,6 +9,7 @@ static BtView view;
 static volatile bool running = false, stopReq = false, stopRemote = false, joinReq = false, retryReq = false;
 static String newSsid, newPass;
 static uint8_t wrongCodes = 0;
+static volatile bool codeShown = false;
 static NimBLEServer* server = nullptr;
 static NimBLECharacteristic *chStat = nullptr, *chScan = nullptr;
 static uint16_t connHandle = 0xFFFF;
@@ -39,6 +40,7 @@ static void notifyStat(const String& json) {
 class ServerCb : public NimBLEServerCallbacks {
   void onConnect(NimBLEServer*, NimBLEConnInfo& info) override {
     connHandle = info.getConnHandle();
+    codeShown = false;
     xSemaphoreTake(vLock, portMAX_DELAY);
     view.offAtMs = millis() + BT_IDLE_OFF_MS;
     xSemaphoreGive(vLock);
@@ -54,6 +56,7 @@ class ServerCb : public NimBLEServerCallbacks {
     xSemaphoreTake(vLock, portMAX_DELAY);
     view.code = code;
     xSemaphoreGive(vLock);
+    codeShown = true;
     setPhase(BT_CODE);
     buzz(T_BT_CODE);
     return code;
@@ -66,6 +69,15 @@ class ServerCb : public NimBLEServerCallbacks {
       return;
     }
     server->disconnect(info.getConnHandle());
+    // Only a code that was shown and then typed wrong counts. A phone or laptop that
+    // still remembers an old pairing fails here without any code, and that must not
+    // use up the 3 tries.
+    bool counted = codeShown;
+    codeShown = false;
+    if (!counted) {
+      setPhase(BT_WAIT);
+      return;
+    }
     if (++wrongCodes >= 3) {
       NimBLEDevice::stopAdvertising();
       setPhase(BT_LOCKOUT);
@@ -115,7 +127,7 @@ static void collectScan() {
   int n = WiFi.scanComplete();
   if (n < 0) return;
   struct Net { String s; int r; };
-  Net best[3];
+  Net best[6];
   int k = 0;
   for (int i = 0; i < n; i++) {
     String s = WiFi.SSID(i);
@@ -124,10 +136,10 @@ static void collectScan() {
     for (int j = 0; j < k; j++) if (best[j].s == s) dup = true;
     if (dup) continue;
     int r = WiFi.RSSI(i);
-    if (k < 3) best[k++] = {s, r};
+    if (k < 6) best[k++] = {s, r};
     else {
       int w = 0;
-      for (int j = 1; j < 3; j++) if (best[j].r < best[w].r) w = j;
+      for (int j = 1; j < 6; j++) if (best[j].r < best[w].r) w = j;
       if (r > best[w].r) best[w] = {s, r};
     }
   }
@@ -189,7 +201,6 @@ static void doJoin() {
 
 static void shutdown(bool remote, bool automatic) {
   NimBLEDevice::stopAdvertising();
-  if (remote) NimBLEDevice::deleteAllBonds();
   NimBLEDevice::deinit(true);
   server = nullptr;
   chStat = chScan = nullptr;

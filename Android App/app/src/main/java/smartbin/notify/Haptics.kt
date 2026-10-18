@@ -57,6 +57,9 @@ object Haptics {
         BT_BLOCKED(300 to 230, 150 to 0, 300 to 120),
         WIFI_JOINED(40 to 120, 30 to 0, 40 to 170, 30 to 0, 120 to 240),
         PIN_SET(20 to 150, 50 to 0, 20 to 150, 50 to 0, 60 to 200),
+        WIFI_FAILED(120 to 220, 60 to 0, 120 to 160, 60 to 0, 200 to 90),
+        BT_OFF(40 to 160, 40 to 110, 40 to 70, 120 to 40),
+        DEMO(30 to 100, 40 to 0, 30 to 140, 40 to 0, 30 to 180, 40 to 0, 90 to 230),
         ;
 
         /** The same rhythm as a notification channel wants it: a pause first, then buzz and pause in turn. */
@@ -129,6 +132,9 @@ object Haptics {
         Sfx.BT_BLOCKED -> Buzz.BT_BLOCKED
         Sfx.WIFI_JOINED -> Buzz.WIFI_JOINED
         Sfx.PIN_SET -> Buzz.PIN_SET
+        Sfx.WIFI_FAILED -> Buzz.WIFI_FAILED
+        Sfx.BT_OFF -> Buzz.BT_OFF
+        Sfx.DEMO -> Buzz.DEMO
         Sfx.ALERT_FULL -> Buzz.FULL
         Sfx.ALERT_TAMPER -> Buzz.TAMPER
         Sfx.ALERT_SENSOR -> Buzz.SENSOR

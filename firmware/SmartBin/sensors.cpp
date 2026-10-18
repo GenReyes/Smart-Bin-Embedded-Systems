@@ -3,11 +3,57 @@
 #include "buzzer.h"
 #include <Wire.h>
 #include <Adafruit_BME680.h>
-#include <DFRobot_BMI160.h>
 #include <HX711.h>
 
 static Adafruit_BME680 bme(&Wire);
-static DFRobot_BMI160 imu;
+static uint8_t imuAddr = 0;
+
+static bool imuWrite(uint8_t reg, uint8_t val) {
+  Wire.beginTransmission(imuAddr);
+  Wire.write(reg);
+  Wire.write(val);
+  return Wire.endTransmission() == 0;
+}
+
+static bool imuRead(uint8_t reg, uint8_t* buf, uint8_t len) {
+  Wire.beginTransmission(imuAddr);
+  Wire.write(reg);
+  if (Wire.endTransmission(false) != 0) return false;
+  if (Wire.requestFrom(imuAddr, len) != len) return false;
+  for (uint8_t i = 0; i < len; i++) buf[i] = Wire.read();
+  return true;
+}
+
+static bool imuStart() {
+  const uint8_t addrs[2] = {0x68, 0x69};
+  uint8_t id = 0;
+  for (uint8_t a : addrs) {
+    imuAddr = a;
+    if (imuRead(0x00, &id, 1) && id == 0xD1) break;
+    id = 0;
+  }
+  if (id != 0xD1) return false;
+  imuWrite(0x7E, 0xB6);
+  delay(100);
+  imuWrite(0x40, 0x28);
+  imuWrite(0x41, 0x03);
+  for (int i = 0; i < 3; i++) {
+    imuWrite(0x7E, 0x11);
+    delay(10);
+    uint8_t pmu = 0;
+    if (imuRead(0x03, &pmu, 1) && ((pmu >> 4) & 3) == 1) return true;
+  }
+  return false;
+}
+
+static bool imuAccel(int16_t a[3]) {
+  uint8_t d[6];
+  if (!imuRead(0x12, d, 6)) return false;
+  a[0] = (int16_t)(d[1] << 8 | d[0]);
+  a[1] = (int16_t)(d[3] << 8 | d[2]);
+  a[2] = (int16_t)(d[5] << 8 | d[4]);
+  return true;
+}
 static HX711 scale;
 
 static volatile bool reqTare = false, reqCalW = false, reqGas = false, reqImuRef = false;
@@ -25,6 +71,12 @@ void requestTare() { reqTare = true; }
 void requestCalWeight(float grams) { reqGrams = grams; reqCalW = true; }
 void requestGasReset() { reqGas = true; }
 void requestImuReference() { reqImuRef = true; }
+
+int airWarmLeft() {
+  uint32_t burn = baselineFromNvs ? 120 : 300;
+  uint32_t age = (millis() - gasStartMs) / 1000;
+  return age < burn ? (int)(burn - age) : 0;
+}
 
 void recomputeView() {
   Reading v = st.raw;
@@ -51,7 +103,7 @@ void recomputeView() {
 
 void sensorsInit() {
   Wire.begin(PIN_SDA, PIN_SCL);
-  Wire.setClock(400000);
+  Wire.setClock(100000);
 
   pinMode(PIN_TRIG, OUTPUT);
   digitalWrite(PIN_TRIG, LOW);
@@ -66,8 +118,7 @@ void sensorsInit() {
     bme.setGasHeater(320, 150);
   }
 
-  imu.softReset();
-  bool imuOk = imu.I2cInit(0x68) == BMI160_OK || imu.I2cInit(0x69) == BMI160_OK;
+  bool imuOk = imuStart();
   float x, y, z;
   if (loadImuRef(x, y, z)) { imuRef[0] = x; imuRef[1] = y; imuRef[2] = z; }
 
@@ -124,7 +175,8 @@ void sensorTask(void*) {
   int tareN = 0, calN = 0;
   uint32_t lastTrig = 0, lastImu = 0, lastHxOk = millis(), lastEnv = 0, envReadyAt = 0, lastRate = 0, lastBaseSave = millis();
   bool envPending = false;
-  int bmeFail = 0, imuFail = 0;
+  int bmeFail = 0, imuFail = 0, sameCount = 0;
+  int16_t lastA[3] = {0, 0, 0};
   float tiltF = 0;
   float rateBuf[31];
   int rateN = 0;
@@ -171,8 +223,19 @@ void sensorTask(void*) {
     if ((ev & EV_IMU) || now - lastImu >= 200) {
       lastImu = now;
       int16_t a[3] = {0, 0, 0};
-      bool ok = imu.getAccelData(a) == BMI160_OK && (a[0] || a[1] || a[2]);
+      bool ok = imuAccel(a) && (a[0] || a[1] || a[2]);
+      if (ok && a[0] == lastA[0] && a[1] == lastA[1] && a[2] == lastA[2]) {
+        if (++sameCount >= 25) {
+          sameCount = 0;
+          ok = false;
+          imuFail = 10;
+          imuStart();
+        }
+      } else {
+        sameCount = 0;
+      }
       if (ok) {
+        memcpy(lastA, a, sizeof(lastA));
         imuFail = 0;
         float x = a[0], y = a[1], z = a[2];
         float m = sqrtf(x * x + y * y + z * z);
@@ -268,10 +331,16 @@ void sensorTask(void*) {
         st.raw.temp = bme.temperature + c.temp_off;
         st.raw.humidity = hum;
         st.raw.pressure = bme.pressure / 100.0f + c.press_off;
+        st.raw.gas_k = bme.gas_resistance / 1000.0f;
         if (!isnan(iaq)) st.raw.iaq = constrain(iaq, 0.0f, 500.0f);
         st.raw.iaq_acc = acc;
         unlockState();
-        if (acc >= 3 && lastAcc < 3) buzz(T_AIR_READY);
+        if (acc >= 1 && lastAcc == 0) {
+          buzz(T_AIR_READY);
+          char meta[72];
+          snprintf(meta, sizeof(meta), "%s air quality readings have started", BIN_LABEL);
+          raiseAlert("sensor", "success", "Air sensor ready", meta);
+        }
         lastAcc = acc;
         if (acc >= 3 && now - lastBaseSave > 3600000UL) {
           lastBaseSave = now;

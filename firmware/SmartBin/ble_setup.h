@@ -12,8 +12,8 @@ struct BtView {
   char why[40];
   char ip[16];
   uint8_t netCount;
-  char nets[3][33];
-  int8_t rssi[3];
+  char nets[6][33];
+  int8_t rssi[6];
 };
 
 void bleStart();

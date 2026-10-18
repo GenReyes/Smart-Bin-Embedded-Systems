@@ -16,12 +16,22 @@ import java.net.URL
  *   POST /api/command    {"cmd": "LOCK"} and the other commands
  *   POST /api/calibrate  the calibration values, stored in EEPROM
  *   POST /api/simulate   {"mask": 5, "values": {...}}
+ *   POST /api/cloud      {"url","key","email","pass"}: the Firebase account the bin signs in with
+ *
+ * A command the bin refuses comes back as HTTP 409 {"ok":false,"why":"..."},
+ * thrown as [Refused] so the reason reaches the user and the cloud is not tried.
  */
 object LocalApi {
     private const val TIMEOUT_MS = 1500
 
     /** The parts of /api/status the app uses. */
-    class Status(val reading: Reading, val cal: Cal?, val simMask: Int?)
+    class Status(
+        val reading: Reading, val cal: Cal?, val simMask: Int?,
+        val fw: String = "", val rssi: Int? = null, val uptimeS: Long? = null, val touchCustom: Boolean? = null,
+    )
+
+    /** The bin answered and said no, with its reason. */
+    class Refused(val why: String) : IOException(why)
 
     suspend fun status(ip: String): Status = parse(JSONObject(call(ip, "/api/status", null)))
 
@@ -35,6 +45,12 @@ object LocalApi {
         val o = JSONObject()
         cal.forEach { (k, v) -> o.put(k, if (v == Math.floor(v)) v.toLong() else v) }
         call(ip, "/api/calibrate", o.toString())
+    }
+
+    /** Gives the bin the Firebase account it signs in with. */
+    suspend fun sendCloud(ip: String, cfg: FirebaseConfig) {
+        val o = JSONObject().put("url", cfg.url.trim()).put("key", cfg.key.trim()).put("email", cfg.email.trim()).put("pass", cfg.password)
+        call(ip, "/api/cloud", o.toString())
     }
 
     suspend fun simulate(ip: String, sim: Sim) {
@@ -65,6 +81,10 @@ object LocalApi {
                 conn.outputStream.use { it.write(bytes) }
             }
             val code = conn.responseCode
+            if (code == 409 || code == 400) {
+                val why = runCatching { JSONObject(conn.errorStream.bufferedReader().use { it.readText() }).optString("why") }.getOrNull()
+                throw Refused(why?.takeIf { it.isNotBlank() } ?: "The bin refused it")
+            }
             if (code !in 200..299) throw IOException("HTTP $code")
             conn.inputStream.bufferedReader().use { it.readText() }.ifBlank { "{}" }
         } finally {
@@ -109,6 +129,10 @@ object LocalApi {
             lidOpen = lidOpen,
             status = status,
             at = System.currentTimeMillis(),
+            faults = j.optJSONArray("faults")?.let { a -> (0 until a.length()).map { a.optString(it) }.filter { it.isNotBlank() } } ?: emptyList(),
+            iaqWarmS = if (j.has("iaq_warm_s") && !j.isNull("iaq_warm_s")) j.optInt("iaq_warm_s") else null,
+            gasK = if (j.has("gas_k") && !j.isNull("gas_k")) j.optDouble("gas_k").takeUnless { it.isNaN() } else null,
+            tamperPhase = j.optString("tamper_phase", ""),
         )
         val cal = j.optJSONObject("cal")?.let { c ->
             val m = DEFAULT_CAL.toMutableMap()
@@ -116,6 +140,12 @@ object LocalApi {
             m.toMap()
         }
         val mask = if (j.has("sim_mask")) j.optInt("sim_mask") else null
-        return Status(reading, cal, mask)
+        return Status(
+            reading, cal, mask,
+            fw = j.optString("fw", ""),
+            rssi = if (j.has("rssi") && !j.isNull("rssi")) j.optInt("rssi") else null,
+            uptimeS = if (j.has("uptime_s") && !j.isNull("uptime_s")) j.optLong("uptime_s") else null,
+            touchCustom = j.optJSONObject("touch")?.let { t -> if (t.has("custom")) t.optBoolean("custom") else null },
+        )
     }
 }

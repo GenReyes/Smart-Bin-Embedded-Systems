@@ -2,6 +2,7 @@
 #include "state.h"
 #include "buzzer.h"
 #include "ble_setup.h"
+#include "sensors.h"
 #include <SPI.h>
 #include <WiFi.h>
 #include <Adafruit_GFX.h>
@@ -86,6 +87,22 @@ static void txt(int x, int y, int w, const char* s, int px, uint16_t col, char a
   if (f == F_TINY) tft.setCursor(cx, y + (px - 7 * mag) / 2);
   else tft.setCursor(cx, y + (px + CAP[f] * mag) / 2);
   tft.print(s);
+}
+
+static void txtFit(int x, int y, int w, const char* s, int px, uint16_t col, char align = 'l', bool regular = false) {
+  char b[40];
+  strlcpy(b, s, sizeof(b));
+  Ft f = fontFor(px, regular);
+  size_t n = strlen(b);
+  if (textW(b, f) > w) {
+    while (n > 2) {
+      b[--n] = 0;
+      char t[44];
+      snprintf(t, sizeof(t), "%s..", b);
+      if (textW(t, f) <= w) { strlcpy(b, t, sizeof(b)); break; }
+    }
+  }
+  txt(x, y, w, b, px, col, align, regular);
 }
 
 static void wrapTxt(int x, int y, int w, const char* s, int px, uint16_t col, int lh) {
@@ -240,13 +257,20 @@ static void btn(int x, int y, int w, int h, const char* label, uint16_t fill, ui
   int o = pressed ? 4 : 0;
   if (pressed) tft.fillRect(x, y, w + 4, h + 4, P->bg == fill ? P->surf : P->bg);
   box(x + o, y + o, w, h, fill, 3, pressed ? 0 : 4);
-  int tw = textW(label, fontFor(px)) + (ic >= 0 ? isz + 5 : 0);
+  int lw = textW(label, fontFor(px));
+  int gap = 5;
+  while (ic >= 0 && lw + isz + gap > w - 12 && isz > 14) {
+    isz -= 2;
+    gap = 3;
+  }
+  if (ic >= 0 && lw + isz + gap > w - 12) ic = -1;
+  int tw = lw + (ic >= 0 ? isz + gap : 0);
   int sx = x + o + (w - tw) / 2;
   if (ic >= 0) {
     icon((Icon)ic, sx, y + o + (h - isz) / 2, isz, on, fill);
-    sx += isz + 5;
+    sx += isz + gap;
   }
-  txt(sx, y + o + (h - px) / 2, w, label, px, on);
+  txt(sx, y + o + (h - px) / 2, x + o + w - 6 - sx, label, px, on);
   if (id) addHit(x, y, w + 4, h + 4, id);
 }
 
@@ -270,7 +294,7 @@ static bool dirty(uint8_t id, const char* sig) {
   return false;
 }
 
-enum Screen : uint8_t { S_BOOT, S_CAL, S_MAIN, S_URGENT, S_PIN, S_COLLECT, S_DONE, S_TAMPER, S_LOCKED, S_INFO, S_BT };
+enum Screen : uint8_t { S_BOOT, S_CAL, S_MAIN, S_URGENT, S_PIN, S_COLLECT, S_DONE, S_TAMPER, S_LOCKED, S_INFO, S_BT, S_TOUCHCAL };
 enum Overlay : uint8_t { O_NONE, O_INFO, O_PIN, O_BT };
 static Screen cur = S_BOOT;
 static Overlay overlay = O_NONE;
@@ -468,7 +492,7 @@ static void drawMain(const BinState& s, const Cal& c, const Sim& sm, uint32_t no
   }
 
   char val[24];
-  bool hx = s.okHX || (sm.mask & 2), bme = s.okBME || (sm.mask & 8), gasOk = (s.okBME || (sm.mask & 4)) && s.v.iaq_acc > 0;
+  bool hx = s.okHX || (sm.mask & 2), bme = s.okBME || (sm.mask & 8), bmeGas = s.okBME || (sm.mask & 4), gasOk = bmeGas && s.v.iaq_acc > 0;
   snprintf(val, sizeof(val), "%.2f kg", s.v.weight_g / 1000.0f);
   reading(6, 146, "Weight", val, hx && s.v.weight_g >= c.weight_cap, !hx, -1, tint);
   snprintf(val, sizeof(val), "%.1f C", s.v.temp);
@@ -478,7 +502,14 @@ static void drawMain(const BinState& s, const Cal& c, const Sim& sm, uint32_t no
   float gp = s.v.iaq / max(1.0f, c.gas_th) * 100;
   Lv al = gp >= 80 ? LR : gp >= 50 ? LA : LG;
   snprintf(val, sizeof(val), "%s %d", gp >= 80 ? "Poor" : gp >= 50 ? "Moderate" : "Good", (int)roundf(s.v.iaq));
-  reading(9, 200, "Air", val, gasOk && gp >= 100, !gasOk, al, tint);
+  if (bmeGas && s.v.iaq_acc == 0) {
+    int left = airWarmLeft();
+    if (left > 0) snprintf(val, sizeof(val), "%d:%02d  %.0fk", left / 60, left % 60, s.v.gas_k);
+    else if (s.v.gas_k > 0) snprintf(val, sizeof(val), "Starting %.0fk", s.v.gas_k);
+    else strcpy(val, "No gas reading");
+    reading(9, 200, "Air (warm)", val, false, false, -1, tint);
+  }
+  else reading(9, 200, "Air", val, gasOk && gp >= 100, !gasOk, al, tint);
 
   bool lr = lidRowActive(s), br = buzzRowActive(s, now);
   if (lr && br) {
@@ -554,7 +585,7 @@ static void drawPin(uint32_t now) {
     icon(I_X, 13, 10, 13, P->on_r, P->r);
     txt(30, 11, 56, "CANCEL", 12, P->on_r);
     addHit(0, 0, 96, 36, B_PIN_CANCEL);
-    txt(98, 9, 134, "ENTER PIN", 16, P->tx, 'r');
+    txt(98, 9, 134, "COLLECT PIN", 16, P->tx, 'r');
     const char* keys[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "<", "0", "OK"};
     const uint8_t ids[] = {B_K1, B_K2, B_K3, B_K4, B_K5, B_K6, B_K7, B_K8, B_K9, B_KDEL, B_K0, B_KOK};
     for (int i = 0; i < 12; i++) {
@@ -850,8 +881,8 @@ static void drawBt(uint32_t now) {
     switch (v.phase) {
       case BT_IDLE:
       case BT_WAIT:
-        txt(8, 124, 224, BIN_BLE_NAME, 22, P->tx, 'c');
-        wrapTxt(20, 154, 200, "On the app or dashboard press PAIR A BIN and choose this name. A pairing code shows next.", 14, P->tx2, 18);
+        txt(8, 120, 224, BIN_BLE_NAME, 22, P->tx, 'c');
+        wrapTxt(16, 152, 208, "On the dashboard or app press PAIR A BIN and pick this name.", 13, P->tx2, 17);
         break;
       case BT_CODE: {
         txt(8, 46, 224, "PAIRING CODE", 14, P->tx2, 'c');
@@ -859,51 +890,51 @@ static void drawBt(uint32_t now) {
         char code[12];
         snprintf(code, sizeof(code), "%03lu %03lu", (unsigned long)(v.code / 1000), (unsigned long)(v.code % 1000));
         txt(8, 76, 224, code, 46, P->tx, 'c');
-        wrapTxt(16, 148, 208, "Type this code on the phone or the dashboard when it asks.", 14, P->tx2, 18);
-        txt(8, 232, 224, "3 wrong codes stop pairing for 60 s.", 12, P->tx2, 'c');
+        wrapTxt(16, 146, 208, "Type it in the pairing window that pops up on the laptop or phone.", 13, P->tx2, 17);
+        txt(8, 242, 224, "3 wrong codes stop pairing for 60 s.", 12, P->tx2, 'c');
         break;
       }
       case BT_LOCKOUT:
         box(8, 48, 224, 130, P->r, 3, 4);
-        txt(8, 62, 224, "PAIRING STOPPED", 22, P->on_r, 'c');
-        txt(8, 98, 224, "3 wrong codes", 20, P->on_r, 'c');
+        txt(16, 62, 208, "PAIRING STOPPED", 22, P->on_r, 'c');
+        txt(16, 98, 208, "3 wrong codes", 20, P->on_r, 'c');
         wrapTxt(16, 192, 208, "Only someone who can see this screen can pair. The phone that tried was turned away.", 13, P->tx2, 17);
         break;
       case BT_PAIRED:
-        box(88, 46, 64, 64, P->g, 3, 4);
-        icon(I_CHECK, 96, 54, 48, P->on_g, P->g);
-        txt(8, 120, 224, "PAIRED", 24, P->tx, 'c');
-        wrapTxt(20, 150, 200, "Choose the Wi-Fi network on the dashboard.", 14, P->tx2, 18);
-        for (int i = 0; i < v.netCount; i++) {
-          int y = 192 + i * 24;
-          frame(8, y, 224, 21, P->surf, 2, P->bd);
-          txt(14, y + 3, 150, v.nets[i], 13, P->tx);
+        box(96, 44, 48, 48, P->g, 3, 4);
+        icon(I_CHECK, 102, 50, 36, P->on_g, P->g);
+        txt(8, 98, 224, "PAIRED", 22, P->tx, 'c');
+        wrapTxt(16, 126, 208, "Pick the network on the dashboard.", 13, P->tx2, 17);
+        for (int i = 0; i < min<int>(v.netCount, 3); i++) {
+          int y = 168 + i * 27;
+          frame(8, y, 224, 23, P->surf, 2, P->bd);
+          txtFit(14, y + 4, 156, v.nets[i], 13, P->tx);
           char r[12];
           snprintf(r, sizeof(r), "%d dBm", v.rssi[i]);
-          txt(158, y + 3, 66, r, 12, P->tx2, 'r');
+          txt(172, y + 4, 54, r, 12, P->tx2, 'r');
         }
         break;
       case BT_CONN:
         txt(8, 128, 224, "CONNECTING...", 22, P->tx, 'c');
         box(24, 166, 192, 34, P->surf, 3, 3);
-        txt(24, 174, 192, v.ssid, 16, P->tx, 'c');
+        txtFit(32, 174, 176, v.ssid, 16, P->tx, 'c');
         txt(20, 214, 200, "Password received.", 13, P->tx2, 'c', true);
         break;
       case BT_OK:
-        box(8, 48, 224, 152, P->g, 3, 4);
-        txt(8, 60, 224, "CONNECTED", 22, P->on_g, 'c');
-        txt(8, 94, 224, "IP ADDRESS", 12, P->on_g, 'c');
-        txt(8, 110, 224, v.ip, 28, P->on_g, 'c');
-        txt(8, 152, 224, v.ssid, 14, P->on_g, 'c', true);
-        txt(8, 172, 224, "Enter this in the dashboard.", 13, P->on_g, 'c', true);
-        wrapTxt(16, 214, 208, "Bluetooth stays on until you turn it off on the dashboard, or in 5 minutes.", 13, P->tx2, 17);
+        box(8, 48, 224, 140, P->g, 3, 4);
+        txt(16, 58, 208, "CONNECTED", 22, P->on_g, 'c');
+        txt(16, 88, 208, "IP ADDRESS", 12, P->on_g, 'c');
+        txt(16, 102, 208, v.ip, 28, P->on_g, 'c');
+        txtFit(16, 140, 208, v.ssid, 14, P->on_g, 'c', true);
+        txt(16, 162, 208, "Type it in the dashboard.", 13, P->on_g, 'c', true);
+        wrapTxt(16, 200, 208, "Bluetooth turns off by itself in 5 minutes.", 13, P->tx2, 17);
         btn(8, 266, 224, 44, "DONE", P->surf, P->tx, 18, I_CHECK, 20, B_BT_DONE);
         break;
       case BT_FAIL:
         box(8, 48, 224, 126, P->r, 3, 4);
-        txt(8, 62, 224, "FAILED", 28, P->on_r, 'c');
-        txt(8, 102, 224, v.why, 20, P->on_r, 'c');
-        txt(8, 132, 224, "Check it and try again.", 14, P->on_r, 'c', true);
+        txt(16, 62, 208, "FAILED", 28, P->on_r, 'c');
+        txt(16, 102, 208, v.why, 20, P->on_r, 'c');
+        txt(16, 132, 208, "Check it and try again.", 14, P->on_r, 'c', true);
         wrapTxt(16, 190, 208, "Other reasons: network not found, or a 5 GHz network.", 13, P->tx2, 17);
         btn(8, 266, 108, 44, "RETRY", P->bl, P->on_bl, 16, -1, 0, B_BT_RETRY);
         btn(124, 266, 108, 44, "CANCEL", P->surf, P->tx, 16, -1, 0, B_BT_CANCEL);
@@ -929,16 +960,18 @@ static void drawBt(uint32_t now) {
         icon(I_BT, 96 + o, 56 + o, 48 - 2 * o, P->bl, P->surf);
         mmss(mm, sizeof(mm), (int32_t)(v.offAtMs - now));
         snprintf(t, sizeof(t), "BT OFF IN %s", mm);
-        box(40, 214, 160, 30, P->surf, 3, 3);
-        txt(40, 221, 160, t, 14, P->tx, 'c');
+        tft.fillRect(20, 220, 204, 36, P->bg);
+        box(24, 222, 192, 30, P->surf, 3, 3);
+        txt(32, 229, 176, t, 14, P->tx, 'c');
       }
       break;
     case BT_CODE:
       mmss(mm, sizeof(mm), (int32_t)(v.phaseMs + BT_CODE_MS - now));
       if (dirty(5, mm)) {
         snprintf(t, sizeof(t), "NEW CODE IN %s", mm);
-        box(36, 192, 168, 30, P->surf, 3, 3);
-        txt(36, 199, 168, t, 14, P->tx, 'c');
+        tft.fillRect(20, 202, 204, 34, P->bg);
+        box(24, 204, 192, 28, P->surf, 3, 3);
+        txt(32, 210, 176, t, 14, P->tx, 'c');
       }
       break;
     case BT_LOCKOUT:
@@ -971,7 +1004,50 @@ static void drawBt(uint32_t now) {
   }
 }
 
+static volatile bool tcReq = false, tcResetReq = false;
+static bool tcActive = false, tcWaitUp = false;
+static uint8_t tcStep = 0;
+static uint32_t tcLastMs = 0, tcDoneMs = 0;
+static long tcSx = 0, tcSy = 0;
+static int tcN = 0;
+static int tcRaw[4][2];
+static const int TC_X[4] = {20, 219, 20, 219};
+static const int TC_Y[4] = {20, 20, 299, 299};
+
+void uiStartTouchCal() {
+  tcReq = true;
+  if (hUi) xTaskNotify(hUi, EV_STATE, eSetBits);
+}
+
+void uiResetTouchCal() {
+  tcResetReq = true;
+  if (hUi) xTaskNotify(hUi, EV_STATE, eSetBits);
+}
+
+static void drawTouchCal() {
+  char sig[16];
+  snprintf(sig, sizeof(sig), "tc%d%d", tcStep, darkTheme);
+  if (!dirty(4, sig)) return;
+  fullDraw = true;
+  tft.fillScreen(P->bg);
+  if (tcStep < 4) {
+    txt(8, 112, 224, "TOUCH CALIBRATION", 16, P->tx, 'c');
+    char b[32];
+    snprintf(b, sizeof(b), "Press the cross  %d of 4", tcStep + 1);
+    txt(8, 142, 224, b, 14, P->tx, 'c', true);
+    wrapTxt(20, 170, 200, "Press firmly on the center, then let go. Wait 30 s to cancel.", 13, P->tx2, 17);
+    int x = TC_X[tcStep], y = TC_Y[tcStep];
+    tft.drawFastHLine(x - 14, y, 29, P->r);
+    tft.drawFastVLine(x, y - 14, 29, P->r);
+    tft.drawCircle(x, y, 7, P->r);
+  } else {
+    txt(8, 120, 224, "TOUCH SAVED", 22, P->tx, 'c');
+    txt(8, 160, 224, "Buttons should line up now", 14, P->tx2, 'c', true);
+  }
+}
+
 static Screen pickScreen(const BinState& s, const Cal& c, const Sim& sm, uint32_t now) {
+  if (tcActive) return S_TOUCHCAL;
   if (s.booting) return S_BOOT;
   if (s.calibrating) return S_CAL;
   if (overlay == O_BT) return S_BT;
@@ -1017,6 +1093,7 @@ static void render(uint32_t now) {
     case S_LOCKED: drawLocked(s); break;
     case S_INFO: drawInfo(s); break;
     case S_BT: drawBt(now); break;
+    case S_TOUCHCAL: drawTouchCal(); break;
   }
 }
 
@@ -1133,19 +1210,106 @@ static void onPress(uint8_t id) {
   (void)s;
 }
 
-static bool readTouch(int& x, int& y) {
+static bool readTouch(int& x, int& y, int& rawX, int& rawY) {
   if (!touch.touched()) return false;
   TS_Point p = touch.getPoint();
+  rawX = p.x;
+  rawY = p.y;
   int rx = p.x, ry = p.y;
-#if TS_SWAP_XY
-  int tmp = rx; rx = ry; ry = tmp;
-#endif
+  if (touchCal.swap) { rx = p.y; ry = p.x; }
 #if TOUCH_DEBUG
   Serial.printf("[touch] raw %d %d z %d\n", rx, ry, p.z);
 #endif
-  x = constrain(map(rx, TS_RAW_X0, TS_RAW_X1, 0, 239), 0, 239);
-  y = constrain(map(ry, TS_RAW_Y0, TS_RAW_Y1, 0, 319), 0, 319);
+  x = constrain(map(rx, touchCal.x0, touchCal.x1, 0, 239), 0, 239);
+  y = constrain(map(ry, touchCal.y0, touchCal.y1, 0, 319), 0, 319);
   return p.z > 200;
+}
+
+static void tcBegin(uint32_t now) {
+  tcActive = true;
+  tcWaitUp = true;
+  tcStep = 0;
+  tcN = 0;
+  tcSx = tcSy = 0;
+  tcLastMs = now;
+  overlay = O_NONE;
+  resetScreen();
+  buzz(T_CAL_START);
+}
+
+static void tcEnd() {
+  tcActive = false;
+  resetScreen();
+}
+
+static void tcFinish(uint32_t now) {
+  float dxx = (tcRaw[1][0] + tcRaw[3][0]) / 2.0f - (tcRaw[0][0] + tcRaw[2][0]) / 2.0f;
+  float dxy = (tcRaw[1][1] + tcRaw[3][1]) / 2.0f - (tcRaw[0][1] + tcRaw[2][1]) / 2.0f;
+  bool sw = fabsf(dxy) > fabsf(dxx);
+  float px[4], py[4];
+  for (int i = 0; i < 4; i++) {
+    px[i] = sw ? tcRaw[i][1] : tcRaw[i][0];
+    py[i] = sw ? tcRaw[i][0] : tcRaw[i][1];
+  }
+  float left = (px[0] + px[2]) / 2, right = (px[1] + px[3]) / 2;
+  float top = (py[0] + py[1]) / 2, bottom = (py[2] + py[3]) / 2;
+  if (fabsf(right - left) < 800 || fabsf(bottom - top) < 800) {
+    Serial.println("[touch] calibration rejected, presses too close together");
+    buzz(T_CAL_CANCEL);
+    raiseAlert("setup", "warning", "Touch calibration failed", "Presses were too close together. Try again.");
+    tcEnd();
+    return;
+  }
+  float kx = (right - left) / (TC_X[1] - TC_X[0]);
+  float ky = (bottom - top) / (TC_Y[2] - TC_Y[0]);
+  TouchCal t;
+  t.swap = sw;
+  t.x0 = lroundf(left - kx * TC_X[0]);
+  t.x1 = lroundf(right + kx * (239 - TC_X[1]));
+  t.y0 = lroundf(top - ky * TC_Y[0]);
+  t.y1 = lroundf(bottom + ky * (319 - TC_Y[2]));
+  touchCal = t;
+  saveTouchCal();
+  Serial.printf("[touch] saved swap %d x %d..%d y %d..%d\n", t.swap, t.x0, t.x1, t.y0, t.y1);
+  buzz(T_SAVED);
+  char meta[72];
+  snprintf(meta, sizeof(meta), "%s touchscreen calibrated", BIN_LABEL);
+  raiseAlert("setup", "success", "Touch calibrated", meta);
+  publish(EV_CAL);
+  tcStep = 4;
+  tcDoneMs = now;
+}
+
+static void tcHandle(bool pressed, int rx, int ry, uint32_t now) {
+  if (tcStep >= 4) {
+    if (now - tcDoneMs > 2500) tcEnd();
+    return;
+  }
+  if (tcWaitUp) {
+    if (!pressed) tcWaitUp = false;
+    tcLastMs = now;
+    return;
+  }
+  if (pressed) {
+    tcSx += rx;
+    tcSy += ry;
+    tcN++;
+    tcLastMs = now;
+    return;
+  }
+  if (tcN >= 3) {
+    tcRaw[tcStep][0] = tcSx / tcN;
+    tcRaw[tcStep][1] = tcSy / tcN;
+    tcStep++;
+    if (tcStep == 4) tcFinish(now);
+    else buzz(T_CAL_STEP);
+  }
+  tcSx = tcSy = 0;
+  tcN = 0;
+  if (tcActive && tcStep < 4 && now - tcLastMs > 30000) {
+    buzz(T_CAL_CANCEL);
+    tcEnd();
+  }
 }
 
 void uiInit() {
@@ -1164,7 +1328,7 @@ void uiInit() {
 
 void uiTask(void*) {
   bool down = false;
-  uint32_t lastDraw = 0;
+  uint32_t lastDraw = 0, holdSince = 0;
   for (;;) {
     uint32_t ev = 0;
     xTaskNotifyWait(0, UINT32_MAX, &ev, pdMS_TO_TICKS(down ? 30 : 100));
@@ -1175,10 +1339,29 @@ void uiTask(void*) {
     }
     spin = (now / 120) % 24;
 
-    if ((ev & EV_TOUCH) || down || digitalRead(PIN_TOUCH_IRQ) == LOW) {
-      int x, y;
-      bool pressed = readTouch(x, y);
-      if (pressed && !down && now - lastTouchMs > 220) {
+    if (tcReq) {
+      tcReq = false;
+      tcBegin(now);
+    }
+    if (tcResetReq) {
+      tcResetReq = false;
+      resetTouchCal();
+      buzz(T_SAVED);
+      publish(EV_CAL);
+    }
+    {
+      int x, y, rx = 0, ry = 0;
+      bool pressed = readTouch(x, y, rx, ry);
+      if (!pressed) holdSince = 0;
+      else if (!holdSince) holdSince = now;
+      if (tcActive) {
+        tcHandle(pressed, rx, ry, now);
+        down = pressed;
+        holdSince = 0;
+      } else if (pressed && holdSince && now - holdSince > 5000) {
+        holdSince = 0;
+        tcBegin(now);
+      } else if (pressed && !down && now - lastTouchMs > 220) {
         down = true;
         lastTouchMs = now;
         for (int i = hitN - 1; i >= 0; i--) {

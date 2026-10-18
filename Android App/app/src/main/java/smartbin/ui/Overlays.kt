@@ -1,5 +1,8 @@
 package smartbin.ui
 
+import smartbin.notify.Feel
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -67,7 +70,7 @@ fun Overlays(vm: AppViewModel, hub: HubState, allowAlerts: () -> Unit) {
                     IconKey(Ic.back, { vm.overlay = Overlay.BinDetail(bins[i - 1].id) }, tint = muted(), enabled = i > 0, sound = Sfx.STEP_DOWN)
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                         T(b.name, size = 1.02f, maxLines = 1)
-                        T("${i + 1} of ${bins.size} · arrows move between bins", size = 0.74f, weight = FontWeight.Bold, color = Sb.c.ink2, maxLines = 1)
+                        T("${i + 1} of ${bins.size} · swipe or use the arrows", size = 0.74f, weight = FontWeight.Bold, color = Sb.c.ink2, maxLines = 1)
                     }
                     IconKey(
                         Ic.back, { vm.overlay = Overlay.BinDetail(bins[i + 1].id) }, tint = muted(), enabled = i < bins.size - 1, sound = Sfx.STEP_UP,
@@ -75,7 +78,23 @@ fun Overlays(vm: AppViewModel, hub: HubState, allowAlerts: () -> Unit) {
                     )
                     IconKey(Ic.cross, close, tint = muted(), sound = Sfx.BACK)
                 }
-                BinCard(vm, b, hub, inSheet = true)
+                // A swipe across the card moves to the next or previous bin, like the arrows.
+                var drag by remember { mutableStateOf(0f) }
+                Box(
+                    Modifier.pointerInput(i, bins.size) {
+                        detectHorizontalDragGestures(
+                            onDragStart = { drag = 0f },
+                            onDragEnd = {
+                                val far = 80.dp.toPx()
+                                when {
+                                    drag < -far && i < bins.size - 1 -> { Feel.event(Sfx.STEP_UP); vm.overlay = Overlay.BinDetail(bins[i + 1].id) }
+                                    drag > far && i > 0 -> { Feel.event(Sfx.STEP_DOWN); vm.overlay = Overlay.BinDetail(bins[i - 1].id) }
+                                }
+                                drag = 0f
+                            },
+                        ) { _, dx -> drag += dx }
+                    },
+                ) { BinCard(vm, b, hub, inSheet = true) }
             }
         }
         is Overlay.Pick -> Sheet(close) { Picker(vm, hub, o.forWhat) }
@@ -109,11 +128,34 @@ fun Overlays(vm: AppViewModel, hub: HubState, allowAlerts: () -> Unit) {
         Overlay.Wifi -> Sheet(close) {
             SheetTitle(Ic.radar, "Networks the bin can see")
             Hint("Only 2.4 GHz networks are listed. The bin cannot join 5 GHz.")
-            listOf("HomeWiFi-2G" to "Strong", "TUP-Lab-2.4" to "Good", "PLDTHOMEFIBR-2G" to "Fair", "Guest_2G" to "Weak").forEach { (n, s) ->
-                Opt(vm.ssid == n, { vm.ssid = n; vm.overlay = null }) {
-                    T(n, Modifier.weight(1f), weight = FontWeight.Bold)
-                    T(s, size = 0.8f, weight = FontWeight.Bold, color = Sb.c.ink2)
+            val nets = vm.btNets.ifEmpty { if (vm.btDemo) AppViewModel.DEMO_NETS else emptyList() }
+            if (nets.isEmpty()) Hint("The bin has not listed any networks yet. Close this and press SCAN again, or type the name.")
+            nets.forEach { n ->
+                Opt(vm.ssid == n.ssid, { vm.ssid = n.ssid; vm.overlay = null }) {
+                    T(n.ssid, Modifier.weight(1f), weight = FontWeight.Bold, maxLines = 1)
+                    T(
+                        n.rssi?.let { r -> (if (r >= -55) "Strong" else if (r >= -67) "Good" else if (r >= -75) "Fair" else "Weak") + " · $r dBm" } ?: "",
+                        size = 0.8f, weight = FontWeight.Bold, color = Sb.c.ink2,
+                    )
                 }
+            }
+        }
+        Overlay.BtDevices -> Sheet(close) {
+            SheetTitle(Ic.bluetooth, "Bins nearby")
+            Hint(if (vm.btScanning) "Looking for bins with WI-FI SETUP open..." else vm.btNote ?: "Pick the bin to pair with.")
+            vm.btFound.forEach { f ->
+                Opt(false, { vm.btConnect(f) }) {
+                    Ico(Ic.bluetooth, 19.dp, Sb.c.bt)
+                    T(f.name, Modifier.weight(1f), weight = FontWeight.Bold, maxLines = 1)
+                    T("${f.rssi} dBm", size = 0.8f, weight = FontWeight.Bold, color = Sb.c.ink2)
+                }
+            }
+            Acts {
+                Btn("Cancel", close, Modifier.weight(1f), sound = Sfx.BACK)
+                Btn(
+                    if (vm.btScanning) "SEARCHING" else "SEARCH AGAIN", { vm.btSearch() }, Modifier.weight(1f), Ic.radar, Look.TINT, Sb.c.bt,
+                    enabled = !vm.btScanning, iconMod = Modifier.spin(vm.btScanning),
+                )
             }
         }
         is Overlay.PinUnlock -> Sheet(close) {
@@ -136,7 +178,7 @@ fun Overlays(vm: AppViewModel, hub: HubState, allowAlerts: () -> Unit) {
             Sheet({ vm.btCancel() }) {
                 BinScreenCode(vm, b.name)
                 PinPad(
-                    Ic.bluetooth, "Type the pairing code", "Tap Pair phone on ${b.name}'s touchscreen, then type the 6 digits it shows. The code changes every time.",
+                    Ic.bluetooth, "Type the pairing code", "On ${b.name}, open WI-FI SETUP, then type the 6 digits it shows. The code changes every time.",
                     "PAIR", vm.btEntry, AppViewModel.BT_CODE_LEN, AppViewModel.BT_CODE_LEN, vm.btMsg,
                     { vm.btKey(it) }, { vm.btBack() }, { vm.btCheck(b) },
                 )
