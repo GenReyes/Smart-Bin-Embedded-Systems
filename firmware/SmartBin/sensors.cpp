@@ -120,7 +120,13 @@ void sensorsInit() {
 
   bool imuOk = imuStart();
   float x, y, z;
-  if (loadImuRef(x, y, z)) { imuRef[0] = x; imuRef[1] = y; imuRef[2] = z; }
+  if (loadImuRef(x, y, z)) {
+    imuRef[0] = x; imuRef[1] = y; imuRef[2] = z;
+    Serial.printf("[imu] upright reference %.2f %.2f %.2f\n", x, y, z);
+  } else {
+    reqImuRef = true;
+    Serial.println("[imu] no upright reference saved, using the first reading");
+  }
 
   scale.begin(PIN_HX_DT, PIN_HX_SCK);
   loadHx(hxOffset, hxScale);
