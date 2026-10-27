@@ -72,7 +72,7 @@ Do the same for the second bin with `BIN_NUMBER 2`.
 | Servo | Dashboard **Settings**, calibration on, change *Servo closed* and *Servo open* until the lid shuts and opens fully. |
 | Fill | Empty bin: press USE NOW for *Distance empty*. Put something at the full line: USE NOW for *Distance full*. Save. |
 | Weight | Empty bin: TARE. Put a known weight in (for example 500 g): type it, CALIBRATE. |
-| Tilt | Calibration start also records "upright" for the BMI160, so start calibration with the bin standing straight. |
+| Tilt | Calibration start also records "upright" for the BMI160, so start calibration with the bin standing straight. On first boot with nothing saved, the first reading is taken as upright. After moving the board (breadboard to PCB, or a new mounting angle), run Calibrate again with the bin standing straight, or the old reference makes it read as tilted and it goes into tamper. |
 | Temperature | Type a reference thermometer reading and press SET OFFSET (the BME680 reads about 2 C high from its own heat). |
 
 Everything you save is kept in the ESP32's flash and survives a restart.
