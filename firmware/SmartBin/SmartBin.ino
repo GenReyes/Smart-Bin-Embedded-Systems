@@ -26,8 +26,12 @@ void setup() {
 
   heapNote("start");
   Serial.printf("[bt] ble memory released at boot: %s\n", btMemReleased(BT_MODE_BLE) ? "yes" : "no");
+  // setup() runs above the tasks it starts, so they cannot hold it up before the web
+  // server and Bluetooth are running.
+  vTaskPrioritySet(nullptr, 5);
   stateInit();
   uiInit();
+  if (btBootMode()) uiShowBt();
   buzzerInit();
   controlInit();
   sensorsInit();
@@ -59,6 +63,7 @@ void setup() {
       Serial.println("[bt] asked to start Bluetooth, but its memory was not kept; try again");
     }
   }
+  vTaskPrioritySet(nullptr, 1);
 }
 
 void loop() { vTaskDelete(nullptr); }
