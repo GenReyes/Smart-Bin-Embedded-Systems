@@ -26,6 +26,8 @@ static float usageFraction = 0;
 
 bool cloudFirebaseOn() { return net.fbUrl.length() && net.fbKey.length() && net.fbEmail.length() && net.fbPass.length(); }
 
+static String lastFail;
+
 static int request(Svc& s, const String& url, const char* method, const String& body, String* out,
                    const char* ctype = "application/json") {
   Client& c = url.startsWith("https://") ? (Client&)s.tls : (Client&)s.plain;
@@ -35,8 +37,9 @@ static int request(Svc& s, const String& url, const char* method, const String& 
   if (!s.http.begin((NetworkClient&)c, url)) return -1;
   if (body.length()) s.http.addHeader("Content-Type", ctype);
   int code = s.http.sendRequest(method, (uint8_t*)body.c_str(), body.length());
-  if (out) *out = code > 0 ? s.http.getString() : String();
-  else if (code > 0) s.http.getString();
+  String got = code > 0 ? s.http.getString() : String();
+  if (code >= 400 || code <= 0) lastFail = got.substring(0, 100);
+  if (out) *out = got;
   s.http.end();
   return code;
 }
@@ -134,6 +137,7 @@ static int fbCall(const char* method, const String& path, const String& body, St
     idToken = "";
     code = request(fb, fbUrl(path, query), method, body, out);
   }
+  if (code <= 0 || code >= 400) Serial.printf("[firebase] %s %s -> %d %s\n", method, path.c_str(), code, lastFail.c_str());
   if (code <= 0 || code >= 500) {
     backoff(fb);
     setFbOk(false);
