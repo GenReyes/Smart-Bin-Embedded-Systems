@@ -3,11 +3,11 @@
 # The Firebase account is never baked in: local.properties holds only sdk.dir here.
 name: Android APK
 
+# Manual only since 2026-10-28: the APK in the repo is built on Brian's laptop with
+# Android Studio, so it installs over his phone's copy. Run this by hand (Actions >
+# Android APK > Run workflow) only when no laptop is around; its key is different.
 on:
   workflow_dispatch:
-  push:
-    branches: ['claude/**']
-    paths: ['Android App/app/**', 'Android App/*.kts', 'Android App/gradle/**', '.github/workflows/android-apk.yml']
 
 permissions:
   contents: write
