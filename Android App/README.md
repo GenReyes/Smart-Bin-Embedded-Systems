@@ -24,7 +24,7 @@ gradlew :app:assembleDebug
 
 The APK lands in `app/build/outputs/apk/debug/app-debug.apk`. Copy it to a phone to install it there.
 
-A ready-built debug APK, `Smart-Bin v2.3.apk`, sits in this folder for installing on a phone without building.
+A ready-built debug APK, `Smart-Bin v3.0.apk`, sits in this folder for installing on a phone without building.
 
 ## What is in it
 

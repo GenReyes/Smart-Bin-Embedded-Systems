@@ -17,7 +17,7 @@ android {
         minSdk = 26
         targetSdk = 37
         versionCode = 7
-        versionName = "2.3"
+        versionName = "3.0"
 
         // The team's Firebase account, read from local.properties (git-ignored) so the
         // password never reaches the public repository. Missing values become empty.
