@@ -59,6 +59,10 @@ constexpr uint32_t TAMPER_COUNTDOWN_S = 10;
 constexpr uint32_t TAMPER_ALARM_EVERY_MS = 2000;   // latched tamper siren repeats this often
 constexpr uint32_t SCREEN_TIMEOUT_MS = 30000;
 constexpr uint32_t BT_IDLE_OFF_MS = 300000;
+// 0: Bluetooth memory is kept from power-on, so Wi-Fi setup starts without a restart
+//    (costs about 5 KB of heap). 1: normal boots give that memory back and the bin
+//    restarts into Bluetooth setup and out of it. Use 1 if Firebase runs out of memory.
+#define BT_RESTART_FOR_MEMORY 0
 constexpr uint32_t BT_CODE_MS = 60000;
 constexpr uint32_t BT_LOCKOUT_MS = 60000;
 constexpr uint64_t FB_MONTH_LIMIT = 10737418240ULL;

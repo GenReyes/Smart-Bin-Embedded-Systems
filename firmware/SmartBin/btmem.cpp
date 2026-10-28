@@ -2,6 +2,7 @@
 #include <nvs.h>
 #include "esp32-hal-bt.h"
 #include "btmem.h"
+#include "config.h"
 
 static bool flagAtBoot = false;
 
@@ -24,12 +25,15 @@ static void writeFlag(uint8_t v) {
   }
 }
 
-// The core calls this before setup(). Bluetooth memory (tens of KB) is kept only on the
-// boot that was started for Bluetooth Wi-Fi setup; every other boot gives it to the heap,
-// which the Firebase TLS connection needs.
+// The core calls this before setup(). With BT_RESTART_FOR_MEMORY, Bluetooth memory is kept
+// only on the boot started for Wi-Fi setup; every other boot gives it to the heap.
 extern "C" bool bleInUse(void) {
+#if BT_RESTART_FOR_MEMORY
   flagAtBoot = readFlag() == 1;
   return flagAtBoot;
+#else
+  return true;
+#endif
 }
 
 bool btBootRequested() { return flagAtBoot; }
