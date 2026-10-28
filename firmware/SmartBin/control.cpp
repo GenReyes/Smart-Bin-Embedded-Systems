@@ -223,7 +223,9 @@ void controlTask(void*) {
     } else if (sim.mask & 64) {
       wantOpen = sim.lid;
       st.lidCloseAtMs = 0;
-    } else if (motion) {
+    } else if (motion && (st.lidOpen || st.lidClosedAtMs == 0 || now - st.lidClosedAtMs >= cl.lid_close_s * 1000UL)) {
+      // A lid that just shut stays shut for lid_close_s, so motion right after closing
+      // (the PIR still high, or the lid itself moving in front of it) does not flap it.
       wantOpen = true;
       st.lidCloseAtMs = 0;
     } else if (st.lidOpen && st.lidCloseAtMs == 0) {
@@ -236,7 +238,11 @@ void controlTask(void*) {
       st.lidCloseAtMs = 0;
     }
     bool lidChanged = wantOpen != st.lidOpen;
-    if (lidChanged) { st.lidOpen = wantOpen; changed = true; }
+    if (lidChanged) {
+      st.lidOpen = wantOpen;
+      if (!wantOpen) st.lidClosedAtMs = now;
+      changed = true;
+    }
     if (motion != prevMotion) changed = true;
 
     st.alarmFull = fullNow && status == ST_OK;

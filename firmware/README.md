@@ -72,7 +72,8 @@ Do the same for the second bin with `BIN_NUMBER 2`.
 | Servo | Dashboard **Settings**, calibration on, change *Servo closed* and *Servo open* until the lid shuts and opens fully. |
 | Fill | Empty bin: press USE NOW for *Distance empty*. Put something at the full line: USE NOW for *Distance full*. Save. |
 | Weight | Empty bin: TARE. Put a known weight in (for example 500 g): type it, CALIBRATE. |
-| Tilt | Calibration start also records "upright" for the BMI160, so start calibration with the bin standing straight. On first boot with nothing saved, the first reading is taken as upright. After moving the board (breadboard to PCB, or a new mounting angle), run Calibrate again with the bin standing straight, or the old reference makes it read as tilted and it goes into tamper. |
+| Tilt | By default the bin takes the angle it stands at when it is switched on as "upright" (*Take upright again at every power-up* under **Tilt sensor (BMI160)**), so it never starts in tamper. That section also shows the saved upright pitch and roll and the board angle now. USE NOW takes the angle now; you can also type pitch and roll. Switch power-up off to keep one saved angle across restarts. Starting calibration also records upright. |
+| Lid timing | *Lid stays open* (default 5 s) is how long the lid waits after motion stops. *Lid stays closed* (default 2 s) keeps a lid that just shut from opening again straight away, so it does not flap. |
 | Temperature | Type a reference thermometer reading and press SET OFFSET (the BME680 reads about 2 C high from its own heat). |
 
 Everything you save is kept in the ESP32's flash and survives a restart.
@@ -137,6 +138,7 @@ Everything in Integration Guide section 4 (`/api/status`, `/api/command`, `/api/
 
 | Call | What it does |
 |---|---|
+| `modes` in the status | `{"locked","collecting","calibrating","tamper"}`, each true or false. `status` is one word with a priority (calibrating, collecting, tamper, locked), so a lock under a tamper hides there; the dashboard and the app read these flags so both show the same keys. Also `pitch`/`roll` (board angle), `cal.tilt_ref_pitch`/`tilt_ref_roll`/`tilt_boot`/`lid_close_s`, and `sim` (the value each simulated sensor is held at). |
 | `GET /api/events` | Server-Sent Events: a `status` event on every change (at most 4 a second), a `ping` every 10 s. The dashboard uses it; `/api/status` stays for the app. |
 | `POST /api/cloud` | `{"url","key","email","pass"}` stores the Firebase account on the bin (the dashboard's SEND TO BINS) |
 | `POST /api/command {"cmd":"BUZZ_TEST","sound":"full"}` | Plays any tune by name (`full`, `tamper`, `lock`, `bt_paired`, ...) |

@@ -368,6 +368,7 @@ table.sim tr{box-shadow:var(--o1)}
 .sect[data-sec="weight"]{--cc:var(--c-weight)}
 .sect[data-sec="air"]{--cc:var(--c-gas)}
 .sect[data-sec="touch"]{--cc:var(--cal)}
+.sect[data-sec="tilt"]{--cc:var(--c-tamper)}
 .sect{margin-top:12px;border-radius:16px;background:var(--base);box-shadow:var(--o1)}
 .dhd{margin:6px 0 8px;font-size:12px;letter-spacing:1px;text-transform:uppercase;color:var(--ink2)}
 #demoBody .seg{margin-bottom:12px}
@@ -1158,6 +1159,18 @@ html[data-theme="dark"]{--onBrand:#13100D;--brand2:#3FC7C2}
         </div>
         <p class="hint">The BME680 warms itself, so it reads a little hot and its humidity a little low. Put a reference thermometer next to the bin for a few minutes, type its reading, press SET OFFSET, then SAVE SETTINGS. Humidity and pressure offsets are optional. The gas reading has no manual offset: it learns its own baseline in normal air, and RESET GAS BASELINE restarts that.</p>
         </div>
+        <div class="sect" data-sec="tilt">
+        <h2 style="margin-top:24px">Tilt sensor (BMI160)</h2>
+        <div class="fields">
+          <div class="field"><label>Tilt from upright now</label><div class="readout nm-in" id="s_tiltnow">--</div></div>
+          <div class="field span2"><label>Board now (pitch / roll)</label><div class="readout nm-in" id="s_board">--</div></div>
+          <div class="field"><label for="s_tpitch">Upright pitch (deg)</label>
+            <div class="withbtn"><input id="s_tpitch" type="number" min="-90" max="90" step="0.5"><button class="btn sm" data-capture="tilt">USE NOW</button></div></div>
+          <div class="field"><label for="s_troll">Upright roll (deg)</label><input id="s_troll" type="number" min="-180" max="180" step="0.5"></div>
+          <div class="field" style="display:flex;align-items:flex-end"><label class="switch"><input id="s_tiltboot" type="checkbox">Take upright again at every power-up</label></div>
+        </div>
+        <p class="hint">The bin counts as tilted when it leans more than the tilt threshold away from the saved upright angle. Stand the bin straight and press USE NOW, or type the pitch and roll, then SAVE SETTINGS. With the power-up switch on, the angle the bin stands at when it is switched on becomes upright, so it never starts in tamper. Switch it off to keep the saved angle across restarts. Starting calibration mode also saves the angle the bin stands at now.</p>
+        </div>
         <div class="sect" data-sec="lid">
         <h2 style="margin-top:24px">Lid and lock</h2>
         <div class="fields">
@@ -1165,9 +1178,11 @@ html[data-theme="dark"]{--onBrand:#13100D;--brand2:#3FC7C2}
           <div class="field"><label for="s_sopen">Servo open (deg)</label><input id="s_sopen" type="number" min="0" max="180"></div>
           <div class="field"><label for="s_pin">Collect PIN</label><input id="s_pin" type="number" min="0" max="9999"></div>
           <div class="field"><label for="s_pirhold">Lid stays open (s)</label><input id="s_pirhold" type="number" min="1" max="60" step="1"></div>
+          <div class="field"><label for="s_lidclose">Lid stays closed (s)</label><input id="s_lidclose" type="number" min="0" max="30" step="1"></div>
           <div class="field"><label for="s_buzz">Buzzer minimum (s)</label><input id="s_buzz" type="number" min="1" max="30" step="1"></div>
           <div class="field" style="display:flex;align-items:flex-end"><label class="switch"><input id="s_autolock" type="checkbox">Lock the lid when the bin is full</label></div>
         </div>
+        <p class="hint">After the lid closes it stays shut for the closed time even if someone is still in front of it, so it does not flap open and shut. 0 lets it open again at once.</p>
 
         </div>
         <div class="sect" data-sec="weight">
@@ -1335,7 +1350,7 @@ function binColor(i){
   const s=50,l=dark?(round===0?64:round===1?55:72):(round===0?46:round===1?38:54);
   return 'hsl('+h+','+s+'%,'+l+'%)';
 }
-const DEF_CAL={d_empty:30,d_full:5,fill_th:80,temp_th:40,hum_th:85,gas_th:200,tilt_th:30,weight_cap:4500,auto_lock:0,servo_closed:0,servo_open:90,collect_pin:1234,pir_hold_s:5,buzz_s:2,temp_off:-2,hum_off:0,press_off:0};
+const DEF_CAL={d_empty:30,d_full:5,fill_th:80,temp_th:40,hum_th:85,gas_th:200,tilt_th:30,weight_cap:4500,auto_lock:0,servo_closed:0,servo_open:90,collect_pin:1234,pir_hold_s:5,buzz_s:2,temp_off:-2,hum_off:0,press_off:0,lid_close_s:2,tilt_boot:1,tilt_ref_pitch:0,tilt_ref_roll:0};
 const SENSORS=[
   {key:'fill',bit:0,label:'Fill level',icon:'fill',kind:'range',min:0,max:100,step:1,unit:'%'},
   {key:'weight',bit:1,label:'Weight',icon:'weight',kind:'number',min:0,max:5000,step:10,unit:'g'},
@@ -1524,7 +1539,8 @@ const LABEL_ICONS={
   s_gas:['gas','var(--c-gas)'],         s_tilt:['tilt','var(--c-tamper)'],
   s_wcap:['weight','var(--c-weight)'],  s_sclosed:['servo','var(--c-lid)'],
   s_sopen:['servo','var(--c-lid)'],     s_pin:['pin','var(--sim)'],
-  s_known:['weight','var(--c-weight)'], s_pirhold:['stopwatch','var(--c-motion)'],
+  s_known:['weight','var(--c-weight)'], s_pirhold:['stopwatch','var(--c-motion)'], s_lidclose:['stopwatch','var(--c-lid)'],
+  s_tpitch:['tilt','var(--c-tamper)'],   s_troll:['tilt','var(--c-tamper)'],
   s_buzz:['speaker','var(--warn)'],
   s_toff:['temp','var(--c-temp)'],      s_tref:['temp','var(--c-temp)'],
   s_hoff:['humid','var(--c-humid)'],    s_poff:['press','var(--c-press)']
@@ -1565,11 +1581,13 @@ function decorateStatics(){
     b.innerHTML=icon('capture')+'<span>USE NOW</span>';
     b.style.display='inline-flex';b.style.alignItems='center';b.style.gap='7px';
   });
-  const al=document.getElementById('s_autolock');
-  if(al&&!al.parentElement.dataset.deco){
-    al.parentElement.dataset.deco='1';
-    al.parentElement.style.setProperty('--lc','var(--sim)');
-  }
+  [['s_autolock','var(--sim)'],['s_tiltboot','var(--c-tamper)']].forEach(([id,cc])=>{
+    const al=document.getElementById(id);
+    if(al&&!al.parentElement.dataset.deco){
+      al.parentElement.dataset.deco='1';
+      al.parentElement.style.setProperty('--lc',cc);
+    }
+  });
 }
 
 function paintHeadings(){
@@ -1986,15 +2004,26 @@ function normalise(b,j){
   d.gas_k=n(j.gas_k,d.gas_k);
   d.warmEnd=Number.isFinite(+j.iaq_warm_s)&&j.iaq_warm_s!==null?Date.now()+j.iaq_warm_s*1000:null;
   d.tilt=n(j.tilt??j.tilt_deg,d.tilt);
+  d.pitch=n(j.pitch,d.pitch);d.roll=n(j.roll,d.roll);
   if(j.motion!==undefined||j.pir!==undefined)d.motion=!!(j.motion??j.pir);
   if(j.lid!==undefined||j.lid_state!==undefined)d.lid=(j.lid??j.lid_state)===1||String(j.lid??j.lid_state).toUpperCase()==='OPEN'?'OPEN':'CLOSED';
   const sm=['OK','LOCKED','TAMPER','COLLECTING','CALIBRATING'];
   d.status=typeof j.status==='number'?(sm[j.status]||'OK'):String(j.status||j.bin_status||'OK').toUpperCase();
   if(j.cal)Object.assign(b.cal,j.cal);
   if(j.touch)b.touch=j.touch;
-  if(Number.isFinite(+j.sim_mask))b.sim.mask=+j.sim_mask;
+  if(Number.isFinite(+j.sim_mask)&&!b._simDirty)b.sim.mask=+j.sim_mask;
+  /* The bin reports what each simulated sensor is held at, so a value set from the app
+     shows here too. Values typed here and not applied yet are kept. */
+  if(j.sim&&typeof j.sim==='object'&&!b._simDirty)for(const k in j.sim)if(Number.isFinite(+j.sim[k])&&k in b.sim.values)b.sim.values[k]=+j.sim[k];
+  const simSig=b.sim.mask+'|'+JSON.stringify(b.sim.values);
+  if(b._simSig!==simSig){
+    const first=b._simSig==null;b._simSig=simSig;
+    if(!first&&state.selSim===b.id&&!$('#simBody').contains(document.activeElement))buildSim();
+  }
   d.faults=Array.isArray(j.faults)?j.faults:[];
   d.tamper_phase=j.tamper_phase||'';
+  d.modes=j.modes&&typeof j.modes==='object'?{locked:!!j.modes.locked,collecting:!!j.modes.collecting,
+    calibrating:!!j.modes.calibrating,tamper:!!j.modes.tamper}:null;
   if(j.last_cmd)d.last_cmd=j.last_cmd;
   if(j.fw)b.fw=j.fw;
   if(Number.isFinite(+j.rssi))b.rssi=+j.rssi;
@@ -2066,6 +2095,7 @@ function stepDemo(b){
   else if(d.status!=='COLLECTING')d.fill=clamp(d.fill+(0.022+Math.random()*0.015)*DEMO.speed,0,100);
   d.weight_g=on(1)?+s.values.weight:Math.round(clamp(d.fill/100*b.cal.weight_cap*0.92+Math.random()*25,0,5000));
   d.tilt=h.tilt!=null?h.tilt:on(4)&&+s.values.tamper?38:clamp(Math.random()*2.2,0,90);
+  d.pitch=+((b.cal.tilt_ref_pitch||0)+d.tilt*0.8).toFixed(1);d.roll=+((b.cal.tilt_ref_roll||0)+d.tilt*0.6).toFixed(1);
   d.motion=on(5)?!!+s.values.motion:Math.random()<0.025;
   d.distance_cm=+(b.cal.d_empty-(d.fill/100)*(b.cal.d_empty-b.cal.d_full)).toFixed(1);
   if(d.status==='COLLECTING'){d.lid='OPEN';return;}
@@ -2305,16 +2335,45 @@ async function poll(){
     if(b.live){pushHistory(b);watchAlerts(b);}
   }
   linkSound(binSnd);tourTick(now);
+  syncCalib(now);
   fbWatchTick(now);fbUsageTick(now);
   if($('#cloudRows')&&state.view==='settings'&&now-(poll._cloudAt||0)>2000){poll._cloudAt=now;cloudRender();}
   render();
 }
 
+/* Calibration mode belongs to the bin. Whoever switches it on (this dashboard, the app or
+   the touchscreen), the bin reports CALIBRATING and every screen follows that report, so
+   the switch here and the one in the app always agree. A start or stop sent from here
+   gets a few seconds to reach the bin before its report counts. */
+const calSync={quietUntil:0};
+function syncCalib(now){
+  if(now<calSync.quietUntil)return;
+  const c=state.calib;
+  if(c){
+    const b=byId(c.bin);
+    if(!b||!isLive(b)||!b.live||now-(c.at||0)<4000||modesOf(b.data).calibrating)return;
+    state.calib=null;
+    if(state.view==='settings')loadSettings();
+    $('#setMsg').textContent='Calibration mode was switched off on '+b.name+' (from its screen or the app). The fields show what is stored on the bin.';
+    render();return;
+  }
+  const b=state.bins.find(x=>isLive(x)&&x.live&&modesOf(x.data).calibrating);
+  if(!b)return;
+  state.calib={bin:b.id,at:now,mine:false};
+  if(state.selSet!==b.id)state.selSet=b.id;
+  if(state.view==='settings')loadSettings();
+  $('#setMsg').textContent=b.name+' was put in calibration mode from its screen or the app, so it is on here too.';
+  render();
+}
+
 /* Commands. On the bin's Wi-Fi the 200 reply is the confirmation. Over Firebase or
    ThingSpeak the dashboard waits for the bin's next status, as the app does (section 7). */
-const EXPECT={LOCK:s=>s==='LOCKED',UNLOCK:s=>s!=='LOCKED',COLLECT:s=>s==='COLLECTING'};
+const EXPECT={LOCK:d=>modesOf(d).locked,UNLOCK:d=>!modesOf(d).locked,COLLECT:d=>modesOf(d).collecting};
 function confirmCloud(b,cmd,pushId,ms,via){
   const t0=Date.now();
+  /* Like the app, the keys stay held until the bin confirms or the wait runs out. */
+  b._wait=cmd;render();
+  const done=()=>{b._wait='';render();};
   const tick=async()=>{
     const age=Date.now()-t0;
     let res=null;
@@ -2322,10 +2381,10 @@ function confirmCloud(b,cmd,pushId,ms,via){
     if(res&&res.cmd===cmd){
       if(res.ok){sfx('cmd_ok');toast(b.name+' confirmed '+cmd+' through '+via+'.');}
       else{sfx('cmd_fail');toast(b.name+' refused '+cmd+(res.why?': '+res.why:'')+'.');}
-      fbRest('DELETE','sb/results/'+enc(pushId)).catch(()=>{});render();return;
+      fbRest('DELETE','sb/results/'+enc(pushId)).catch(()=>{});done();return;
     }
-    if(age>1500&&b.live&&EXPECT[cmd](b.data.status)){sfx('cmd_ok');toast(b.name+' confirmed '+cmd+' through '+via+'.');render();return;}
-    if(age>=ms){sfx('cmd_fail');toast(b.name+' did not confirm '+cmd+' within '+Math.round(ms/1000)+' s.');return;}
+    if(age>1500&&b.live&&EXPECT[cmd](b.data)){sfx('cmd_ok');toast(b.name+' confirmed '+cmd+' through '+via+'.');done();return;}
+    if(age>=ms){sfx('cmd_fail');toast(b.name+' did not confirm '+cmd+' within '+Math.round(ms/1000)+' s.');done();return;}
     setTimeout(tick,1000);
   };
   setTimeout(tick,1000);
@@ -2335,7 +2394,7 @@ async function sendLive(b,cmd,extra){
   if(b.ip&&!SECURE&&(b.route==='local'||!b.route||!CLOUD_CMDS.includes(cmd))){
     try{
       const r=await callRaw(b,'/api/command',body);
-      if(r.ok){sfx('cmd_ok');if(r.j&&r.j.status)b.data.status=String(r.j.status).toUpperCase();L(b).nextLocal=0;return true;}
+      if(r.ok){sfx('cmd_ok');L(b).nextLocal=0;return true;}
       sfx('cmd_fail');toast(b.name+' refused '+cmd+(r.j&&r.j.why?': '+r.j.why:' (HTTP '+r.status+')')+'.');return false;
     }catch(e){
       if(!CLOUD_CMDS.includes(cmd)){sfx('cmd_fail');toast(b.name+' did not answer. '+cmd.replace(/_/g,' ')+' needs the bin’s Wi-Fi.');return false;}
@@ -2476,14 +2535,15 @@ function watchAlerts(b){
   if(humid&&!p.humid)addAlert('warning','humid','Humidity high',b.name+' at '+Math.round(d.humidity)+'%, limit '+c.hum_th+'%');
   if(gassy&&!p.gassy)addAlert('warning','gas','Air quality warning',b.name+' index '+Math.round(d.gas)+', limit '+c.gas_th);
   if(d.status==='TAMPER'&&p.status!=='TAMPER')addAlert('critical','tamper','Tamper detected',b.name+' was moved or tilted');
-  if(d.status==='LOCKED'&&p.status!=='LOCKED')addAlert('info','lock','Bin locked',b.name+' locked from the dashboard');
-  if(d.status!=='LOCKED'&&p.status==='LOCKED')addAlert('success','check','Bin unlocked',b.name+' is open for use again','lock');
-  if(d.status==='CALIBRATING'&&p.status!=='CALIBRATING')addAlert('info','calib','Calibration started',b.name+' is being calibrated');
+  const m=modesOf(d);
+  if(p.locked!=null&&m.locked&&!p.locked)addAlert('info','lock','Bin locked',b.name+' locked');
+  if(p.locked!=null&&!m.locked&&p.locked)addAlert('success','check','Bin unlocked',b.name+' is open for use again','lock');
+  if(m.calibrating&&!p.calibrating&&p.status!=='CALIBRATING')addAlert('info','calib','Calibration started',b.name+' is being calibrated');
   const fl=(d.faults||[]).join(', ');
   if(fl&&fl!==p.faults)addAlert('warning','gear','Sensor not answering',b.name+': '+fl,'sensor');
   if(!fl&&p.faults)addAlert('success','check','Sensor back',b.name+' reads every sensor again','sensor');
   if(p.acc===0&&d.iaq_acc>0)addAlert('success','gas','Air sensor ready',b.name+' air quality readings are settled','sensor');
-  b.prev={full,hot,humid,gassy,status:d.status,faults:fl,acc:d.iaq_acc};
+  b.prev={full,hot,humid,gassy,status:d.status,locked:m.locked,calibrating:m.calibrating,faults:fl,acc:d.iaq_acc};
 }
 
 /* ---------- commands ---------- */
@@ -2517,15 +2577,29 @@ function toast(msg){
 
 /* ---------- mode ---------- */
 function currentMode(){
-  const cal=!!state.calib,sim=state.bins.some(b=>b.sim.mask>0);
+  const cal=state.bins.some(binCal),sim=state.bins.some(b=>b.sim.mask>0);
   if(cal&&sim)return 'dual';
   if(cal)return 'calib';
   if(sim)return 'sim';
   if(state.bins.some(b=>b.data.status==='TAMPER'||b.data.fill>=b.cal.fill_th))return 'alert';
   return 'normal';
 }
+/* A bin is in calibration when it says so, whoever started it (this dashboard, the app
+   or the touchscreen), or while this dashboard's own start is on its way to it. */
+function binCal(b){return modesOf(b.data).calibrating||!!(state.calib&&state.calib.bin===b.id)}
+/* Every mode that is on. Firmware since 2026-10-28 sends them as "modes", because "status"
+   is one word and hides a lock under a tamper or a calibration. Demo bins and older
+   firmware fall back to the status word. */
+function modesOf(d){
+  if(d.modes)return d.modes;
+  const s=d.status;
+  return {locked:s==='LOCKED',collecting:s==='COLLECTING',calibrating:s==='CALIBRATING',tamper:s==='TAMPER'};
+}
+/* The one word the status chip shows: calibration has its own CAL chip, so the chip
+   shows what is underneath it. */
+function statusKey(d){const m=modesOf(d);return m.tamper?'TAMPER':m.collecting?'COLLECTING':m.locked?'LOCKED':'OK';}
 function binMode(b){
-  const cal=!!(state.calib&&state.calib.bin===b.id),sim=b.sim.mask>0;
+  const cal=binCal(b),sim=b.sim.mask>0;
   return cal&&sim?'dual':cal?'cal':sim?'sim':'none';
 }
 let lastMode='';
@@ -2700,12 +2774,12 @@ function renderOverlayCard(){
 
   /* status chips - use same sig-check as renderCard */
   const simOn=b.sim.mask>0,calOn=binMode(b)==='cal'||binMode(b)==='dual';
-  const tilting=d.tamper_phase==='COUNTDOWN'&&d.status!=='TAMPER'&&d.status!=='CALIBRATING';
+  const tilting=d.tamper_phase==='COUNTDOWN'&&d.status!=='TAMPER'&&!modesOf(d).calibrating;
   const csig=[d.lid,d.status,d.motion,simOn,calOn,b.live,b.route,isLive(b),b._demoLink,tilting].join('|');
   const ch=q('chips');
   if(ch&&ch.dataset.sig!==csig){
     ch.dataset.sig=csig;
-    const stKey=d.status==='CALIBRATING'?'OK':d.status;
+    const stKey=statusKey(d);
     const stIco=stKey==='TAMPER'?icon('tamper'):stKey==='LOCKED'?icon('lock',true)
       :stKey==='COLLECTING'?icon('truck'):icon('check');
     const stCol={OK:'var(--ok)',LOCKED:'var(--sim)',TAMPER:'var(--c-tamper)',
@@ -2724,16 +2798,8 @@ function renderOverlayCard(){
   }
 
   /* action buttons */
-  const op=state.role==='operator',busy=d.status==='CALIBRATING';
-  const locked=d.status==='LOCKED',tamper=d.status==='TAMPER',collecting=d.status==='COLLECTING';
-  const want=[];
-  want.push(locked
-    ?['UNLOCK','UNLOCK','solid','lock',!busy,'var(--sim)']
-    :['LOCK','LOCK','tint','lock',!(busy||tamper),'var(--sim)']);
-  if(op)want.push(['CLEAR_TAMPER','RESET TAMPER',tamper?'danger':'tint','tamper',tamper,'var(--c-tamper)']);
-  want.push(collecting
-    ?['COLLECT_DONE','DONE','solid','check',true,'var(--cal)']
-    :['COLLECT','COLLECT','tint','truck',!busy,'var(--c-link)']);
+  const op=state.role==='operator';
+  const {want,tamper}=actionKeys(b,op);
   const asig=want.map(w=>w.join('|')).join(',');
   const act=q('actions');
   if(act&&act.dataset.sig!==asig){
@@ -2955,14 +3021,14 @@ function renderCard(b){
   const bm=binMode(b);
   root.dataset.bmode=bm;
   const simOn=b.sim.mask>0,calOn=bm==='cal'||bm==='dual';
-  const tilting=d.tamper_phase==='COUNTDOWN'&&d.status!=='TAMPER'&&d.status!=='CALIBRATING';
+  const tilting=d.tamper_phase==='COUNTDOWN'&&d.status!=='TAMPER'&&!modesOf(d).calibrating;
   const csig=[d.lid,d.status,d.motion,simOn,calOn,b.live,b.route,isLive(b),b._demoLink,tilting].join('|');
   const ch=q('chips');
   if(ch.dataset.sig!==csig){
     ch.dataset.sig=csig;
     /* CALIBRATING is shown by the CAL chip only, the same way SIM shows simulation.
        The status chip keeps reporting the underlying bin state. */
-    const stKey=d.status==='CALIBRATING'?'OK':d.status;
+    const stKey=statusKey(d);
     const stIco=stKey==='TAMPER'?icon('tamper'):stKey==='LOCKED'?icon('lock',true)
       :stKey==='COLLECTING'?icon('truck'):icon('check');
     const stCol={OK:'var(--ok)',LOCKED:'var(--sim)',TAMPER:'var(--c-tamper)',
@@ -3015,20 +3081,12 @@ function renderCard(b){
   tuneSensorIcons(root,d,c);
   updateTiles();
 
-  const op=state.role==='operator',busy=d.status==='CALIBRATING';
-  const locked=d.status==='LOCKED',tamper=d.status==='TAMPER',collecting=d.status==='COLLECTING';
-  const want=[];
+  const op=state.role==='operator';
+  const {want,tamper}=actionKeys(b,op);
   /* LOCK and UNLOCK travel together: an action you can do but cannot undo
      strands a collector who locked a bin with no operator around. RESET TAMPER
      is operator only and is left out of the collector's card entirely, since a
      control they can never use is just noise. */
-  want.push(locked
-    ?['UNLOCK','UNLOCK','solid','lock',!busy,'var(--sim)']
-    :['LOCK','LOCK','tint','lock',!(busy||tamper),'var(--sim)']);
-  if(op)want.push(['CLEAR_TAMPER','RESET TAMPER',tamper?'danger':'tint','tamper',tamper,'var(--c-tamper)']);
-  want.push(collecting
-    ?['COLLECT_DONE','DONE','solid','check',true,'var(--cal)']
-    :['COLLECT','COLLECT','tint','truck',!busy,'var(--c-link)']);
   const asig=want.map(w=>w.join('|')).join(',');
   const act=q('actions');
   if(act.dataset.sig!==asig){
@@ -3040,6 +3098,27 @@ function renderCard(b){
         '<span>'+w[1]+'</span></button>';
     }).join('');
   }
+}
+/* The LOCK / RESET TAMPER / COLLECT keys, with the same rules as the app's bin card
+   (Overview.kt): every key waits while the bin calibrates, is not answering, or has a
+   cloud command it has not confirmed yet. LOCK and COLLECT wait out a tamper, and LOCK a
+   pickup, which the bin would refuse anyway. A locked bin shows UNLOCK even while a
+   tamper or a pickup outranks LOCKED in its status word. */
+function actionKeys(b,op){
+  const d=b.data,stale=isLive(b)&&!b.live,wait=b._wait||'';
+  const busy=binCal(b)||stale||!!wait;
+  const m=modesOf(d),locked=m.locked,tamper=m.tamper,collecting=m.collecting;
+  const want=[];
+  if(wait==='LOCK'||wait==='UNLOCK')want.push([wait,wait==='LOCK'?'LOCKING':'UNLOCKING','tint','lock',false,'var(--sim)']);
+  else want.push(locked
+    ?['UNLOCK','UNLOCK','solid','lock',!busy,'var(--sim)']
+    :['LOCK','LOCK','tint','lock',!(busy||tamper||collecting),'var(--sim)']);
+  if(op)want.push(['CLEAR_TAMPER','RESET TAMPER',tamper?'danger':'tint','tamper',tamper&&!stale&&!wait,'var(--c-tamper)']);
+  if(wait==='COLLECT')want.push(['COLLECT','STARTING','tint','truck',false,'var(--c-link)']);
+  else want.push(collecting
+    ?['COLLECT_DONE','DONE','solid','check',!stale&&!wait,'var(--cal)']
+    :['COLLECT','COLLECT','tint','truck',!(busy||tamper),'var(--c-link)']);
+  return {want,tamper};
 }
 /* Every chip is one grid cell of the same size, so the label has to fit on one
    line even in the narrowest card (about 94px per cell with 3 bins at 1100px).
@@ -3502,13 +3581,15 @@ function adaptiveSeg(hostId,attr,selIds,withAll){
 /* ---------- settings ---------- */
 const MAP={s_dempty:'d_empty',s_dfull:'d_full',s_fill:'fill_th',s_temp:'temp_th',s_hum:'hum_th',s_gas:'gas_th',s_tilt:'tilt_th',
   s_wcap:'weight_cap',s_sclosed:'servo_closed',s_sopen:'servo_open',s_pin:'collect_pin',
-  s_pirhold:'pir_hold_s',s_buzz:'buzz_s',s_toff:'temp_off',s_hoff:'hum_off',s_poff:'press_off'};
+  s_pirhold:'pir_hold_s',s_lidclose:'lid_close_s',s_buzz:'buzz_s',s_toff:'temp_off',s_hoff:'hum_off',s_poff:'press_off',
+  s_tpitch:'tilt_ref_pitch',s_troll:'tilt_ref_roll'};
 function loadSettings(){
   const seg=adaptiveSeg('setSeg','set',[state.selSet],false);
   if($('#setSeg').dataset.sig!==seg){$('#setSeg').dataset.sig=seg;$('#setSeg').innerHTML=seg;}
   const b=byId(state.selSet);if(!b)return;
   for(const k in MAP)$('#'+k).value=b.cal[MAP[k]];
   $('#s_autolock').checked=!!b.cal.auto_lock;
+  $('#s_tiltboot').checked=b.cal.tilt_boot==null||!!b.cal.tilt_boot;
   sectSummaries(b);
   sectAllRender();
   refreshCalGate();
@@ -3521,7 +3602,8 @@ function sectSummaries(b){
   const sum={range:f(c.d_empty,1)+' to '+f(c.d_full,1)+' cm',
     limits:f(c.fill_th,0)+'% \u00B7 '+f(c.temp_th,0)+'\u00B0C \u00B7 '+f(c.hum_th,0)+'%RH \u00B7 '+f(c.gas_th,0)+' IAQ',
     air:'offset '+f(c.temp_off,1)+'\u00B0C',
-    lid:'PIN \u2022\u2022\u2022\u2022 \u00B7 '+f(c.pir_hold_s,0)+' s'+(c.auto_lock?' \u00B7 auto-lock':''),
+    lid:'PIN \u2022\u2022\u2022\u2022 \u00B7 open '+f(c.pir_hold_s,0)+' s \u00B7 shut '+f(c.lid_close_s??2,0)+' s'+(c.auto_lock?' \u00B7 auto-lock':''),
+    tilt:'upright '+f(c.tilt_ref_pitch||0,1)+'\u00B0 / '+f(c.tilt_ref_roll||0,1)+'\u00B0'+(c.tilt_boot==null||c.tilt_boot?' \u00B7 at power-up':''),
     weight:Number.isFinite(d.weight_g)?(d.weight_g/1000).toFixed(2)+' kg now':'',
     touch:b.touch&&b.touch.custom!=null?(b.touch.custom?'calibrated':'default values'):''};
   $$('.sect').forEach(x=>{const e=x.querySelector('.ssum');if(e)e.textContent=sum[x.dataset.sec]||'';});
@@ -3530,7 +3612,7 @@ function calibrating(){const b=byId(state.selSet);return !!(b&&state.calib&&stat
 function formDirty(){
   const b=byId(state.selSet);if(!b)return false;
   for(const k in MAP)if(+$('#'+k).value!==+b.cal[MAP[k]])return true;
-  return ($('#s_autolock').checked?1:0)!==(b.cal.auto_lock?1:0);
+  return ($('#s_autolock').checked?1:0)!==(b.cal.auto_lock?1:0)||($('#s_tiltboot').checked?1:0)!==(b.cal.tilt_boot==null||b.cal.tilt_boot?1:0);
 }
 function refreshDirty(){
   const on=state.role!=='collector'&&calibrating(),dirty=on&&formDirty();
@@ -3591,6 +3673,9 @@ function updateSettingsLive(){
       :!t?'Waiting for the bin'
       :(t.custom?'Calibrated on the bin':'Default values')+' \u00B7 X '+t.x0+'\u2013'+t.x1+' \u00B7 Y '+t.y0+'\u2013'+t.y1+(t.swap?' \u00B7 axes swapped':'');
   }
+  const tn=$('#s_tiltnow'),bd=$('#s_board'),dead=(b.data.faults||[]).includes('BMI160');
+  if(tn)tn.textContent=dead?'Not answering':fmt(b.data.tilt,1)+'\u00B0 (alert over '+fmt(b.cal.tilt_th,0)+'\u00B0)';
+  if(bd)bd.textContent=dead?'--':Number.isFinite(b.data.pitch)?fmt(b.data.pitch,1)+'\u00B0 / '+fmt(b.data.roll,1)+'\u00B0':'Waiting for the bin';
   const tl=$('#s_tlive'),iq=$('#s_iaq');
   if(tl)tl.textContent=fmt(b.data.temp_raw,1)+' / '+fmt(b.data.temp,1)+' \u00B0C';
   if(iq){
@@ -3605,6 +3690,7 @@ async function saveSettings(){
   const b=byId(state.selSet);if(!b)return;
   const c={};for(const k in MAP)c[MAP[k]]=+$('#'+k).value;
   c.auto_lock=$('#s_autolock').checked?1:0;
+  c.tilt_boot=$('#s_tiltboot').checked?1:0;
   if(c.d_full>=c.d_empty){$('#setMsg').textContent='Distance full must be smaller than distance empty.';return;}
   if(Math.abs(c.temp_off)>10||Math.abs(c.hum_off)>20||Math.abs(c.press_off)>50){
     $('#setMsg').textContent='An offset that large means the sensor is faulty or wired wrong. Temperature up to 10 C, humidity up to 20 %RH, pressure up to 50 hPa.';return;}
@@ -3664,6 +3750,8 @@ async function applySim(){
   let msg=b.sim.mask?'Simulation applied to '+b.name+'.':b.name+' is reading real sensors again.';
   if(b.ip){try{const r=await callRaw(b,'/api/simulate',{mask:b.sim.mask,values:b.sim.values});if(!r.ok)throw new Error('refused');}
     catch(e){msg=b.name+' did not answer, so this only changes the screen.';}}
+  /* From here on the bin's own report is what this screen shows, as on the app. */
+  b._simDirty=false;
   $('#simMsg').textContent=msg;render();
 }
 
@@ -3671,8 +3759,8 @@ async function applySim(){
 function setRole(r){
   if(state.role==='operator'&&r==='collector'&&opBooted)sfx('op_out');
   if(r==='collector'&&state.calib){
-    const b=byId(state.calib.bin);state.calib=null;
-    if(b)command(b.id,'CALIBRATE_END');
+    const b=byId(state.calib.bin),mine=state.calib.mine;state.calib=null;
+    if(b&&mine){calSync.quietUntil=Date.now()+4000;command(b.id,'CALIBRATE_END');}
   }
   state.role=r;cardSig='';
   $('#rolechip').innerHTML=icon('lock',r!=='operator')+'<span>'+(r==='operator'?'OPERATOR':'COLLECTOR')+'</span>';
@@ -3717,7 +3805,13 @@ document.addEventListener('click',async e=>{
   const cap=t.closest('[data-capture]');
   if(cap&&!cap.disabled){
     const b=byId(state.selSet);if(!b)return;
-    $('#'+cap.dataset.capture).value=fmt(b.data.distance_cm,1);
+    if(cap.dataset.capture==='tilt'){
+      if(!Number.isFinite(b.data.pitch)){$('#setMsg').textContent=b.name+' has not sent its board angle yet.';return;}
+      $('#s_tpitch').value=fmt(b.data.pitch,1);$('#s_troll').value=fmt(b.data.roll,1);refreshDirty();
+      $('#setMsg').textContent='Took pitch '+fmt(b.data.pitch,1)+'\u00B0 and roll '+fmt(b.data.roll,1)+'\u00B0 as upright. Press SAVE SETTINGS to keep it.';
+      return;
+    }
+    $('#'+cap.dataset.capture).value=fmt(b.data.distance_cm,1);refreshDirty();
     $('#setMsg').textContent='Captured '+fmt(b.data.distance_cm,1)+' cm from the sensor. Press SAVE SETTINGS to keep it.';
     return;
   }
@@ -3727,7 +3821,7 @@ document.addEventListener('click',async e=>{
     const box=tw.closest('.twoway');
     box.dataset.val=tw.dataset.v;
     box.querySelectorAll('.tw').forEach(x=>x.setAttribute('aria-pressed',String(x===tw)));
-    const b=byId(state.selSim);if(b)b.sim.values[box.dataset.sv]=+tw.dataset.v;
+    const b=byId(state.selSim);if(b){b.sim.values[box.dataset.sv]=+tw.dataset.v;b._simDirty=true;}
     return;
   }
   if(t.closest('#btUse')){btUse();return;}
@@ -3755,7 +3849,7 @@ document.addEventListener('click',async e=>{
     if(pop&&!pop.classList.contains('hide')){pop.classList.add('hide');$('#statusPill').setAttribute('aria-expanded','false');}
   }
   const mb=t.closest('.modebtn');
-  if(mb){const b=byId(state.selSim);b.sim.mask^=(1<<+mb.dataset.bit);buildSim();applyMode();return;}
+  if(mb){const b=byId(state.selSim);b.sim.mask^=(1<<+mb.dataset.bit);b._simDirty=true;buildSim();applyMode();return;}
   const ed=t.closest('[data-edit]');
   if(ed){
     const inOverlay=!!t.closest('#tileOverlay');
@@ -4000,11 +4094,11 @@ $('#calToggle').addEventListener('change',e=>{
   const b=byId(state.selSet);
   if(!b){e.target.checked=false;return;}
   if(e.target.checked){
-    state.calib={bin:b.id};
+    state.calib={bin:b.id,at:Date.now(),mine:true};
     command(b.id,'CALIBRATE_START');
     $('#setMsg').textContent=b.name+' is in calibration mode. Its screen and the dashboard are teal until you switch this off.';
   }else{
-    state.calib=null;
+    state.calib=null;calSync.quietUntil=Date.now()+4000;
     command(b.id,'CALIBRATE_END');
     $('#setMsg').textContent='Calibration mode off. '+b.name+' is back to normal and the fields show what is stored on the bin.';
   }
@@ -4015,7 +4109,7 @@ $('#btnSimOff').addEventListener('click',()=>{const b=byId(state.selSim);if(b)b.
 $('#simBody').addEventListener('input',e=>{
   const el=e.target.closest('[data-sv]');if(!el||el.classList.contains('twoway'))return;
   $$('#simBody [data-sv="'+el.dataset.sv+'"]').forEach(x=>{if(x!==el&&!x.classList.contains('twoway'))x.value=el.value});
-  const b=byId(state.selSim);if(b)b.sim.values[el.dataset.sv]=+el.value;
+  const b=byId(state.selSim);if(b){b.sim.values[el.dataset.sv]=+el.value;b._simDirty=true;}
 });
 document.addEventListener('pointerdown',e=>{
   const host=e.target.closest('.btn,.tab,.iconbtn,.role,.addmini');

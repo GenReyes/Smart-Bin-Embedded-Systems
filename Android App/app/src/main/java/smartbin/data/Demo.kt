@@ -105,7 +105,10 @@ object Demo {
             c.v("auto_lock") > 0 && fill >= c.v("fill_th") -> { status = BinStatus.LOCKED; lid = false }
             else -> lid = if (s.on(6)) (sv["lid"] ?: 0.0) > 0 else motion
         }
-        return base.copy(fill = fill, weight = weight, tilt = tilt, motion = motion, distance = distance, lidOpen = lid, status = status)
+        return base.copy(
+            fill = fill, weight = weight, tilt = tilt, motion = motion, distance = distance, lidOpen = lid, status = status,
+            pitch = c.v("tilt_ref_pitch") + tilt * 0.8, roll = c.v("tilt_ref_roll") + tilt * 0.6,
+        )
     }
 
     /** A day of made-up history so the charts have something to draw in demo mode. */

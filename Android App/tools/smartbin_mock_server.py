@@ -52,6 +52,7 @@ DEFAULT_CAL = {
     "d_empty": 30, "d_full": 5, "fill_th": 80, "temp_th": 40, "hum_th": 85, "gas_th": 200,
     "tilt_th": 30, "weight_cap": 4500, "auto_lock": 0, "servo_closed": 0, "servo_open": 90,
     "collect_pin": 1234, "pir_hold_s": 5, "buzz_s": 2, "temp_off": -2, "hum_off": 0, "press_off": 0,
+    "lid_close_s": 2, "tilt_boot": 1, "tilt_ref_pitch": 0.0, "tilt_ref_roll": 0.0,
 }
 DEFAULT_SIM = {"fill": 60, "weight": 2000, "gas": 120, "temp": 28, "humidity": 60, "tamper": 0, "motion": 0, "lid": 0}
 
@@ -74,6 +75,11 @@ class Bin:
         self.gas = 60 + self.fill
         self.iaq_acc = 3
         self.tilt = 0.0
+        # The board's angle now; at power-up it is taken as upright, as tilt_boot does on the bin.
+        self.pitch = random.uniform(-3, 3)
+        self.roll = random.uniform(-3, 3)
+        self.cal["tilt_ref_pitch"] = round(self.pitch, 1)
+        self.cal["tilt_ref_roll"] = round(self.roll, 1)
         self.motion = False
         self.lid_open = False
         self.status = "OK"
@@ -128,7 +134,8 @@ class Bin:
                 "temp": round(temp, 2), "temp_raw": round(temp - c["temp_off"], 2), "humidity": round(hum, 1),
                 "pressure": round(self.press, 1), "iaq": round(self.gas), "iaq_acc": self.iaq_acc,
                 "tilt": round(self.tilt, 1), "motion": self.motion, "lid": "OPEN" if self.lid_open else "CLOSED",
-                "status": self.status, "cal": c, "sim_mask": self.sim_mask,
+                "status": self.status, "cal": c, "sim_mask": self.sim_mask, "sim": dict(s),
+                "pitch": round(c["tilt_ref_pitch"] + self.tilt * 0.8, 1), "roll": round(c["tilt_ref_roll"] + self.tilt * 0.6, 1),
             }
 
     def command(self, cmd, body):
@@ -147,6 +154,7 @@ class Bin:
                 self.gas = min(self.gas, 48)
             elif cmd == "CALIBRATE_START":
                 self.calibrating = True
+                self.cal["tilt_ref_pitch"], self.cal["tilt_ref_roll"] = round(self.pitch, 1), round(self.roll, 1)
             elif cmd == "CALIBRATE_END":
                 self.calibrating = False
             elif cmd == "RESET_GAS":

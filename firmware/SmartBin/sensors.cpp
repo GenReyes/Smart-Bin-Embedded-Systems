@@ -56,8 +56,8 @@ static bool imuAccel(int16_t a[3]) {
 }
 static HX711 scale;
 
-static volatile bool reqTare = false, reqCalW = false, reqGas = false, reqImuRef = false;
-static volatile float reqGrams = 0;
+static volatile bool reqTare = false, reqCalW = false, reqGas = false, reqImuRef = false, reqImuSet = false;
+static volatile float reqGrams = 0, reqPitch = 0, reqRoll = 0;
 
 static int32_t hxOffset = 0;
 static float hxScale = 420.0f;
@@ -71,6 +71,30 @@ void requestTare() { reqTare = true; }
 void requestCalWeight(float grams) { reqGrams = grams; reqCalW = true; }
 void requestGasReset() { reqGas = true; }
 void requestImuReference() { reqImuRef = true; }
+void requestImuAngles(float pitch, float roll) {
+  reqPitch = pitch;
+  reqRoll = roll;
+  reqImuSet = true;
+}
+
+// Pitch and roll of a unit gravity vector, in degrees, and back. Upright on a flat
+// board is about (0, 0, 1), which is pitch 0, roll 0.
+static float pitchOf(const float v[3]) { return atan2f(-v[0], sqrtf(v[1] * v[1] + v[2] * v[2])) * 57.29578f; }
+static float rollOf(const float v[3]) { return atan2f(v[1], v[2]) * 57.29578f; }
+static void vecOf(float pitchDeg, float rollDeg, float v[3]) {
+  float p = pitchDeg / 57.29578f, r = rollDeg / 57.29578f;
+  v[0] = -sinf(p);
+  v[1] = cosf(p) * sinf(r);
+  v[2] = cosf(p) * cosf(r);
+}
+
+// Called with the state lock held.
+static void noteRef(bool saved) {
+  st.refPitch = pitchOf(imuRef);
+  st.refRoll = rollOf(imuRef);
+  st.refSaved = saved;
+  st.calVersion++;
+}
 
 int airWarmLeft() {
   uint32_t burn = baselineFromNvs ? 120 : 300;
@@ -120,8 +144,14 @@ void sensorsInit() {
 
   bool imuOk = imuStart();
   float x, y, z;
-  if (loadImuRef(x, y, z)) {
-    imuRef[0] = x; imuRef[1] = y; imuRef[2] = z;
+  bool saved = loadImuRef(x, y, z);
+  if (saved) { imuRef[0] = x; imuRef[1] = y; imuRef[2] = z; }
+  // With tilt_boot on (the default), whatever angle the bin stands at when it is switched
+  // on becomes "upright", so a bin set down on uneven ground does not start in tamper.
+  if (calSnapshot().tilt_boot) {
+    reqImuRef = true;
+    Serial.println("[imu] taking the upright reference from the first reading");
+  } else if (saved) {
     Serial.printf("[imu] upright reference %.2f %.2f %.2f\n", x, y, z);
   } else {
     reqImuRef = true;
@@ -129,6 +159,9 @@ void sensorsInit() {
   }
 
   scale.begin(PIN_HX_DT, PIN_HX_SCK);
+  // With the HX711 unplugged a floating DT pin can sit low, which looks like "data ready"
+  // and gives junk readings. The pull-up keeps it high, so a missing board is never ready.
+  pinMode(PIN_HX_DT, INPUT_PULLUP);
   loadHx(hxOffset, hxScale);
   if (fabsf(hxScale) < 0.001f) hxScale = 420.0f;
 
@@ -139,6 +172,7 @@ void sensorsInit() {
   lockState();
   st.okBME = bmeOk;
   st.okIMU = imuOk;
+  noteRef(saved);
   unlockState();
 }
 
@@ -181,7 +215,8 @@ void sensorTask(void*) {
   int tareN = 0, calN = 0;
   uint32_t lastTrig = 0, lastImu = 0, lastHxOk = millis(), lastEnv = 0, envReadyAt = 0, lastRate = 0, lastBaseSave = millis();
   bool envPending = false;
-  int bmeFail = 0, imuFail = 0, sameCount = 0;
+  int bmeFail = 0, imuFail = 0, sameCount = 0, hxJunk = 0, hxSame = 0;
+  long hxLastRaw = 1;
   int16_t lastA[3] = {0, 0, 0};
   float tiltF = 0;
   float rateBuf[31];
@@ -247,11 +282,33 @@ void sensorTask(void*) {
         float m = sqrtf(x * x + y * y + z * z);
         if (m > 1) {
           x /= m; y /= m; z /= m;
+          bool newRef = false;
           if (reqImuRef) {
             reqImuRef = false;
             imuRef[0] = x; imuRef[1] = y; imuRef[2] = z;
-            saveImuRef(x, y, z);
+            newRef = true;
+          } else if (reqImuSet) {
+            reqImuSet = false;
+            vecOf(reqPitch, reqRoll, imuRef);
+            newRef = true;
           }
+          if (newRef) {
+            saveImuRef(imuRef[0], imuRef[1], imuRef[2]);
+            Serial.printf("[imu] upright saved: pitch %.1f roll %.1f\n", pitchOf(imuRef), rollOf(imuRef));
+            // The new reference counts at once: no slow slide out of (or into) tamper.
+            float d0 = constrain(x * imuRef[0] + y * imuRef[1] + z * imuRef[2], -1.0f, 1.0f);
+            tiltF = acosf(d0) * 57.29578f;
+            lockState();
+            noteRef(true);
+            st.calSteps |= 8;
+            unlockState();
+            changed = true;
+          }
+          const float now3[3] = {x, y, z};
+          lockState();
+          st.pitch = pitchOf(now3);
+          st.roll = rollOf(now3);
+          unlockState();
           float dot = constrain(x * imuRef[0] + y * imuRef[1] + z * imuRef[2], -1.0f, 1.0f);
           float deg = acosf(dot) * 57.29578f;
           tiltF = tiltF * 0.6f + deg * 0.4f;
@@ -266,8 +323,20 @@ void sensorTask(void*) {
       unlockState();
     }
 
+    bool hxGood = false;
+    long raw = 0;
     if (scale.is_ready()) {
-      long raw = scale.read();
+      raw = scale.read();
+      // A board that is unplugged or unpowered reads all zeros or all ones, or pins at
+      // the ends of its range. A real one always moves in its last bits, so the same
+      // number 20 times in a row (2 s) also means it is not really there.
+      bool junk = raw == 0 || raw == -1 || raw == 0x7FFFFF || raw == -0x800000;
+      hxSame = raw == hxLastRaw ? hxSame + 1 : 0;
+      hxLastRaw = raw;
+      hxJunk = (junk || hxSame >= 20) ? hxJunk + 1 : 0;
+      hxGood = hxJunk < 3;
+    }
+    if (hxGood) {
       lastHxOk = now;
       if (reqTare) {
         tareAcc += raw;

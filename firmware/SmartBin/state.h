@@ -17,6 +17,9 @@ struct Cal {
   uint16_t buzz_repeat_s = 30;
   uint8_t quiet_on = 0;
   uint16_t quiet_from = 1320, quiet_to = 360;
+  // Added after the first bins were built. loadCal() reads an older, shorter block and keeps these defaults.
+  uint16_t lid_close_s = 2;           // after closing, the lid stays shut this long even if the PIR still sees motion
+  uint8_t tilt_boot = 1;              // 1 = take the upright reference again at every power-up
 };
 
 struct TouchCal {
@@ -63,7 +66,11 @@ struct BinState {
   bool alarmFull = false, alarmEnv = false, buzzerOn = false;
   uint32_t buzzerUntilMs = 0;
   float fillRatePerHour = 0;
-  uint8_t calSteps = 0;               // bit 0 tare, bit 1 empty distance, bit 2 full distance
+  uint8_t calSteps = 0;               // bit 0 tare, bit 1 empty distance, bit 2 full distance, bit 3 upright
+  uint32_t lidClosedAtMs = 0;         // when the lid last closed, for Cal::lid_close_s
+  float pitch = 0, roll = 0;          // BMI160 angles now, degrees
+  float refPitch = 0, refRoll = 0;    // the saved upright reference, degrees
+  bool refSaved = false;
   uint32_t doneAtMs = 0;              // when COLLECT_DONE ran, for the A5 screen
   LastCmd last;
   uint32_t version = 0;

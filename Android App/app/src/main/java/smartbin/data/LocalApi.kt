@@ -26,7 +26,7 @@ object LocalApi {
 
     /** The parts of /api/status the app uses. */
     class Status(
-        val reading: Reading, val cal: Cal?, val simMask: Int?,
+        val reading: Reading, val cal: Cal?, val simMask: Int?, val simValues: Map<String, Double>? = null,
         val fw: String = "", val rssi: Int? = null, val uptimeS: Long? = null, val touchCustom: Boolean? = null,
     )
 
@@ -133,6 +133,11 @@ object LocalApi {
             iaqWarmS = if (j.has("iaq_warm_s") && !j.isNull("iaq_warm_s")) j.optInt("iaq_warm_s") else null,
             gasK = if (j.has("gas_k") && !j.isNull("gas_k")) j.optDouble("gas_k").takeUnless { it.isNaN() } else null,
             tamperPhase = j.optString("tamper_phase", ""),
+            modes = j.optJSONObject("modes")?.let { m ->
+                Modes(m.optBoolean("locked"), m.optBoolean("collecting"), m.optBoolean("calibrating"), m.optBoolean("tamper"))
+            },
+            pitch = if (j.has("pitch") && !j.isNull("pitch")) j.optDouble("pitch").takeUnless { it.isNaN() } else null,
+            roll = if (j.has("roll") && !j.isNull("roll")) j.optDouble("roll").takeUnless { it.isNaN() } else null,
         )
         val cal = j.optJSONObject("cal")?.let { c ->
             val m = DEFAULT_CAL.toMutableMap()
@@ -140,8 +145,12 @@ object LocalApi {
             m.toMap()
         }
         val mask = if (j.has("sim_mask")) j.optInt("sim_mask") else null
+        // What each simulated sensor is held at, so the app shows what the dashboard set and the other way round.
+        val simValues = j.optJSONObject("sim")?.let { o ->
+            o.keys().asSequence().mapNotNull { k -> o.optDouble(k).takeUnless { it.isNaN() }?.let { k to it } }.toMap()
+        }
         return Status(
-            reading, cal, mask,
+            reading, cal, mask, simValues,
             fw = j.optString("fw", ""),
             rssi = if (j.has("rssi") && !j.isNull("rssi")) j.optInt("rssi") else null,
             uptimeS = if (j.has("uptime_s") && !j.isNull("uptime_s")) j.optLong("uptime_s") else null,

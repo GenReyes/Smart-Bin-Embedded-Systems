@@ -286,7 +286,7 @@ fun liveBanners(hub: HubState): List<Live> {
     val b = hub.bins
     val out = ArrayList<Live>()
     val cal = b.filter { it.calibrating }
-    val tam = b.filter { it.reading.status == BinStatus.TAMPER }
+    val tam = b.filter { it.reading.mode.tamper }
     val full = b.filter { it.full }
     val sim = b.filter { it.simulating }
     val lost = b.filter { it.stale }

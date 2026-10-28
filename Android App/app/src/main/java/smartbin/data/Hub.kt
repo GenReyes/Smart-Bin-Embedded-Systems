@@ -80,6 +80,8 @@ object Hub {
     private var fbOk = 0L
     private var tsOk = 0L
     private var lastCheck = 0L
+    /** When this app last switched calibration on or off, so the bin gets a moment to answer before its report counts. */
+    private var calibAt = 0L
     /** Per channel: the first and the latest (time, entry number) seen, for the message estimate. */
     private val tsSeen = HashMap<String, Pair<Pair<Long, Long>, Pair<Long, Long>>>()
     /** Demo options: bins pretending to have gone quiet. */
@@ -94,7 +96,7 @@ object Hub {
 
     private data class Flags(
         val full: Boolean, val hot: Boolean, val humid: Boolean, val gassy: Boolean, val status: BinStatus, val source: Source,
-        val faults: String, val acc: Int,
+        val faults: String, val acc: Int, val locked: Boolean = false, val collecting: Boolean = false,
     )
 
     /** Demo tour: readings held on a demo bin while the tour acts something out. */
@@ -190,6 +192,7 @@ object Hub {
         checkRoutes(merged, now)
         val pending = settle(_state.value.pending, merged, now)
         _state.value = current.copy(
+            calibBin = syncCalib(current.calibBin, merged, now),
             pending = pending,
             bins = merged, link = link, loading = false,
             fbUp = if (cloud.ready) now - fbOk < 60_000 else null,
@@ -240,7 +243,7 @@ object Hub {
                 return b.copy(
                     reading = s.reading, source = Source.LIVE, lastSeen = now,
                     cal = s.cal ?: b.cal,
-                    sim = if (s.simMask != null && b.id !in simDirty) b.sim.copy(mask = s.simMask) else b.sim,
+                    sim = if (s.simMask != null && b.id !in simDirty) b.sim.copy(mask = s.simMask, values = b.sim.values + (s.simValues ?: emptyMap())) else b.sim,
                     fw = s.fw.ifBlank { b.fw }, rssi = s.rssi ?: b.rssi, uptimeS = s.uptimeS ?: b.uptimeS, touchCustom = s.touchCustom ?: b.touchCustom,
                 )
             } catch (e: CancellationException) {
@@ -333,6 +336,21 @@ object Hub {
         }
     }
 
+    /**
+     * Calibration mode belongs to the bin. Whoever switches it on (this app, the dashboard or
+     * the touchscreen), the bin reports it, and the switch here follows that report, so the
+     * app and the dashboard always agree. A switch made here gets 4 s to reach the bin first.
+     */
+    private fun syncCalib(cur: String?, bins: List<Bin>, now: Long): String? {
+        if (now - calibAt < 4_000) return cur
+        val live = bins.filter { !it.demo && (it.source == Source.LIVE || it.source == Source.CLOUD) }
+        if (cur != null) {
+            val b = live.firstOrNull { it.id == cur } ?: return cur
+            return if (b.calibrating) cur else null
+        }
+        return live.firstOrNull { it.calibrating }?.id
+    }
+
     /** Drops each cloud command the bin has now carried out, or that waited too long. */
     private fun settle(pending: Map<String, Pending>, bins: List<Bin>, now: Long): Map<String, Pending> {
         if (pending.isEmpty()) return pending
@@ -341,9 +359,9 @@ object Hub {
             val b = bins.firstOrNull { it.id == id } ?: return@forEach
             val fresh = b.lastSeen > p.at
             val done = fresh && when (p.cmd) {
-                "LOCK" -> b.reading.status == BinStatus.LOCKED
-                "UNLOCK" -> b.reading.status != BinStatus.LOCKED
-                "COLLECT" -> b.reading.status == BinStatus.COLLECTING
+                "LOCK" -> b.reading.mode.locked
+                "UNLOCK" -> !b.reading.mode.locked
+                "COLLECT" -> b.reading.mode.collecting
                 else -> true
             }
             when {
@@ -399,6 +417,7 @@ object Hub {
                 full = r.fill >= c.v("fill_th") && !r.fault("HC-SR04"), hot = r.temp >= c.v("temp_th") && !r.fault("BME680"),
                 humid = r.hum >= c.v("hum_th") && !r.fault("BME680"), gassy = r.gas >= c.v("gas_th") && !r.warming && !r.fault("BME680"),
                 status = r.status, source = b.source, faults = r.faults.joinToString(", "), acc = r.iaqAcc,
+                locked = r.mode.locked, collecting = r.mode.collecting,
             )
             val p = prev[b.id]
             prev[b.id] = f
@@ -410,15 +429,14 @@ object Hub {
             if (f.gassy && !p.gassy) add(b, Severity.WARNING, "gas", "Air quality warning", "$n index ${r.gas.toInt()}, limit ${c.v("gas_th").toInt()}", AlertType.SENSOR)
             if (f.status != p.status) when (f.status) {
                 BinStatus.TAMPER -> add(b, Severity.CRITICAL, "tamper", "Tamper detected", "$n was moved or tilted", AlertType.TAMPER)
-                BinStatus.LOCKED -> add(b, Severity.INFO, "lock", "Bin locked", "$n locked from the app", AlertType.LOCK)
                 BinStatus.CALIBRATING -> add(b, Severity.INFO, "calib", "Calibration started", "$n is being calibrated", AlertType.INFO, kind = AlertKind.SETUP)
-                BinStatus.COLLECTING -> {}
-                BinStatus.OK -> when (p.status) {
-                    BinStatus.LOCKED -> add(b, Severity.SUCCESS, "check", "Bin unlocked", "$n is open for use again", AlertType.LOCK, kind = AlertKind.LOCK)
-                    BinStatus.COLLECTING -> add(b, Severity.SUCCESS, "truck", "Collection complete", "$n is back to normal", AlertType.PICKUP)
-                    else -> {}
-                }
+                else -> {}
             }
+            // Lock and pickup follow the bin's own flags, so a lock under a tamper or a calibration
+            // is neither lost nor announced twice, the same as the dashboard.
+            if (f.locked && !p.locked) add(b, Severity.INFO, "lock", "Bin locked", "$n locked", AlertType.LOCK)
+            if (!f.locked && p.locked) add(b, Severity.SUCCESS, "check", "Bin unlocked", "$n is open for use again", AlertType.LOCK, kind = AlertKind.LOCK)
+            if (!f.collecting && p.collecting) add(b, Severity.SUCCESS, "truck", "Collection complete", "$n is back to normal", AlertType.PICKUP)
             if (f.faults.isNotEmpty() && f.faults != p.faults) add(b, Severity.WARNING, "gear", "Sensor not answering", "$n: ${f.faults}", AlertType.SENSOR)
             if (f.faults.isEmpty() && p.faults.isNotEmpty()) add(b, Severity.SUCCESS, "check", "Sensor back", "$n reads every sensor again", AlertType.INFO, kind = AlertKind.SENSOR)
             if (p.acc == 0 && f.acc > 0) add(b, Severity.SUCCESS, "gas", "Air sensor ready", "$n air quality readings are settled", AlertType.INFO, kind = AlertKind.SENSOR)
@@ -549,11 +567,11 @@ object Hub {
 
     /** What a command does to a bin's reading, as the card shows it. */
     private fun effect(r: Reading, cmd: String): Reading = when (cmd) {
-        "LOCK" -> r.copy(status = BinStatus.LOCKED, lidOpen = false)
-        "UNLOCK" -> r.copy(status = BinStatus.OK)
-        "CLEAR_TAMPER" -> r.copy(status = BinStatus.OK, tilt = 0.0)
-        "COLLECT" -> r.copy(status = BinStatus.COLLECTING, lidOpen = true)
-        "COLLECT_DONE" -> r.copy(status = BinStatus.OK, lidOpen = false, fill = 0.0, weight = 0.0, gas = minOf(r.gas, 48.0))
+        "LOCK" -> r.copy(status = BinStatus.LOCKED, lidOpen = false, modes = r.modes?.copy(locked = true))
+        "UNLOCK" -> r.copy(status = BinStatus.OK, modes = r.modes?.copy(locked = false))
+        "CLEAR_TAMPER" -> r.copy(status = BinStatus.OK, tilt = 0.0, modes = r.modes?.copy(tamper = false))
+        "COLLECT" -> r.copy(status = BinStatus.COLLECTING, lidOpen = true, modes = r.modes?.copy(collecting = true))
+        "COLLECT_DONE" -> r.copy(status = BinStatus.OK, lidOpen = false, fill = 0.0, weight = 0.0, gas = minOf(r.gas, 48.0), modes = r.modes?.copy(collecting = false))
         "TARE" -> r.copy(weight = 0.0)
         "RESET_GAS" -> r.copy(iaqAcc = 0, iaqWarmS = 20)
         else -> r
@@ -563,11 +581,12 @@ object Hub {
     suspend fun setCalibration(id: String?) {
         val old = _state.value.calibBin
         if (old == id) return
+        calibAt = System.currentTimeMillis()
         _state.value = _state.value.copy(calibBin = id)
         old?.let { o -> bin(o)?.takeIf { it.source == Source.LIVE && !it.demo }?.let { runCatching { LocalApi.command(it.ip, "CALIBRATE_END") } } }
-        old?.let { o -> update(o) { b -> if (b.reading.status == BinStatus.CALIBRATING) b.copy(reading = b.reading.copy(status = BinStatus.OK)) else b } }
+        old?.let { o -> update(o) { b -> if (b.reading.status == BinStatus.CALIBRATING) b.copy(reading = b.reading.copy(status = BinStatus.OK, modes = b.reading.modes?.copy(calibrating = false))) else b } }
         id?.let { n -> bin(n)?.takeIf { it.source == Source.LIVE && !it.demo }?.let { runCatching { LocalApi.command(it.ip, "CALIBRATE_START") } } }
-        id?.let { n -> update(n) { b -> b.copy(reading = b.reading.copy(status = BinStatus.CALIBRATING)) } }
+        id?.let { n -> update(n) { b -> b.copy(reading = b.reading.copy(status = BinStatus.CALIBRATING, modes = b.reading.modes?.copy(calibrating = true))) } }
     }
 
     /** Stores new calibration values on the bin (EEPROM over Wi-Fi) and in the app. */

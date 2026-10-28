@@ -228,7 +228,7 @@ fun BinCard(vm: AppViewModel, b: Bin, hub: HubState, inSheet: Boolean = false) {
         val live = b.source == Source.LIVE
         val cloud = b.source == Source.CLOUD
         val tsp = b.source == Source.THINGSPEAK
-        val stKey = if (calOn) BinStatus.OK else r.status
+        val stKey = r.statusKey
         val stIcon = when (stKey) {
             BinStatus.TAMPER -> Ic.tamper; BinStatus.LOCKED -> Ic.lock(true); BinStatus.COLLECTING -> Ic.truck; else -> Ic.check
         }
@@ -306,9 +306,11 @@ fun BinCard(vm: AppViewModel, b: Bin, hub: HubState, inSheet: Boolean = false) {
         // A command sent through Firebase or ThingSpeak holds every key until the bin confirms it.
         val wait = hub.pending[b.id]
         val busy = calOn || stale || wait != null
-        val locked = r.status == BinStatus.LOCKED
-        val tamper = r.status == BinStatus.TAMPER
-        val coll = r.status == BinStatus.COLLECTING
+        // The bin's own flags, as the dashboard reads them: a lock under a tamper or a pickup still shows UNLOCK.
+        val md = r.mode
+        val locked = md.locked
+        val tamper = md.tamper
+        val coll = md.collecting
         // Once the bin answers, the key that sent the command flashes green (confirmed) or red (timed out).
         val done = vm.settled[b.id]
         val fade = settleFade(done)
@@ -319,14 +321,14 @@ fun BinCard(vm: AppViewModel, b: Bin, hub: HubState, inSheet: Boolean = false) {
             val cm = m.then(flashFor("COLLECT", "COLLECT_DONE"))
             if (wait != null && (wait.cmd == "LOCK" || wait.cmd == "UNLOCK")) WaitKey(wait, if (wait.cmd == "LOCK") "LOCKING" else "UNLOCKING", c.sim, m)
             else if (locked) Btn("UNLOCK", { vm.command(b.id, "UNLOCK") }, lm, Ic.lock(false), Look.SOLID, c.sim, enabled = !busy, stack = true, sound = Sfx.UNLOCK)
-            else Btn("LOCK", { vm.command(b.id, "LOCK") }, lm, Ic.lock(true), Look.TINT, c.sim, enabled = !busy && !tamper, stack = true, sound = Sfx.LOCK)
+            else Btn("LOCK", { vm.command(b.id, "LOCK") }, lm, Ic.lock(true), Look.TINT, c.sim, enabled = !busy && !tamper && !coll, stack = true, sound = Sfx.LOCK)
             if (op) Btn(
                 "RESET TAMPER", { vm.command(b.id, "CLEAR_TAMPER") }, m.then(flashFor("CLEAR_TAMPER")), Ic.tamper, if (tamper) Look.DANGER else Look.TINT, c.tamper,
                 enabled = tamper && !stale && wait == null, stack = true, sound = Sfx.CONFIRM,
             )
             if (wait != null && wait.cmd == "COLLECT") WaitKey(wait, "STARTING", c.link, m)
             else if (coll) Btn("DONE", { vm.command(b.id, "COLLECT_DONE") }, cm, Ic.check, Look.SOLID, c.cal, enabled = !stale && wait == null, stack = true, sound = Sfx.DONE)
-            else Btn("COLLECT", { vm.command(b.id, "COLLECT") }, cm, Ic.truck, Look.TINT, c.link, enabled = !busy, stack = true, sound = Sfx.PICKUP)
+            else Btn("COLLECT", { vm.command(b.id, "COLLECT") }, cm, Ic.truck, Look.TINT, c.link, enabled = !busy && !tamper, stack = true, sound = Sfx.PICKUP)
         }
         if (wait != null) {
             val via = if (wait.via == Source.THINGSPEAK) "ThingSpeak" else "Firebase"
@@ -442,7 +444,7 @@ private fun urgency(b: Bin): Double {
     val p = b.reading.fill
     val th = b.cal.v("fill_th")
     if (p >= th) return -1000 + p
-    val rate = if (b.reading.status == BinStatus.COLLECTING) 0.0 else Hub.ratePerHour(b)
+    val rate = if (b.reading.mode.collecting) 0.0 else Hub.ratePerHour(b)
     return if (rate > 0.05) (th - p) / rate else 9999 - p
 }
 
@@ -494,7 +496,7 @@ private fun CardFoot(b: Bin, cc: Color) {
 /** Time to full from how fast the bin has been filling. Returns the text and how near it is: 0 near, 1 mid, 2 far, 3 none. */
 fun etaOf(b: Bin): Pair<String, Int> {
     val left = b.cal.v("fill_th") - b.reading.fill
-    val rate = if (b.reading.status == BinStatus.COLLECTING) 0.0 else Hub.ratePerHour(b)
+    val rate = if (b.reading.mode.collecting) 0.0 else Hub.ratePerHour(b)
     if (left <= 0) return "Full now" to 0
     if (rate <= 0.05) return "Not filling" to 3
     val h = left / rate
@@ -610,12 +612,12 @@ private fun Tile(b: Bin, onClick: () -> Unit) {
             T(b.name, size = 0.84f, maxLines = 1)
             T("${Math.round(r.fill)}%", size = 1.22f, color = lc, tnum = true, lineHeight = 1.05f)
             Row(Modifier.height(15.dp), horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally)) {
-                if (r.status == BinStatus.TAMPER) Ico(Ic.tamper, 15.dp, c.tamper, Modifier.shake())
-                if (r.status == BinStatus.LOCKED) Ico(Ic.lock(true), 15.dp, c.sim)
-                if (r.status == BinStatus.COLLECTING) Ico(Ic.truck, 15.dp, c.cal)
+                if (r.mode.tamper) Ico(Ic.tamper, 15.dp, c.tamper, Modifier.shake())
+                if (r.mode.locked) Ico(Ic.lock(true), 15.dp, c.sim)
+                if (r.mode.collecting) Ico(Ic.truck, 15.dp, c.cal)
                 if (simOn) Ico(Ic.flask, 15.dp, c.sim)
                 if (calOn) Ico(Ic.calib, 15.dp, c.cal)
-                if (r.lidOpen && r.status != BinStatus.COLLECTING) Ico(Ic.lid(true), 15.dp, c.lid)
+                if (r.lidOpen && !r.mode.collecting) Ico(Ic.lid(true), 15.dp, c.lid)
                 if (stale) Ico(Ic.wifi(false), 15.dp, c.tamper)
             }
         }

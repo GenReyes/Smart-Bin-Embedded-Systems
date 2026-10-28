@@ -24,7 +24,7 @@ gradlew :app:assembleDebug
 
 The APK lands in `app/build/outputs/apk/debug/app-debug.apk`. Copy it to a phone to install it there.
 
-A ready-built debug APK, `Smart-Bin v2.2.apk`, sits in this folder for installing on a phone without building.
+A ready-built debug APK, `Smart-Bin v2.3.apk`, sits in this folder for installing on a phone without building.
 
 ## What is in it
 
@@ -74,7 +74,7 @@ Over Firebase and ThingSpeak only LOCK, UNLOCK and COLLECT work. Calibration and
 
 | Call | Body | What it does |
 |---|---|---|
-| `GET /api/status` | | Readings, status, `cal` object and `sim_mask` |
+| `GET /api/status` | | Readings, status, `modes` (locked, collecting, calibrating, tamper flags), `pitch`/`roll`, `cal` object (incl. `lid_close_s`, `tilt_boot`, `tilt_ref_pitch`, `tilt_ref_roll`), `sim_mask` and `sim` values |
 | `POST /api/command` | `{"cmd": "LOCK"}` | LOCK, UNLOCK, CLEAR_TAMPER, COLLECT, COLLECT_DONE, CALIBRATE_START, CALIBRATE_END, RESET_GAS, TARE, CAL_WEIGHT (`"grams"`), TOUCH_CAL, TOUCH_CAL_RESET, BUZZ_TEST (`"sound"`) |
 | `POST /api/calibrate` | calibration values | Stores them in EEPROM |
 | `POST /api/simulate` | `{"mask": 5, "values": {...}}` | Holds the chosen sensors at the given values |

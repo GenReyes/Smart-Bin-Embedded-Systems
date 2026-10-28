@@ -18,6 +18,8 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -115,6 +117,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
         }
+        // Calibration mode follows the bin, so a start or stop from the dashboard or the bin's screen shows here too.
+        viewModelScope.launch {
+            Hub.state.map { it.calibBin }.distinctUntilChanged().collect { followCalib(it) }
+        }
     }
 
     // ---------- whole app ----------
@@ -138,7 +144,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** Back to the start page, where demo mode is turned on or off. Operator needs the PIN again after. */
     fun toStart() {
         if (role == Role.OPERATOR) Feel.event(Sfx.OP_OUT)
-        if (editing) viewModelScope.launch { Hub.setCalibration(null) }
+        if (editing && calibMine) viewModelScope.launch { Hub.setCalibration(null) }
         edit = null
         dirty = false
         overlay = null
@@ -236,7 +242,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         // Only "a role was picked" is kept; the next start is always collector.
         store.putString(SmartBinApp.KEY_ROLE, Role.COLLECTOR.name)
         if (r == Role.COLLECTOR) {
-            if (editing) viewModelScope.launch { Hub.setCalibration(null) }
+            if (editing && calibMine) viewModelScope.launch { Hub.setCalibration(null) }
             edit = null
             dirty = false
             if (screen == Screen.SIM) screen = Screen.OVERVIEW
@@ -566,19 +572,43 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         open = if (k in open) open - k else open + k
     }
 
+    /** True when this app switched calibration on, so leaving operator only ends a calibration it started. */
+    private var calibMine = false
+
+    /** The bin went into or out of calibration mode, whoever switched it. */
+    private fun followCalib(id: String?) {
+        if (id != null && edit == null) {
+            val b = Hub.bin(id) ?: return
+            calibMine = false
+            edit = b.cal
+            dirty = false
+            selSet = id
+            if (operator && started) say("${b.name} was put in calibration mode from its screen or the dashboard, so it is on here too.")
+        } else if (id == null && edit != null) {
+            val lost = dirty
+            edit = null
+            dirty = false
+            calibMine = false
+            if (operator && started) say(if (lost) "Calibration was switched off on the bin, so unsaved changes were dropped." else "Calibration was switched off on the bin, from its screen or the dashboard.")
+        }
+    }
+
     fun setCalibration(on: Boolean, b: Bin) {
         viewModelScope.launch {
             if (on) {
-                Hub.setCalibration(b.id)
+                // edit is set first, so following the bin's report does not take this for a remote start.
                 edit = b.cal
                 dirty = false
+                calibMine = true
+                Hub.setCalibration(b.id)
                 Feel.event(Sfx.CALIB)
                 say("Calibration mode on for ${b.name}.")
             } else {
                 val lost = dirty
-                Hub.setCalibration(null)
                 edit = null
                 dirty = false
+                calibMine = false
+                Hub.setCalibration(null)
                 say(if (lost) "Calibration off. Unsaved changes were dropped." else "Calibration off. ${b.name} is back to normal.")
             }
         }
@@ -608,6 +638,26 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val e = edit ?: return
         edit = e + ("auto_lock" to if (e.v("auto_lock") > 0) 0.0 else 1.0)
         dirty = true
+    }
+
+    fun toggleTiltBoot() {
+        val e = edit ?: return
+        edit = e + ("tilt_boot" to if (e.v("tilt_boot") > 0) 0.0 else 1.0)
+        dirty = true
+    }
+
+    /** Takes the board's angle now as upright. SAVE sends it to the bin. */
+    fun useTiltNow(b: Bin) {
+        val e = edit ?: return
+        val p = b.reading.pitch
+        val r = b.reading.roll
+        if (p == null || r == null) {
+            say("${b.name} has not sent its board angle yet.")
+            return
+        }
+        edit = e + ("tilt_ref_pitch" to Math.round(p * 10) / 10.0) + ("tilt_ref_roll" to Math.round(r * 10) / 10.0)
+        dirty = true
+        say("Took pitch ${fmt(p, 1)}° and roll ${fmt(r, 1)}° as upright. Press SAVE to keep it.")
     }
 
     fun useNow(key: String, b: Bin) {
@@ -1364,6 +1414,9 @@ val FIELDS: Map<String, FieldSpec> = mapOf(
     "servo_closed" to FieldSpec("Servo closed", { Ic.servo }, "deg", 1.0, 0.0, 180.0, 0),
     "servo_open" to FieldSpec("Servo open", { Ic.servo }, "deg", 1.0, 0.0, 180.0, 0),
     "pir_hold_s" to FieldSpec("Lid stays open", { Ic.clock }, "s", 1.0, 1.0, 60.0, 0),
+    "lid_close_s" to FieldSpec("Lid stays closed", { Ic.clock }, "s", 1.0, 0.0, 30.0, 0),
+    "tilt_ref_pitch" to FieldSpec("Upright pitch", { Ic.tilt }, "deg", 0.5, -90.0, 90.0, 1),
+    "tilt_ref_roll" to FieldSpec("Upright roll", { Ic.tilt }, "deg", 0.5, -180.0, 180.0, 1),
     "buzz_s" to FieldSpec("Buzzer minimum", { Ic.bell }, "s", 1.0, 1.0, 30.0, 0),
     "tref" to FieldSpec("Reference thermometer", { Ic.temp(28.0) }, "°C", 0.1, -40.0, 85.0, 1),
     "known" to FieldSpec("Known weight", { Ic.weight(0.3) }, "g", 50.0, 10.0, 5000.0, 0),

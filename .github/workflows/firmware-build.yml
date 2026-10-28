@@ -1,0 +1,38 @@
+# Compiles the ESP32 firmware for both bins, so a change is known to build before it is
+# uploaded from a laptop. Nothing is committed back; secrets.h is the example file.
+name: Firmware build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths: ['firmware/**', '.github/workflows/firmware-build.yml']
+
+concurrency:
+  group: fw-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        bin: [1, 2]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+      - name: ESP32 core and libraries
+        run: |
+          arduino-cli config init --overwrite
+          arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32
+          arduino-cli lib install "ESP Async WebServer" "Async TCP" "ArduinoJson" "Adafruit ILI9341" \
+            "XPT2046_Touchscreen" "Adafruit BME680 Library" "HX711 Arduino Library" "ESP32Servo" "NimBLE-Arduino@2.3.0" \
+            || arduino-cli lib install "ESP Async WebServer" "Async TCP" "ArduinoJson" "Adafruit ILI9341" \
+            "XPT2046_Touchscreen" "Adafruit BME680 Library" "HX711 Arduino Library" "ESP32Servo" "NimBLE-Arduino"
+      - name: Compile bin ${{ matrix.bin }}
+        run: |
+          cp firmware/SmartBin/secrets.example.h firmware/SmartBin/secrets.h
+          sed -i 's/^#define BIN_NUMBER 1$/#define BIN_NUMBER ${{ matrix.bin }}/' firmware/SmartBin/config.h
+          arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=huge_app --warnings default firmware/SmartBin

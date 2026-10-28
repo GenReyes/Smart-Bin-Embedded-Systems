@@ -290,13 +290,16 @@ struct Sent {
   uint8_t status = 255, tamper = 255, acc = 255;
   bool lid = false, motion = false, full = false, env = false;
   uint8_t faults = 255;
+  uint8_t modes = 255;
 };
+
+static uint8_t modeBits(const BinState& s) { return s.locked | (s.collecting << 1) | (s.calibrating << 2) | (s.autoLocked << 3); }
 
 static uint8_t faultBits(const BinState& s) { return (!s.okHC) | (!s.okHX << 1) | (!s.okBME << 2) | (!s.okIMU << 3); }
 
 static bool importantChange(const Sent& a, const BinState& s) {
   return a.status != s.status || a.lid != s.lidOpen || a.tamper != s.tamperPhase || a.full != s.alarmFull ||
-         a.env != s.alarmEnv || a.faults != faultBits(s);
+         a.env != s.alarmEnv || a.faults != faultBits(s) || a.modes != modeBits(s);
 }
 
 static bool minorChange(const Sent& a, const BinState& s) {
@@ -309,7 +312,7 @@ static bool minorChange(const Sent& a, const BinState& s) {
 static void remember(Sent& a, const BinState& s) {
   a.fill = s.v.fill; a.weight = s.v.weight_g; a.temp = s.v.temp; a.hum = s.v.humidity; a.iaq = s.v.iaq;
   a.tilt = s.v.tilt; a.status = s.status; a.tamper = s.tamperPhase; a.acc = s.v.iaq_acc; a.lid = s.lidOpen;
-  a.motion = s.v.motion; a.full = s.alarmFull; a.env = s.alarmEnv; a.faults = faultBits(s);
+  a.motion = s.v.motion; a.full = s.alarmFull; a.env = s.alarmEnv; a.faults = faultBits(s); a.modes = modeBits(s);
 }
 
 static bool tsWrite(const BinState& s) {
@@ -412,7 +415,10 @@ void cloudTask(void*) {
       }
       if (!calSent || s.calVersion != lastCalVer) {
         JsonDocument d;
-        calToJson(calSnapshot(), d.to<JsonObject>());
+        JsonObject co = d.to<JsonObject>();
+        calToJson(calSnapshot(), co);
+        co["tilt_ref_pitch"] = roundf(s.refPitch * 10) / 10;
+        co["tilt_ref_roll"] = roundf(s.refRoll * 10) / 10;
         String b;
         serializeJson(d, b);
         if (fbCall("PUT", String("sb/bins/") + BIN_ID + "/cal", b, nullptr) == 200) {

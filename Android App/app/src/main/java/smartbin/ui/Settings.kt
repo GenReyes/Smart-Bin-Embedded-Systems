@@ -189,7 +189,7 @@ private fun ReadOnlyNote() {
 }
 
 /** The fold-out groups, in order. Touchscreen is added for operators. */
-private val SECTION_KEYS = listOf("range", "limits", "air", "lid", "weight")
+private val SECTION_KEYS = listOf("range", "limits", "air", "tilt", "lid", "weight")
 
 /** .sect: a fold-out group of settings with its summary on the right. */
 @Composable
@@ -266,7 +266,39 @@ private fun Sections(vm: AppViewModel, b: Bin, v: Cal, on: Boolean) {
         )
         Hint("The BME680 warms itself, so it reads a little hot and its humidity a little low. Put a reference thermometer next to the bin for a few minutes, enter its reading, press SET OFFSET, then SAVE. The gas reading learns its own baseline in normal air, and RESET GAS BASELINE restarts that.")
     }
-    Sect(vm, "lid", "Lid and lock", "PIN •••• · ${fmt(v.v("pir_hold_s"), 0)} s", c.sim, on) {
+    val boot = v.v("tilt_boot") > 0
+    Sect(
+        vm, "tilt", "Tilt sensor (BMI160)",
+        "upright ${fmt(v.v("tilt_ref_pitch"), 1)}° / ${fmt(v.v("tilt_ref_roll"), 1)}°" + if (boot) " · at power-up" else "", c.tamper, on,
+    ) {
+        val dead = r.fault("BMI160")
+        Field("Tilt from upright now", Ic.tilt, c.tamper) {
+            Readout(if (dead) "Not answering" else "${fmt(r.tilt, 1)}° (alert over ${fmt(v.v("tilt_th"), 0)}°)")
+        }
+        Field("Board now (pitch / roll)", Ic.tilt, c.tamper) {
+            Readout(
+                when {
+                    dead -> "--"
+                    r.pitch != null && r.roll != null -> "${fmt(r.pitch, 1)}° / ${fmt(r.roll, 1)}°"
+                    else -> "Waiting for the bin"
+                },
+            )
+        }
+        Fld(vm, "tilt_ref_pitch", v.v("tilt_ref_pitch"), on, c.tamper) {
+            Btn("USE NOW", { vm.useTiltNow(b) }, look = Look.TINT, cc = c.tamper, small = true, enabled = on, sound = Sfx.CONFIRM)
+        }
+        Fld(vm, "tilt_ref_roll", v.v("tilt_ref_roll"), on, c.tamper)
+        Row(
+            Modifier.fillMaxWidth().bump(c, 14.dp).padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            T("Take upright again at every power-up", Modifier.weight(1f), size = 0.9f, weight = FontWeight.Bold)
+            Toggle(boot, { vm.toggleTiltBoot() }, enabled = on)
+        }
+        Hint("The bin counts as tilted when it leans more than the tilt threshold away from the saved upright angle. Stand the bin straight and press USE NOW, or set the pitch and roll, then SAVE. With power-up on, the angle the bin stands at when it is switched on becomes upright, so it never starts in tamper. Switch it off to keep the saved angle across restarts. Starting calibration mode also saves the angle the bin stands at now.")
+    }
+    Sect(vm, "lid", "Lid and lock", "PIN •••• · open ${fmt(v.v("pir_hold_s"), 0)} s · shut ${fmt(v.v("lid_close_s"), 0)} s", c.sim, on) {
         Fld(vm, "servo_closed", v.v("servo_closed"), on, c.sim)
         Fld(vm, "servo_open", v.v("servo_open"), on, c.sim)
         Field("Collect PIN", Ic.pin, c.sim) {
@@ -276,6 +308,7 @@ private fun Sections(vm: AppViewModel, b: Bin, v: Cal, on: Boolean) {
             )
         }
         Fld(vm, "pir_hold_s", v.v("pir_hold_s"), on, c.sim)
+        Fld(vm, "lid_close_s", v.v("lid_close_s"), on, c.sim)
         Fld(vm, "buzz_s", v.v("buzz_s"), on, c.sim)
         Row(
             Modifier.fillMaxWidth().bump(c, 14.dp).padding(horizontal = 12.dp, vertical = 10.dp),
@@ -285,6 +318,7 @@ private fun Sections(vm: AppViewModel, b: Bin, v: Cal, on: Boolean) {
             T("Lock the lid when the bin is full", Modifier.weight(1f), size = 0.9f, weight = FontWeight.Bold)
             Toggle(v.v("auto_lock") > 0, { vm.toggleAutoLock() }, enabled = on)
         }
+        Hint("After the lid closes it stays shut for the closed time even if someone is still in front of it, so it does not flap open and shut. 0 lets it open again at once.")
     }
     Sect(vm, "weight", "Weight", "%.2f kg now".format(r.weight / 1000), c.weight, on) {
         Field("Reading now", Ic.weight(r.weight / v.v("weight_cap")), c.weight) { Readout("%.2f kg".format(r.weight / 1000)) }

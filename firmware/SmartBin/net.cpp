@@ -120,8 +120,17 @@ static void handleCalibrate(AsyncWebServerRequest* r, JsonVariant& j) {
     st.calVersion++;
     recomputeView();
   }
+  // The upright reference is typed as pitch and roll. Both apps send every value on save,
+  // so it only changes when a number really moved.
+  JsonVariantConst jp = o["tilt_ref_pitch"], jr = o["tilt_ref_roll"];
+  bool refAsked = !jp.isNull() || !jr.isNull();
+  float p = jp.isNull() ? st.refPitch : constrain(jp.as<float>(), -90.0f, 90.0f);
+  float rl = jr.isNull() ? st.refRoll : constrain(jr.as<float>(), -180.0f, 180.0f);
+  bool refMove = refAsked && !isnan(p) && !isnan(rl) && (fabsf(p - st.refPitch) >= 0.06f || fabsf(rl - st.refRoll) >= 0.06f);
   bool calibrating = st.calibrating;
   unlockState();
+  if (refMove) requestImuAngles(p, rl);
+  any |= refAsked;
   if (!any) { sendJson(r, 400, "{\"ok\":false,\"why\":\"No known calibration keys\"}"); return; }
   saveCal();
   buzz(calibrating ? T_CAL_STEP : T_SAVED);

@@ -57,11 +57,28 @@ data class Reading(
     val gasK: Double? = null,
     /** COUNTDOWN (clears by itself) or LATCHED (needs RESET TAMPER), while the bin is in TAMPER. */
     val tamperPhase: String = "",
+    /** Every mode that is on, from the bin's "modes". Null from older firmware, ThingSpeak and demo bins. */
+    val modes: Modes? = null,
+    /** The BMI160 board angle now, in degrees. */
+    val pitch: Double? = null,
+    val roll: Double? = null,
 ) {
+    /** [status] is one word, so a lock hides under a tamper or a calibration; this says each mode, as the dashboard reads it. */
+    val mode: Modes get() = modes ?: Modes(
+        locked = status == BinStatus.LOCKED, collecting = status == BinStatus.COLLECTING,
+        calibrating = status == BinStatus.CALIBRATING, tamper = status == BinStatus.TAMPER,
+    )
+    /** What the status chip shows. Calibration has its own CAL chip, so this is what lies under it. */
+    val statusKey: BinStatus get() = mode.let {
+        when { it.tamper -> BinStatus.TAMPER; it.collecting -> BinStatus.COLLECTING; it.locked -> BinStatus.LOCKED; else -> BinStatus.OK }
+    }
     fun fault(sensor: String) = sensor in faults
     /** The air score is not settled yet. */
     val warming get() = iaqAcc == 0 && !fault("BME680")
 }
+
+/** The modes the bin has on at once, from "modes" in its status. */
+data class Modes(val locked: Boolean, val collecting: Boolean, val calibrating: Boolean, val tamper: Boolean)
 
 /**
  * The calibration values of one bin, kept as named numbers so they map one to
@@ -74,6 +91,7 @@ val DEFAULT_CAL: Cal = mapOf(
     "gas_th" to 200.0, "tilt_th" to 30.0, "weight_cap" to 4500.0, "auto_lock" to 0.0,
     "servo_closed" to 0.0, "servo_open" to 90.0, "collect_pin" to 1234.0, "pir_hold_s" to 5.0,
     "buzz_s" to 2.0, "temp_off" to -2.0, "hum_off" to 0.0, "press_off" to 0.0,
+    "lid_close_s" to 2.0, "tilt_boot" to 1.0, "tilt_ref_pitch" to 0.0, "tilt_ref_roll" to 0.0,
 )
 
 fun Cal.v(key: String): Double = this[key] ?: DEFAULT_CAL[key] ?: 0.0
@@ -124,12 +142,12 @@ data class Bin(
     /** A made-up demo bin. Real bins are read over Wi-Fi, Firebase or ThingSpeak, and show "not answering" instead. */
     val demo get() = isDemo
     val stale get() = source == Source.STALE
-    val calibrating get() = reading.status == BinStatus.CALIBRATING
+    val calibrating get() = reading.mode.calibrating
     val simulating get() = sim.mask > 0
     val full get() = reading.fill >= cal.v("fill_th")
     val sensorOver get() = reading.temp >= cal.v("temp_th") || reading.hum >= cal.v("hum_th") ||
         reading.gas >= cal.v("gas_th") || reading.weight >= cal.v("weight_cap")
-    val urgent get() = reading.status == BinStatus.TAMPER || full
+    val urgent get() = reading.mode.tamper || full
     val needsAction get() = urgent || sensorOver
 }
 
@@ -197,7 +215,7 @@ data class HubState(
         else Routes(local = bins.any { it.source == Source.LIVE }, firebase = fbUp == true, thingspeak = tsUp == true)
     val mode: Mode
         get() {
-            val cal = calibBin != null
+            val cal = calibBin != null || bins.any { it.calibrating }
             val sim = bins.any { it.simulating }
             return when {
                 cal && sim -> Mode.DUAL

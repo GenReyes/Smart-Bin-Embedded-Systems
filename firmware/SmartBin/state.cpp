@@ -1,6 +1,7 @@
 #include "state.h"
 #include "sensors.h"
 #include <Preferences.h>
+#include <cstddef>
 #include <WiFi.h>
 #include <sys/time.h>
 #include "secrets.h"
@@ -85,7 +86,16 @@ void saveCal() {
 
 void loadCal() {
   prefsBegin(true);
-  if (prefs.getBytesLength("cal") == sizeof(Cal)) prefs.getBytes("cal", &cal, sizeof(Cal));
+  size_t n = prefs.getBytesLength("cal");
+  if (n == sizeof(Cal)) {
+    prefs.getBytes("cal", &cal, sizeof(Cal));
+  } else if (n == offsetof(Cal, lid_close_s)) {
+    // Saved by firmware from before lid_close_s and tilt_boot: keep every value and add the new defaults.
+    prefs.getBytes("cal", &cal, n);
+    Cal d;
+    cal.lid_close_s = d.lid_close_s;
+    cal.tilt_boot = d.tilt_boot;
+  }
   prefsEnd();
 }
 
@@ -236,6 +246,8 @@ void calToJson(const Cal& c, JsonObject o) {
   o["quiet_on"] = c.quiet_on;
   o["quiet_from"] = c.quiet_from;
   o["quiet_to"] = c.quiet_to;
+  o["lid_close_s"] = c.lid_close_s;
+  o["tilt_boot"] = c.tilt_boot;
 }
 
 template <typename T>
@@ -276,6 +288,8 @@ bool calFromJson(JsonObjectConst o, Cal& c) {
   any |= take(o, "quiet_on", c.quiet_on, 0, 1);
   any |= take(o, "quiet_from", c.quiet_from, 0, 1439);
   any |= take(o, "quiet_to", c.quiet_to, 0, 1439);
+  any |= take(o, "lid_close_s", c.lid_close_s, 0, 30);
+  any |= take(o, "tilt_boot", c.tilt_boot, 0, 1);
   if (c.d_full >= c.d_empty) c.d_full = c.d_empty - 1;
   return any;
 }
@@ -305,9 +319,22 @@ void statusToJson(const BinState& s, const Cal& c, const Sim& sm, JsonObject o, 
     o["iaq_acc"] = v.iaq_acc;
   }
   o["tilt"] = r1(v.tilt);
+  if (s.okIMU) {
+    o["pitch"] = r1(s.pitch);
+    o["roll"] = r1(s.roll);
+  }
   o["motion"] = v.motion;
   o["lid"] = s.lidOpen ? "OPEN" : "CLOSED";
   o["status"] = STATUS_NAMES[s.status];
+  // "status" is one word with a priority (calibrating, collecting, tamper, locked), so a
+  // locked bin in tamper says TAMPER. These flags say every mode that is on, so the
+  // dashboard and the app show the same lock and pickup state whatever outranks it.
+  JsonObject m = o["modes"].to<JsonObject>();
+  m["locked"] = s.locked;
+  m["auto_locked"] = s.locked && s.autoLocked;
+  m["collecting"] = s.collecting;
+  m["calibrating"] = s.calibrating;
+  m["tamper"] = s.tamperPhase != 0;
   o["sim_mask"] = sm.mask;
   if (s.tamperPhase) o["tamper_phase"] = s.tamperPhase == 1 ? "COUNTDOWN" : "LATCHED";
   JsonArray f = o["faults"].to<JsonArray>();
@@ -315,7 +342,24 @@ void statusToJson(const BinState& s, const Cal& c, const Sim& sm, JsonObject o, 
   if (!s.okHX) f.add("HX711");
   if (!s.okBME) f.add("BME680");
   if (!s.okIMU) f.add("BMI160");
-  if (withCal) calToJson(c, o["cal"].to<JsonObject>());
+  if (withCal) {
+    JsonObject co = o["cal"].to<JsonObject>();
+    calToJson(c, co);
+    // The upright reference lives beside Cal (its own key in flash), so it is added here.
+    co["tilt_ref_pitch"] = r1(s.refPitch);
+    co["tilt_ref_roll"] = r1(s.refRoll);
+    co["tilt_ref_saved"] = s.refSaved;
+    // What each sensor is held at in simulation, so every dashboard and phone shows the same values.
+    JsonObject so = o["sim"].to<JsonObject>();
+    so["fill"] = r1(sm.fill);
+    so["weight"] = r1(sm.weight);
+    so["gas"] = r1(sm.gas);
+    so["temp"] = r1(sm.temp);
+    so["humidity"] = r1(sm.humidity);
+    so["tamper"] = sm.tamper ? 1 : 0;
+    so["motion"] = sm.motion ? 1 : 0;
+    so["lid"] = sm.lid ? 1 : 0;
+  }
   if (withCal) {
     JsonObject t = o["touch"].to<JsonObject>();
     t["swap"] = touchCal.swap;

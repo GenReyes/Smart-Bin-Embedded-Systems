@@ -770,9 +770,9 @@ static void drawCal(const BinState& s, const Cal& c, uint32_t now) {
   if (dirty(4, darkTheme ? "cal1" : "cal0")) {
     fullDraw = true;
     tft.fillScreen(P->t);
-    frame(8, 222, 224, 44, P->surf, 3, P->bd);
-    txt(8, 228, 224, "Keep the bin empty and", 13, P->tx, 'c');
-    txt(8, 245, 224, "do not touch it.", 13, P->tx, 'c');
+    frame(8, 226, 224, 40, P->surf, 3, P->bd);
+    txt(8, 230, 224, "Keep the bin empty, upright", 13, P->tx, 'c');
+    txt(8, 246, 224, "and do not touch it.", 13, P->tx, 'c');
     btn(60, 268, 120, 42, "CANCEL", P->r, P->on_r, 15, -1, 0, B_CAL_CANCEL);
   }
   topBar(s, false, 0);
@@ -787,17 +787,19 @@ static void drawCal(const BinState& s, const Cal& c, uint32_t now) {
     tft.fillRect(90, 80, 60, 60, P->t);
     icon(I_RING, 92, 82, 56, P->on_t, P->t, spin * 15);
   }
-  char rows[3][24];
+  char rows[4][24];
   strcpy(rows[0], "Weight zero");
   snprintf(rows[1], 24, "Empty: %.0f cm", c.d_empty);
   snprintf(rows[2], 24, "Full: %.0f cm", c.d_full);
-  for (int i = 0; i < 3; i++) {
+  if (s.okIMU) snprintf(rows[3], 24, "Upright: %.0f deg", s.v.tilt);
+  else strcpy(rows[3], "Upright: no BMI160");
+  for (int i = 0; i < 4; i++) {
     bool ok = s.calSteps & (1 << i);
     char rs[40];
     snprintf(rs, sizeof(rs), "%s%d", rows[i], ok);
     if (!dirty(7 + i, rs)) continue;
-    int y = 150 + i * 24;
-    tft.fillRect(16, y, 210, 22, P->t);
+    int y = 142 + i * 21;
+    tft.fillRect(16, y, 210, 21, P->t);
     txt(20, y + 4, 140, rows[i], 15, P->on_t, 'l', true);
     chip(168, y, 52, 20, ok ? "OK" : "...", P->surf, P->tx);
   }
