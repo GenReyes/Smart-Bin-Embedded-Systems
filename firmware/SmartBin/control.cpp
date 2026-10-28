@@ -154,7 +154,7 @@ static void updateLed(const BinState& s, const Cal& c, uint32_t now) {
 void controlTask(void*) {
   uint32_t lastTick = 0, lastWave = 0, lastFullBuzz = 0, lastEnvBuzz = 0, lastTamperTick = 0;
   bool prevFull = false, prevEnv = false, prevHC = true, prevHX = true, prevBME = true;
-  bool prevMotion = false, firstPass = true;
+  bool prevMotion = false, firstPass = true, pirArmed = true, ignoredNoted = false;
   BinStatus prevStatus = ST_OK;
   uint8_t prevMask = 0;
 
@@ -223,9 +223,10 @@ void controlTask(void*) {
     } else if (sim.mask & 64) {
       wantOpen = sim.lid;
       st.lidCloseAtMs = 0;
-    } else if (motion && (st.lidOpen || st.lidClosedAtMs == 0 || now - st.lidClosedAtMs >= cl.lid_close_s * 1000UL)) {
-      // A lid that just shut stays shut for lid_close_s, so motion right after closing
-      // (the PIR still high, or the lid itself moving in front of it) does not flap it.
+    } else if (motion && (st.lidOpen || pirArmed)) {
+      // After the lid shuts, the PIR has to go quiet once (after lid_close_s) before it can
+      // open the lid again. The closing servo often retriggers the PIR, which then stays high
+      // for its own hold time; without this the lid opened again with nobody there.
       wantOpen = true;
       st.lidCloseAtMs = 0;
     } else if (st.lidOpen && st.lidCloseAtMs == 0) {
@@ -240,8 +241,20 @@ void controlTask(void*) {
     bool lidChanged = wantOpen != st.lidOpen;
     if (lidChanged) {
       st.lidOpen = wantOpen;
-      if (!wantOpen) st.lidClosedAtMs = now;
+      if (!wantOpen) {
+        st.lidClosedAtMs = now;
+        pirArmed = false;
+        ignoredNoted = false;
+      }
       changed = true;
+    }
+    if (!st.lidOpen && !pirArmed) {
+      bool settled = now - st.lidClosedAtMs >= cl.lid_close_s * 1000UL;
+      if (settled && !motion) pirArmed = true;
+      else if (settled && motion && !ignoredNoted) {
+        ignoredNoted = true;
+        Serial.println("[lid] PIR still high since the lid closed; waiting for it to go low before opening again");
+      }
     }
     if (motion != prevMotion) changed = true;
 
