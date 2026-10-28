@@ -1,6 +1,7 @@
 #include "cloud.h"
 #include "state.h"
 #include "buzzer.h"
+#include "btmem.h"
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
@@ -441,6 +442,16 @@ void cloudTask(void*) {
                     (unsigned)uxTaskGetStackHighWaterMark(hUi), (unsigned)uxTaskGetStackHighWaterMark(hCloud),
                     (unsigned)uxTaskGetStackHighWaterMark(hPush), (unsigned)uxTaskGetStackHighWaterMark(hControl),
                     (unsigned)uxTaskGetStackHighWaterMark(hSensor), (unsigned)ESP.getFreeHeap());
+    }
+    if (btBootMode()) {
+      // Bluetooth keeps the memory the HTTPS handshake needs. The bin restarts when setup
+      // ends, so the cloud simply waits until then.
+      static bool noted = false;
+      if (!noted) {
+        noted = true;
+        Serial.println("[cloud] paused during Bluetooth setup; it resumes after the restart");
+      }
+      continue;
     }
     if (ev & EV_WIFI) {
       idToken = "";
