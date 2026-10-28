@@ -37,6 +37,16 @@ static int request(Svc& s, const String& url, const char* method, const String& 
   if (!s.http.begin((NetworkClient&)c, url)) return -1;
   if (body.length()) s.http.addHeader("Content-Type", ctype);
   int code = s.http.sendRequest(method, (uint8_t*)body.c_str(), body.length());
+  if (code <= 0 && url.startsWith("https://")) {
+    char tlsMsg[96] = "";
+    int tlsCode = s.tls.lastError(tlsMsg, sizeof(tlsMsg));
+    String host = url.substring(8, url.indexOf('/', 8));
+    IPAddress ip;
+    bool dns = WiFi.hostByName(host.c_str(), ip);
+    Serial.printf("[firebase] connect to %s failed: %s, tls %d %s, dns %s, free heap %u, largest block %u\n", host.c_str(),
+                  HTTPClient::errorToString(code).c_str(), tlsCode, tlsMsg, dns ? "ok" : "FAILED", (unsigned)ESP.getFreeHeap(),
+                  (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+  }
   String got = code > 0 ? s.http.getString() : String();
   if (code >= 400 || code <= 0) lastFail = got.substring(0, 100);
   if (out) *out = got;
