@@ -10,6 +10,7 @@
 #include "net.h"
 #include "cloud.h"
 #include "ui.h"
+#include "esp32-hal-bt.h"
 
 static void heapNote(const char* where) {
   Serial.printf("[heap] %s: free %u, largest block %u\n", where, (unsigned)ESP.getFreeHeap(),
@@ -22,6 +23,7 @@ void setup() {
   Serial.printf("\nSmart-Bin %s firmware v%s\n", BIN_ID, FW_VERSION);
 
   heapNote("start");
+  Serial.printf("[bt] ble memory released at boot: %s\n", btMemReleased(BT_MODE_BLE) ? "yes" : "no");
   stateInit();
   uiInit();
   buzzerInit();

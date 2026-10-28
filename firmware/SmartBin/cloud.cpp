@@ -391,9 +391,18 @@ void cloudTask(void*) {
   bool usageLoaded = false, wasConnected = false;
   bool calSent = false;
 
+  bool stackShown = false;
+
   for (;;) {
     uint32_t ev = 0;
     xTaskNotifyWait(0, UINT32_MAX, &ev, pdMS_TO_TICKS(500));
+    if (!stackShown && millis() > 45000) {
+      stackShown = true;
+      Serial.printf("[stack] bytes never used: ui %u, cloud %u, push %u, control %u, sensor %u, free heap %u\n",
+                    (unsigned)uxTaskGetStackHighWaterMark(hUi), (unsigned)uxTaskGetStackHighWaterMark(hCloud),
+                    (unsigned)uxTaskGetStackHighWaterMark(hPush), (unsigned)uxTaskGetStackHighWaterMark(hControl),
+                    (unsigned)uxTaskGetStackHighWaterMark(hSensor), (unsigned)ESP.getFreeHeap());
+    }
     if (ev & EV_WIFI) {
       idToken = "";
       fb.retryAt = 0;
