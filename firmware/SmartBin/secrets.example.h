@@ -16,7 +16,8 @@
 #define FIREBASE_PASSWORD ""
 
 // ThingSpeak, one channel per bin. Empty = ThingSpeak off. See firmware/README.md section 5.
-#define THINGSPEAK_SERVER "https://api.thingspeak.com"
+// Plain http: a second HTTPS session next to Firebase's does not fit in the ESP32's memory.
+#define THINGSPEAK_SERVER "http://api.thingspeak.com"
 #define THINGSPEAK_WRITE_KEY_BIN_A ""
 #define THINGSPEAK_WRITE_KEY_BIN_B ""
 #define THINGSPEAK_TALKBACK_ID_BIN_A ""

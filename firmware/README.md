@@ -104,11 +104,11 @@ What the bin writes, and how often (Integration Guide 6A):
 ## 5. ThingSpeak (history and charts)
 
 1. Make one channel per bin with 8 fields: Fill %, Weight g, Temperature C, Humidity %, Air IAQ, Pressure hPa, Tilt deg, Flags.
-2. Put each channel's **Write API Key** in `secrets.h` (`THINGSPEAK_WRITE_KEY_BIN_A` / `_B`).
+2. Put each channel's **Write API Key** in `secrets.h` (`THINGSPEAK_WRITE_KEY_BIN_A` / `_B`). Keep `THINGSPEAK_SERVER` as `http://api.thingspeak.com`: with Firebase already holding an HTTPS session, a second one does not fit in memory. If you set it to `https://`, the bin closes the Firebase session before each ThingSpeak write, which works but reconnects to Firebase every time.
 3. Optional, for LOCK/UNLOCK/COLLECT through ThingSpeak: **Apps > TalkBack > New TalkBack** for each bin, then put its ID and API key in `secrets.h`.
 4. In the dashboard and the app, give each bin its channel ID, Read API key, TalkBack ID and TalkBack key in its SET sheet.
 
-The bin writes every 30 s (sooner for a new alert, never faster than 15 s), skips writes when nothing moved, and always writes at least every 5 minutes. Field 8 is `motion + 2 × lid open + 4 × status`, the `status` text is the bin's IP.
+The bin writes every 30 s (sooner for a new alert, never faster than 15 s), skips writes when nothing moved, and always writes at least every 5 minutes. Field 8 is `motion + 2 × lid open + 4 × status`, the `status` text is the bin's IP. A sensor that is missing (no reading) leaves its field out of that write instead of sending `nan`.
 
 ## 6. The touchscreen
 

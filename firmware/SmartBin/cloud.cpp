@@ -15,7 +15,7 @@ struct Svc {
   uint8_t fails = 0;
 };
 
-static Svc fb, ts, auth;
+static Svc fb, ts, auth, tb;
 static String idToken;
 static uint32_t tokenUntil = 0;
 static bool fbOk = false;
@@ -43,7 +43,7 @@ static int request(Svc& s, const String& url, const char* method, const String& 
     String host = url.substring(8, url.indexOf('/', 8));
     IPAddress ip;
     bool dns = WiFi.hostByName(host.c_str(), ip);
-    Serial.printf("[firebase] connect to %s failed: %s, tls %d %s, dns %s, free heap %u, largest block %u\n", host.c_str(),
+    Serial.printf("[https] connect to %s failed: %s, tls %d %s, dns %s, free heap %u, largest block %u\n", host.c_str(),
                   HTTPClient::errorToString(code).c_str(), tlsCode, tlsMsg, dns ? "ok" : "FAILED", (unsigned)ESP.getFreeHeap(),
                   (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
   }
@@ -352,13 +352,29 @@ static void remember(Sent& a, const BinState& s) {
   a.motion = s.v.motion; a.full = s.alarmFull; a.env = s.alarmEnv; a.faults = faultBits(s); a.modes = modeBits(s);
 }
 
+static void addField(String& url, int n, float v, int dec) {
+  if (isnan(v) || isinf(v)) return;
+  url += "&field" + String(n) + "=" + String(v, dec);
+}
+
 static bool tsWrite(const BinState& s) {
   const Reading& v = s.v;
   int flags = (v.motion ? 1 : 0) + (s.lidOpen ? 2 : 0) + 4 * s.status;
-  String url = net.tsServer + "/update?api_key=" + enc(net.tsWriteKey) + "&field1=" + String(v.fill, 1) +
-               "&field2=" + String(v.weight_g, 0) + "&field3=" + String(v.temp, 2) + "&field4=" + String(v.humidity, 1) +
-               "&field5=" + String(v.iaq, 0) + "&field6=" + String(v.pressure, 1) + "&field7=" + String(v.tilt, 1) +
-               "&field8=" + String(flags) + "&status=" + enc(localIp());
+  String url = net.tsServer + "/update?api_key=" + enc(net.tsWriteKey);
+  addField(url, 1, v.fill, 1);
+  addField(url, 2, v.weight_g, 0);
+  addField(url, 3, v.temp, 2);
+  addField(url, 4, v.humidity, 1);
+  addField(url, 5, v.iaq, 0);
+  addField(url, 6, v.pressure, 1);
+  addField(url, 7, v.tilt, 1);
+  url += "&field8=" + String(flags) + "&status=" + enc(localIp());
+  if (url.startsWith("https://")) {
+    for (Svc* x : {&fb, &tb}) {
+      x->http.end();
+      x->tls.stop();
+    }
+  }
   String out;
   int code = request(ts, url, "GET", "", &out);
   out.trim();
@@ -368,11 +384,13 @@ static bool tsWrite(const BinState& s) {
   lockState();
   st.tsOk = ok;
   unlockState();
-  if (!ok) Serial.printf("[thingspeak] write failed (%d) %s\n", code, out.c_str());
+  if (!ok) {
+    String shown = url;
+    shown.replace(enc(net.tsWriteKey), "<key>");
+    Serial.printf("[thingspeak] write failed (%d) %s\n  %s\n", code, out.substring(0, 60).c_str(), shown.c_str());
+  }
   return ok;
 }
-
-static Svc tb;
 
 static void closeIdleTls() {
   for (Svc* x : {&fb, &ts, &tb}) {
