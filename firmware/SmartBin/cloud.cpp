@@ -94,6 +94,13 @@ static bool signIn() {
   auth.tls.stop();
   if (code != 200) {
     Serial.printf("[firebase] sign-in failed (%d) %s\n", code, resp.substring(0, 120).c_str());
+    if (code <= 0) {
+      IPAddress ip;
+      bool dns = WiFi.hostByName("identitytoolkit.googleapis.com", ip);
+      Serial.printf("[firebase] %s, dns %s %s, wifi %d dBm, free heap %u, largest block %u\n", HTTPClient::errorToString(code).c_str(),
+                    dns ? "ok" : "FAILED", dns ? ip.toString().c_str() : "", WiFi.RSSI(), (unsigned)ESP.getFreeHeap(),
+                    (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+    }
     return false;
   }
   JsonDocument r;
@@ -111,6 +118,7 @@ static String fbUrl(const String& path, const String& query = "") {
 static int fbCall(const char* method, const String& path, const String& body, String* out, const String& query = "",
                   bool count = true) {
   if (!idToken.length() || (int32_t)(millis() - tokenUntil) >= 0) {
+    if (!due(fb)) return -1;
     if (!signIn()) {
       backoff(fb);
       setFbOk(false);
