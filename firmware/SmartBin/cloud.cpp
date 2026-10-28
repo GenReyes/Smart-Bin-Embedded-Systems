@@ -354,7 +354,9 @@ static void remember(Sent& a, const BinState& s) {
 
 static void addField(String& url, int n, float v, int dec) {
   if (isnan(v) || isinf(v)) return;
-  url += "&field" + String(n) + "=" + String(v, dec);
+  String t = String(v, dec);
+  t.trim();
+  url += "&field" + String(n) + "=" + t;
 }
 
 static bool tsWrite(const BinState& s) {
