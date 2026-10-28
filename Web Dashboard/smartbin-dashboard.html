@@ -1167,7 +1167,7 @@ html[data-theme="dark"]{--onBrand:#13100D;--brand2:#3FC7C2}
           <div class="field"><label for="s_tpitch">Upright pitch (deg)</label>
             <div class="withbtn"><input id="s_tpitch" type="number" min="-90" max="90" step="0.5"><button class="btn sm" data-capture="tilt">USE NOW</button></div></div>
           <div class="field"><label for="s_troll">Upright roll (deg)</label><input id="s_troll" type="number" min="-180" max="180" step="0.5"></div>
-          <div class="field" style="display:flex;align-items:flex-end"><label class="switch"><input id="s_tiltboot" type="checkbox">Take upright again at every power-up</label></div>
+          <div class="field span2" style="display:flex;align-items:flex-end"><label class="switch"><input id="s_tiltboot" type="checkbox">Take upright again at every power-up</label></div>
         </div>
         <p class="hint">The bin counts as tilted when it leans more than the tilt threshold away from the saved upright angle. Stand the bin straight and press USE NOW, or type the pitch and roll, then SAVE SETTINGS. With the power-up switch on, the angle the bin stands at when it is switched on becomes upright, so it never starts in tamper. Switch it off to keep the saved angle across restarts. Starting calibration mode also saves the angle the bin stands at now.</p>
         </div>
@@ -1609,7 +1609,7 @@ function paintHeadings(){
   for(const id in TH){const el=document.getElementById(id);
     if(el)el.innerHTML='<span class="thh" style="--cc:'+TH[id][2]+'">'+icon(TH[id][0])+TH[id][1]+'</span>';}
   $$('#filterChips .fchip[data-ico]').forEach(c=>{if(!c.querySelector('svg'))c.insertAdjacentHTML('afterbegin',icon(c.dataset.ico));});
-  const SEC={range:'ruler',limits:'bell',lid:'servo',weight:'weight',air:'gas',touch:'capture'};
+  const SEC={range:'ruler',limits:'bell',lid:'servo',weight:'weight',air:'gas',tilt:'tilt',touch:'capture'};
   /* Each group folds, closed at first like the app, so the one you need is a short scroll away.
      The summary on the right says what is inside without opening it. */
   $$('.sect').forEach(d=>{
