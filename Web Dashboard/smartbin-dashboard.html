@@ -2870,7 +2870,9 @@ function saveFromSetOverlay(bid){
     const row=$('#card-'+bid+' [data-r="edit"]');
     if(row){b.name=row.querySelector('[data-k="name"]')?.value.trim()||b.name;
       b.place=row.querySelector('[data-k="place"]')?.value.trim()||'';
-      b.ip=row.querySelector('[data-k="ip"]')?.value.trim()||'';relink(b);}
+      b.ip=row.querySelector('[data-k="ip"]')?.value.trim()||'';
+      for(const k of ['cloud','tsCh','tsKey','tbId','tbKey']){const el=row.querySelector('[data-k="'+k+'"]');if(el)b[k]=el.value.trim();}
+      relink(b);}
   }
   persist();cardSig='';render();loadSettings();buildSim();toast(b.name+' saved.');
   closeSetOverlay();
@@ -2962,6 +2964,11 @@ function cardHTML(b){
       '<div class="field"><label>Name</label><input type="text" data-k="name" value="'+esc(b.name)+'"></div>'+
       '<div class="field"><label>Location</label><input type="text" data-k="place" value="'+esc(b.place)+'"></div>'+
       '<div class="field"><label>IP address</label><input type="text" data-k="ip" value="'+esc(b.ip)+'" placeholder="192.168.1.101"></div>'+
+      '<div class="field"><label>Firebase cloud name</label><input type="text" data-k="cloud" value="'+esc(b.cloud||'')+'" placeholder="bin01" spellcheck="false"></div>'+
+      '<div class="field"><label>ThingSpeak channel ID</label><input type="text" data-k="tsCh" value="'+esc(b.tsCh||'')+'" inputmode="numeric" placeholder="1234567"></div>'+
+      '<div class="field"><label>ThingSpeak read key</label><input type="text" data-k="tsKey" value="'+esc(b.tsKey||'')+'" spellcheck="false"></div>'+
+      '<div class="field"><label>TalkBack ID</label><input type="text" data-k="tbId" value="'+esc(b.tbId||'')+'" inputmode="numeric"></div>'+
+      '<div class="field"><label>TalkBack API key</label><input type="text" data-k="tbKey" value="'+esc(b.tbKey||'')+'" spellcheck="false"></div>'+
       '<div class="field" style="display:flex;align-items:flex-end;gap:10px">'+
         '<button class="btn sm accent" data-save="'+b.id+'">Save</button>'+
         '<button class="btn sm danger" data-remove="'+b.id+'">Remove</button></div>'+
@@ -3868,7 +3875,9 @@ document.addEventListener('click',async e=>{
     const b=byId(sv.dataset.save),row=$('#card-'+b.id+' [data-r="edit"]');
     if(b&&row){b.name=row.querySelector('[data-k="name"]').value.trim()||b.name;
       b.place=row.querySelector('[data-k="place"]').value.trim();
-      b.ip=row.querySelector('[data-k="ip"]').value.trim();relink(b);
+      b.ip=row.querySelector('[data-k="ip"]').value.trim();
+      for(const k of ['cloud','tsCh','tsKey','tbId','tbKey']){const el=row.querySelector('[data-k="'+k+'"]');if(el)b[k]=el.value.trim();}
+      relink(b);
       persist();cardSig='';render();loadSettings();buildSim();toast(b.name+' saved.');}
     return;
   }
