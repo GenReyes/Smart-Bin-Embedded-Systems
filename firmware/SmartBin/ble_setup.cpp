@@ -206,10 +206,7 @@ static void shutdown(bool remote, bool automatic) {
   server = nullptr;
   chStat = chScan = nullptr;
   running = false;
-  lockState();
-  st.btOn = false;
-  unlockState();
-  publish();
+  // st.btOn stays set, so the cloud keeps waiting until the restart below.
   setPhase(BT_OFF);
   buzz(automatic ? T_BT_AUTO_OFF : T_BT_OFF);
   // Starting and stopping Bluetooth leaves the heap in pieces (70 KB free but no block
