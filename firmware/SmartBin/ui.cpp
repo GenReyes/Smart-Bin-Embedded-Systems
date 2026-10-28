@@ -1,4 +1,5 @@
 #include "ui.h"
+#include "btmem.h"
 #include "state.h"
 #include "buzzer.h"
 #include "ble_setup.h"
@@ -1050,9 +1051,9 @@ static void drawTouchCal() {
 
 static Screen pickScreen(const BinState& s, const Cal& c, const Sim& sm, uint32_t now) {
   if (tcActive) return S_TOUCHCAL;
+  if (overlay == O_BT) return S_BT;
   if (s.booting) return S_BOOT;
   if (s.calibrating) return S_CAL;
-  if (overlay == O_BT) return S_BT;
   if ((overlay == O_INFO || overlay == O_PIN) && now - overlayMs > SCREEN_TIMEOUT_MS) {
     overlay = O_NONE;
     buzz(T_BACK_MAIN);
@@ -1163,6 +1164,12 @@ static void onPress(uint8_t id) {
         pinBuf[0] = 0;
         if (pinForBt) {
           buzz(T_OPEN);
+          if (btNeedsRestart()) {
+            tft.fillScreen(P->bg);
+            txt(8, 96, 224, "BLUETOOTH SETUP", 20, P->tx, 'c');
+            wrapTxt(16, 136, 208, "Restarting once to make room for Bluetooth. The pairing screen comes up in a few seconds.", 14, P->tx2, 19);
+            delay(1800);
+          }
           openOverlay(O_BT);
           bleStart();
         } else {
