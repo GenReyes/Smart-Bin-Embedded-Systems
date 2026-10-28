@@ -210,16 +210,14 @@ static void shutdown(bool remote, bool automatic) {
   st.btOn = false;
   unlockState();
   publish();
-  if (remote || automatic) {
-    setPhase(BT_OFF);
-    buzz(automatic ? T_BT_AUTO_OFF : T_BT_OFF);
-  } else {
-    setPhase(BT_IDLE);
-  }
-  if (btBootMode()) {
-    vTaskDelay(pdMS_TO_TICKS(1200));
-    ESP.restart();
-  }
+  setPhase(BT_OFF);
+  buzz(automatic ? T_BT_AUTO_OFF : T_BT_OFF);
+  // Starting and stopping Bluetooth leaves the heap in pieces (70 KB free but no block
+  // over 18 KB), too small for a TLS handshake, so the bin restarts with a clean heap.
+  Serial.println("[bt] setup ended; restarting so Firebase has room again");
+  Serial.flush();
+  vTaskDelay(pdMS_TO_TICKS(1800));
+  ESP.restart();
 }
 
 static void bleTask(void*) {
