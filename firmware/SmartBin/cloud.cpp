@@ -71,7 +71,7 @@ static void setFbOk(bool ok) {
   st.cloudOk = ok;
   unlockState();
   buzz(ok ? T_CLOUD_UP : T_CLOUD_DOWN);
-  Serial.printf("[firebase] %s\n", ok ? "reachable" : "cannot be reached");
+  Serial.printf("[firebase] %s (free heap %u)\n", ok ? "reachable" : "cannot be reached", (unsigned)ESP.getFreeHeap());
   publish();
 }
 
@@ -86,7 +86,10 @@ static String enc(const String& s) {
   return o;
 }
 
+static void closeIdleTls();
+
 static bool signIn() {
+  closeIdleTls();
   String url = net.fbUrl.startsWith("http://")
                    ? net.fbUrl + "/__auth/signInWithPassword?key=" + enc(net.fbKey)
                    : "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=" + enc(net.fbKey);
@@ -123,6 +126,7 @@ static bool signIn() {
   JsonDocument r;
   if (deserializeJson(r, resp)) return false;
   idToken = r["idToken"] | "";
+  Serial.printf("[firebase] signed in as %s\n", net.fbEmail.c_str());
   uint32_t secs = atoi(r["expiresIn"] | "3600");
   tokenUntil = millis() + (secs > 400 ? secs - 300 : secs) * 1000UL;
   return idToken.length() > 0;
@@ -143,8 +147,13 @@ static int fbCall(const char* method, const String& path, const String& body, St
     }
   }
   int code = request(fb, fbUrl(path, query), method, body, out);
-  if (code == 401) {
+  if (code == 401 && lastFail.indexOf("Permission denied") < 0) {
     idToken = "";
+    if (!signIn()) {
+      backoff(fb);
+      setFbOk(false);
+      return -1;
+    }
     code = request(fb, fbUrl(path, query), method, body, out);
   }
   if (code <= 0 || code >= 400) Serial.printf("[firebase] %s %s -> %d %s\n", method, path.c_str(), code, lastFail.c_str());
@@ -154,6 +163,8 @@ static int fbCall(const char* method, const String& path, const String& body, St
     return code;
   }
   fb.fails = 0;
+  static bool refusedShown = false;
+  if ((code == 401 || code == 403) && !refusedShown && (refusedShown = true)) Serial.printf("[firebase] the rules refused this account (%s); a bin account's email must start with \"bin\"\n", net.fbEmail.c_str());
   setFbOk(code < 400);
   if (count && (!strcmp(method, "PUT") || !strcmp(method, "PATCH") || !strcmp(method, "POST")))
     monthBytes += (uint64_t)body.length() * max(1, watchers);
@@ -362,6 +373,14 @@ static bool tsWrite(const BinState& s) {
 }
 
 static Svc tb;
+
+static void closeIdleTls() {
+  for (Svc* x : {&fb, &ts, &tb}) {
+    x->http.end();
+    x->tls.stop();
+    x->plain.stop();
+  }
+}
 
 static void talkBack() {
   String url = net.tsServer + "/talkbacks/" + enc(net.tbId) + "/commands/execute.json";

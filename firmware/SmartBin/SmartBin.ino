@@ -11,6 +11,8 @@
 #include "cloud.h"
 #include "ui.h"
 #include "esp32-hal-bt.h"
+#include "btmem.h"
+#include "ble_setup.h"
 
 static void heapNote(const char* where) {
   Serial.printf("[heap] %s: free %u, largest block %u\n", where, (unsigned)ESP.getFreeHeap(),
@@ -47,6 +49,16 @@ void setup() {
   startWebServer();
   heapNote("after tasks and web server");
   wifiConnect();
+
+  if (btBootRequested()) {
+    btClearBootFlag();
+    if (btBootMode()) {
+      uiShowBt();
+      bleStart();
+    } else {
+      Serial.println("[bt] asked to start Bluetooth, but its memory was not kept; try again");
+    }
+  }
 }
 
 void loop() { vTaskDelete(nullptr); }

@@ -3,6 +3,7 @@
 #include "buzzer.h"
 #include <WiFi.h>
 #include <NimBLEDevice.h>
+#include "btmem.h"
 
 static SemaphoreHandle_t vLock;
 static BtView view;
@@ -215,6 +216,10 @@ static void shutdown(bool remote, bool automatic) {
   } else {
     setPhase(BT_IDLE);
   }
+  if (btBootMode()) {
+    vTaskDelay(pdMS_TO_TICKS(1200));
+    ESP.restart();
+  }
 }
 
 static void bleTask(void*) {
@@ -265,6 +270,10 @@ static void bleTask(void*) {
 void bleStart() {
   if (!vLock) vLock = xSemaphoreCreateMutex();
   if (running) return;
+  if (btNeedsRestart()) {
+    btRestartForBle();
+    return;
+  }
   running = true;
   wrongCodes = 0;
   stopReq = false;

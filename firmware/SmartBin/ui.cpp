@@ -1110,6 +1110,8 @@ static void openOverlay(Overlay o) {
   resetScreen();
 }
 
+void uiShowBt() { openOverlay(O_BT); }
+
 static void onPress(uint8_t id) {
   BinState s = snapshot();
   if (id >= B_K0 && id <= B_K9) {

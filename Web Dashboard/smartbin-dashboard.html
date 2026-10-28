@@ -2182,11 +2182,11 @@ async function sendCloudToBins(){
   if(e){toast(e);return;}
   const targets=state.bins.filter(b=>b.ip&&!SECURE);
   if(!targets.length){toast('No bin has an IP address yet, so there is nothing to send to.');return;}
-  let ok=0;const miss=[];
+  let ok=0;const miss=[];let why='';
   await Promise.all(targets.map(async b=>{try{const r=await callRaw(b,'/api/cloud',{url:v.url,key:v.key,email:v.email,pass:v.pass});
-    if(r.ok)ok++;else miss.push(b.name)}catch(err){miss.push(b.name)}}));
+    if(r.ok)ok++;else{miss.push(b.name);if(r.j&&r.j.why)why=r.j.why}}catch(err){miss.push(b.name)}}));
   sfx(ok?'cmd_ok':'cmd_fail');
-  cloud.msg=[ok?'ok':'bad','Sent to '+ok+' of '+targets.length+' bins'+(miss.length?'. Not answering: '+miss.join(', '):'')+'. They sign in again within a few seconds.'];
+  cloud.msg=[ok?'ok':'bad','Sent to '+ok+' of '+targets.length+' bins'+(miss.length?'. Not accepted by: '+miss.join(', ')+(why?'. '+why:''):'')+'. They sign in again within a few seconds.'];
   cloudRender();
 }
 async function fbWatchTick(now){
