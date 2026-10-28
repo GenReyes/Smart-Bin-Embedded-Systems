@@ -947,7 +947,7 @@ static void drawBt(uint32_t now) {
         icon(I_CHECK, 94, 70, 52, P->tx, P->surf);
         txt(8, 150, 224, "BLUETOOTH OFF", 24, P->tx, 'c');
         txt(20, 184, 200, "Setup finished. Wi-Fi stays on.", 14, P->tx2, 'c', true);
-        txt(8, 262, 224, "Back to the main screen", 12, P->tx2, 'c');
+        txt(8, 262, 224, "Restarting, back in a few seconds", 12, P->tx2, 'c');
         break;
     }
   }
@@ -999,7 +999,6 @@ static void drawBt(uint32_t now) {
         frame(60, 282, 120, 12, P->surf, 2, P->bd);
         tft.fillRect(62, 284, 116 * max<int32_t>(0, left) / 1500, 8, P->bd);
       }
-      if (left <= 0) overlay = O_NONE;
       break;
     }
     default:
@@ -1206,11 +1205,10 @@ static void onPress(uint8_t id) {
     case B_BT_CANCEL:
       buzz(T_CANCEL);
       bleStop(false);
-      openOverlay(O_NONE);
       break;
     case B_BT_DONE:
       buzz(T_KEY);
-      openOverlay(O_NONE);
+      bleStop(false);
       break;
     case B_BT_RETRY:
       buzz(T_KEY);
