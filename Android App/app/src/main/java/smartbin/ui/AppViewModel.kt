@@ -117,10 +117,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
         }
-        // Calibration mode follows the bin, so a start or stop from the dashboard or the bin's screen shows here too.
-        viewModelScope.launch {
-            Hub.state.map { it.calibBin }.distinctUntilChanged().collect { followCalib(it) }
-        }
     }
 
     // ---------- whole app ----------
@@ -1384,6 +1380,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         fb = w
         Hub.saveFirebase(w)
         fbMsg = true to "Put back the last details that passed a test."
+    }
+
+    init {
+        // Calibration mode follows the bin, so a start or stop from the dashboard or the bin's screen shows here too.
+        // Kept last: the first value arrives at once and reads properties declared above, which must exist by then.
+        viewModelScope.launch {
+            Hub.state.map { it.calibBin }.distinctUntilChanged().collect { followCalib(it) }
+        }
     }
 
     companion object {
