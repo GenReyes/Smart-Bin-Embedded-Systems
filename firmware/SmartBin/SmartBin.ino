@@ -11,17 +11,24 @@
 #include "cloud.h"
 #include "ui.h"
 
+static void heapNote(const char* where) {
+  Serial.printf("[heap] %s: free %u, largest block %u\n", where, (unsigned)ESP.getFreeHeap(),
+                (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+}
+
 void setup() {
   Serial.begin(115200);
   delay(200);
   Serial.printf("\nSmart-Bin %s firmware v%s\n", BIN_ID, FW_VERSION);
 
+  heapNote("start");
   stateInit();
   uiInit();
   buzzerInit();
   controlInit();
   sensorsInit();
   netInit();
+  heapNote("after init");
 
   xTaskCreatePinnedToCore(uiTask, "ui", 8192, nullptr, 2, &hUi, 1);
   xTaskCreatePinnedToCore(cloudTask, "cloud", 12288, nullptr, 1, &hCloud, 0);
@@ -36,6 +43,7 @@ void setup() {
 #endif
 
   startWebServer();
+  heapNote("after tasks and web server");
   wifiConnect();
 }
 

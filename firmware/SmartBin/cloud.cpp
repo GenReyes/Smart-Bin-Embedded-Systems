@@ -89,6 +89,9 @@ static bool signIn() {
   if (!auth.http.begin((NetworkClient&)c, url)) return false;
   auth.http.addHeader("Content-Type", "application/json");
   int code = auth.http.POST(body);
+  char tlsMsg[96] = "";
+  int tlsCode = 0;
+  if (code <= 0 && url.startsWith("https://")) tlsCode = auth.tls.lastError(tlsMsg, sizeof(tlsMsg));
   if (code > 0) resp = auth.http.getString();
   auth.http.end();
   auth.tls.stop();
@@ -100,6 +103,7 @@ static bool signIn() {
       Serial.printf("[firebase] %s, dns %s %s, wifi %d dBm, free heap %u, largest block %u\n", HTTPClient::errorToString(code).c_str(),
                     dns ? "ok" : "FAILED", dns ? ip.toString().c_str() : "", WiFi.RSSI(), (unsigned)ESP.getFreeHeap(),
                     (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+      Serial.printf("[firebase] tls error %d: %s\n", tlsCode, tlsMsg);
     }
     return false;
   }
