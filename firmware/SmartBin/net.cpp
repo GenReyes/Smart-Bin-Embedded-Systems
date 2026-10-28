@@ -167,6 +167,11 @@ static void handleCloud(AsyncWebServerRequest* r, JsonVariant& j) {
     sendJson(r, 400, "{\"ok\":false,\"why\":\"The database URL starts with https://\"}");
     return;
   }
+  email.trim();
+  if (email.length() && !email.startsWith("bin")) {
+    sendJson(r, 400, "{\"ok\":false,\"why\":\"A bin signs in with its own account, whose email starts with bin (for example bin01@smartbin.test). The operator account is only for the dashboard.\"}");
+    return;
+  }
   net.fbUrl = url;
   net.fbKey = key;
   net.fbEmail = email;
