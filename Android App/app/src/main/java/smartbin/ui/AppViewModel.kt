@@ -697,22 +697,51 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
-    /** Gives every bin on Wi-Fi the saved Firebase account, so they write to the same database. */
+    /**
+     * Gives every bin on Wi-Fi the saved database URL and key with the bins' own account.
+     * Firebase's rules only let accounts whose email starts with "bin" write bin data, and
+     * the bin itself refuses any other email, so the operator account is never sent.
+     */
     fun sendCloudToBins() {
-        if (!operator) {
+        fun stop(msg: String) {
             Feel.event(Sfx.DENIED)
-            say("Only an operator can send the cloud account to the bins.")
-            return
+            fbMsg = false to msg
+            say(msg)
         }
+        if (!operator) return stop("Only an operator can send the cloud account to the bins.")
+        val saved = Hub.firebase()
+        if (saved.url.isBlank() || saved.key.isBlank()) return stop("Save the database URL and Web API key with TEST AND SAVE first.")
+        val email = binEmail.trim()
+        if (!email.lowercase().startsWith("bin") || "@" !in email) return stop(
+            "The bins need their own account, whose email starts with bin (for example bin01@smartbin.test). " +
+                "Firebase refuses bin data from a person's account like the operator's, so nothing was sent.",
+        )
+        if (binPass.length < 6) return stop("Type the bin account's password (6 characters or more).")
+        if (Hub.binsOnWifi().isEmpty()) return stop("No bin is on Wi-Fi with an address, so nothing was sent.")
+        val cfg = saved.copy(email = email, password = binPass)
+        fbBusy = true
         viewModelScope.launch {
-            val (ok, tried) = Hub.sendCloudToBins()
-            when {
-                tried == 0 -> { Feel.event(Sfx.DENIED); say("No bin is on Wi-Fi with an address, so nothing was sent.") }
-                ok == tried -> { Feel.event(Sfx.SAVED); say("Sent the cloud account to $ok bin${if (ok == 1) "" else "s"}.") }
-                else -> { Feel.event(Sfx.CMD_FAIL); say("$ok of $tried bins took the cloud account. Check the others are on.") }
+            val check = Hub.cloud.checkSignIn(cfg)
+            if (check.isFailure) {
+                fbBusy = false
+                return@launch stop("$email did not sign in: ${check.exceptionOrNull()?.message.orEmpty()} Nothing was sent.")
             }
+            val r = Hub.sendCloudToBins(cfg)
+            fbBusy = false
+            val msg = when {
+                r.ok == r.tried -> "Sent $email to ${r.ok} bin${if (r.ok == 1) "" else "s"}. They sign in within a few seconds; the Info screen shows Firebase OK."
+                else -> "${r.ok} of ${r.tried} bins took it. " + (r.why?.let { "${r.missed.joinToString()} refused: $it" } ?: "Not answering: ${r.missed.joinToString()}.")
+            }
+            if (r.ok > 0) Hub.saveBinEmail(email)
+            Feel.event(if (r.ok == r.tried) Sfx.SAVED else Sfx.CMD_FAIL)
+            fbMsg = (r.ok == r.tried) to msg
+            say(msg)
         }
     }
+
+    /** The bins' own Firebase account for SEND TO BINS. The password is kept only while the app runs. */
+    var binEmail by mutableStateOf(Hub.binEmail())
+    var binPass by mutableStateOf("")
 
     fun save(b: Bin) {
         val e = edit ?: return
@@ -864,7 +893,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         btFound.clear()
         btScanning = true
         overlay = Overlay.BtDevices
-        btNote = "Looking for bins nearby. On the bin, tap i, then WI-FI SETUP, and type the Collect PIN."
+        btNote = "Looking for bins nearby. On the bin, tap i, then WI-FI SETUP, and type the Collect PIN. It restarts once before the pairing screen shows."
         btJob?.cancel()
         btJob = viewModelScope.launch {
             try {
@@ -875,7 +904,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             } finally {
                 btScanning = false
             }
-            if (btFound.isEmpty()) btNote = "No bin found. Check that the bin shows WI-FI SETUP and stands close by" +
+            if (btFound.isEmpty()) btNote = "No bin found. Check that the bin shows the Bluetooth pairing screen (it restarts once first) and stands close by" +
                 (if (Build.VERSION.SDK_INT < 31) ", and that Location is on." else ".")
         }
     }
@@ -1139,7 +1168,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             if (!btDemo) ble.off()
             bt = 4
             Feel.event(Sfx.BT_OFF)
-            btNote = "Bluetooth is off on $btName. It stays on its Wi-Fi until someone opens WI-FI SETUP again."
+            btNote = "Bluetooth is off on $btName. It restarts now so Firebase has its memory back, and is on Wi-Fi again in about 10 s."
         }
     }
 

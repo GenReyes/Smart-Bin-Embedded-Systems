@@ -314,7 +314,7 @@ fun BinSeg(vm: AppViewModel, hub: HubState, forWhat: PickFor, selected: String?,
         Column(Modifier.weight(1f)) {
             T(b?.name ?: "All bins", size = 0.95f, maxLines = 1)
             T(
-                if (b != null) "${b.place} · ${Math.round(b.reading.fill)}%" + modeTxt(b) else if (bins.size > 5) "The 5 fullest of ${bins.size} are drawn" else "${bins.size} bins",
+                if (b != null) "${b.place} · ${if (b.reading.noFill) "no fill reading" else "${Math.round(b.reading.fill)}%"}" + modeTxt(b) else if (bins.size > 5) "The 5 fullest of ${bins.size} are drawn" else "${bins.size} bins",
                 size = 0.76f, weight = FontWeight.SemiBold, color = c.ink2, maxLines = 1,
             )
         }

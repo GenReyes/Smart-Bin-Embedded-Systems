@@ -414,7 +414,7 @@ object Hub {
             val r = b.reading
             val c = b.cal
             val f = Flags(
-                full = r.fill >= c.v("fill_th") && !r.fault("HC-SR04"), hot = r.temp >= c.v("temp_th") && !r.fault("BME680"),
+                full = r.fill >= c.v("fill_th") && !r.noFill, hot = r.temp >= c.v("temp_th") && !r.fault("BME680"),
                 humid = r.hum >= c.v("hum_th") && !r.fault("BME680"), gassy = r.gas >= c.v("gas_th") && !r.warming && !r.fault("BME680"),
                 status = r.status, source = b.source, faults = r.faults.joinToString(", "), acc = r.iaqAcc,
                 locked = r.mode.locked, collecting = r.mode.collecting,
@@ -678,14 +678,28 @@ object Hub {
         return b
     }
 
-    /** Sends the saved Firebase account to every real bin on Wi-Fi. Returns how many took it and how many were tried. */
-    suspend fun sendCloudToBins(): Pair<Int, Int> {
-        val cfg = store.firebase()
-        val bins = _state.value.bins.filter { !it.demo && it.ip.isNotBlank() }
+    /** The bins SEND TO BINS reaches: real ones with an address. */
+    fun binsOnWifi() = _state.value.bins.filter { !it.demo && it.ip.isNotBlank() }
+
+    /**
+     * Gives every real bin on Wi-Fi the saved database URL and key with the bins' own
+     * account ([cfg] carries that email and password). Returns how many took it, how many
+     * were tried, the names that did not answer, and the reason a bin gave for refusing.
+     */
+    suspend fun sendCloudToBins(cfg: FirebaseConfig): SendResult {
+        val bins = binsOnWifi()
         var ok = 0
-        bins.forEach { b -> if (runCatching { LocalApi.sendCloud(b.ip, cfg) }.isSuccess) ok++ }
-        return ok to bins.size
+        val missed = mutableListOf<String>()
+        var why: String? = null
+        bins.forEach { b ->
+            runCatching { LocalApi.sendCloud(b.ip, cfg) }
+                .onSuccess { ok++ }
+                .onFailure { e -> missed += b.name; if (e is LocalApi.Refused) why = e.why }
+        }
+        return SendResult(ok, bins.size, missed, why)
     }
+
+    class SendResult(val ok: Int, val tried: Int, val missed: List<String>, val why: String?)
 
     fun editBin(
         id: String, name: String, place: String, ip: String, cloudId: String,
@@ -1006,6 +1020,13 @@ object Hub {
     // ---------- Firebase ----------
 
     fun firebase() = store.firebase()
+
+    /** The bins' own account email last sent, or bin01@ on the operator's domain as a first guess. */
+    fun binEmail(): String = store.string("bin_email", "").ifBlank {
+        store.firebase().email.substringAfter('@', "").takeIf { it.isNotBlank() }?.let { "bin01@$it" } ?: ""
+    }
+
+    fun saveBinEmail(email: String) = store.putString("bin_email", email.trim())
     fun firebaseWorking() = store.firebaseWorking()
 
     fun saveFirebase(cfg: FirebaseConfig) {

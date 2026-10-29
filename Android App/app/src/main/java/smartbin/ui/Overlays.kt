@@ -367,7 +367,7 @@ private fun Picker(vm: AppViewModel, hub: HubState, forWhat: PickFor) {
                 }
                 if (b.simulating) MTag("SIM", c.sim)
                 if (b.calibrating) MTag("CAL", c.cal)
-                T("${Math.round(b.reading.fill)}%", size = 0.9f, color = levelColor(b, c))
+                T(if (b.reading.noFill) "--" else "${Math.round(b.reading.fill)}%", size = 0.9f, color = levelColor(b, c))
             }
         }
         if (shown.isEmpty()) Empty(Ic.bins, "No bin matches.")

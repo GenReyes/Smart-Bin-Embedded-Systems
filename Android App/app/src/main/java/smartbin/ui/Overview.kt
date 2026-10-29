@@ -218,7 +218,7 @@ fun BinCard(vm: AppViewModel, b: Bin, hub: HubState, inSheet: Boolean = false) {
             }
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(Modifier.alpha(if (stale) 0.42f else 1f), verticalAlignment = Alignment.Bottom) {
-                    T(Math.round(r.fill).toString(), size = 2.45f, color = c.accent, tnum = true, lineHeight = 1f)
+                    T(if (r.noFill) "--" else Math.round(r.fill).toString(), size = 2.45f, color = c.accent, tnum = true, lineHeight = 1f)
                     T("%", Modifier.padding(bottom = 3.dp), size = 2.45f * 0.42f, color = c.accent, lineHeight = 1f)
                 }
                 if (op) IconKey(Ic.gear, { vm.openBinEdit(b) }, tint = c.ink2, iconSize = 16.dp, label = "SET", sound = Sfx.OPEN)
@@ -276,7 +276,7 @@ fun BinCard(vm: AppViewModel, b: Bin, hub: HubState, inSheet: Boolean = false) {
                     },
             )
             Ticks(listOf(0.0, 50.0, fillTh, 100.0))
-            if (r.fault("HC-SR04")) T("Fill sensor not answering. The bar shows the last reading.", Modifier.padding(top = 4.dp), size = 0.74f, weight = FontWeight.Bold, color = c.bad)
+            if (r.noFill) T("No fill reading: the ultrasonic (HC-SR04) is not answering or not fitted yet. Weight and the other sensors still work.", Modifier.padding(top = 4.dp), size = 0.74f, weight = FontWeight.Bold, color = c.bad)
             CardFoot(b, barColor)
         }
         // Four sensor tiles
@@ -443,6 +443,7 @@ private fun SensorTile(icon: ImageVector, cc: Color, value: String, label: Strin
 private fun urgency(b: Bin): Double {
     val p = b.reading.fill
     val th = b.cal.v("fill_th")
+    if (b.reading.noFill) return 20000.0
     if (p >= th) return -1000 + p
     val rate = if (b.reading.mode.collecting) 0.0 else Hub.ratePerHour(b)
     return if (rate > 0.05) (th - p) / rate else 9999 - p
@@ -497,6 +498,7 @@ private fun CardFoot(b: Bin, cc: Color) {
 fun etaOf(b: Bin): Pair<String, Int> {
     val left = b.cal.v("fill_th") - b.reading.fill
     val rate = if (b.reading.mode.collecting) 0.0 else Hub.ratePerHour(b)
+    if (b.reading.noFill) return "No fill sensor" to 3
     if (left <= 0) return "Full now" to 0
     if (rate <= 0.05) return "Not filling" to 3
     val h = left / rate
@@ -518,6 +520,7 @@ private fun CollectNext(vm: AppViewModel, bins: List<Bin>) {
                 val th = b.cal.v("fill_th")
                 val (eta, near) = etaOf(b)
                 val (tag, tagColor) = when {
+                    b.reading.noFill -> "NO FILL" to c.ink2
                     p >= th -> "NOW" to c.bad
                     near == 3 -> "IDLE" to c.ink2
                     near == 0 -> "SOON" to c.bad
@@ -545,7 +548,7 @@ private fun CollectNext(vm: AppViewModel, bins: List<Bin>) {
                             T(eta, size = 0.76f, weight = FontWeight.SemiBold, color = c.ink2, maxLines = 1)
                         }
                     }
-                    T("$p%", tnum = true)
+                    T(if (b.reading.noFill) "--" else "$p%", tnum = true)
                     Tag(tag, tagColor)
                 }
             }
@@ -610,7 +613,7 @@ private fun Tile(b: Bin, onClick: () -> Unit) {
         ) {
             BinIcon(r.fill, lc, 42.dp)
             T(b.name, size = 0.84f, maxLines = 1)
-            T("${Math.round(r.fill)}%", size = 1.22f, color = lc, tnum = true, lineHeight = 1.05f)
+            T(if (r.noFill) "--" else "${Math.round(r.fill)}%", size = 1.22f, color = lc, tnum = true, lineHeight = 1.05f)
             Row(Modifier.height(15.dp), horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally)) {
                 if (r.mode.tamper) Ico(Ic.tamper, 15.dp, c.tamper, Modifier.shake())
                 if (r.mode.locked) Ico(Ic.lock(true), 15.dp, c.sim)

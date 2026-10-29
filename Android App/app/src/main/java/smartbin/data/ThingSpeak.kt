@@ -21,9 +21,13 @@ import java.util.TimeZone
  *   field1 fill %         field5 air quality (IAQ)
  *   field2 weight g       field6 pressure hPa
  *   field3 temperature C  field7 tilt deg
- *   field4 humidity %     field8 motion + 2 * lid open + 4 * status
+ *   field4 humidity %     field8 flags, below
  *   status (text)         the bin's local IP address
- * Status numbers: 0 OK, 1 LOCKED, 2 TAMPER, 3 COLLECTING, 4 CALIBRATING.
+ * Field 8: motion + 2 * lid open + 4 * status (status 0 OK, 1 LOCKED, 2 TAMPER,
+ * 3 COLLECTING, 4 CALIBRATING). Firmware from 29 Oct 2026 also sets 512 and
+ * adds the modes (32 locked, 64 collecting, 128 calibrating, 256 tamper) and
+ * the missing sensors (1024 HC-SR04, 2048 HX711, 4096 BME680, 8192 BMI160).
+ * A missing sensor's field is left empty.
  */
 class ThingSpeak(private var server: String = THINGSPEAK_URL) {
 
@@ -44,13 +48,16 @@ class ThingSpeak(private var server: String = THINGSPEAK_URL) {
         val o = JSONObject(text)
         fun f(n: Int, def: Double) = o.optString("field$n").toDoubleOrNull() ?: def
         val flags = f(8, 0.0).toInt()
-        val status = BinStatus.entries.getOrElse(flags shr 2) { BinStatus.OK }
-        val fill = f(1, 0.0)
+        val status = BinStatus.entries.getOrElse((flags shr 2) and 7) { BinStatus.OK }
+        val full = flags and 512 != 0
+        val modes = if (full) Modes(flags and 32 != 0, flags and 64 != 0, flags and 128 != 0, flags and 256 != 0) else null
+        val faults = if (full) FAULT_BITS.filter { (bit, _) -> flags and bit != 0 }.map { it.second } else emptyList()
         val r = Reading(
-            fill = fill, weight = f(2, 0.0), temp = f(3, 28.0), tempRaw = f(3, 28.0), hum = f(4, 60.0),
+            fill = f(1, 0.0), weight = f(2, 0.0), temp = f(3, 28.0), tempRaw = f(3, 28.0), hum = f(4, 60.0),
             gas = f(5, 60.0), press = f(6, 1008.4), tilt = f(7, 0.0),
             motion = flags and 1 == 1, lidOpen = flags and 2 == 2, status = status,
-            at = System.currentTimeMillis(),
+            at = System.currentTimeMillis(), faults = faults, modes = modes,
+            hasFill = !full || o.optString("field1").toDoubleOrNull() != null,
         )
         return Entry(r, parseTime(o.optString("created_at")), o.optString("status").takeIf { it.isNotBlank() && it != "null" }, o.optLong("entry_id", 0L))
     }
@@ -91,4 +98,8 @@ class ThingSpeak(private var server: String = THINGSPEAK_URL) {
     }.getOrDefault(0L)
 
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
+
+    private companion object {
+        val FAULT_BITS = listOf(1024 to "HC-SR04", 2048 to "HX711", 4096 to "BME680", 8192 to "BMI160")
+    }
 }

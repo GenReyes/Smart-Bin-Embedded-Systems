@@ -604,6 +604,7 @@ fun statusColor(b: Bin, c: SbColors): Color = when (b.reading.status) {
 fun levelColor(b: Bin, c: SbColors): Color {
     val p = b.reading.fill
     return when {
+        b.reading.noFill -> c.ink2
         p >= b.cal.v("fill_th") -> c.bad
         p >= 50 -> c.warn
         else -> c.ok

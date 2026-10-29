@@ -376,9 +376,15 @@ def ts_handler(bins, ip):
                 s = b.status_json()
                 code = STATUS_CODES.index(s["status"]) if s["status"] in STATUS_CODES else 0
                 flags = (1 if s["motion"] else 0) + (2 if s["lid"] == "OPEN" else 0) + 4 * code
+                # Firmware from 29 Oct 2026: 512 marks the long form, then the modes and the missing sensors.
+                m = s.get("modes") or {}
+                flags += 512 + 32 * bool(m.get("locked")) + 64 * bool(m.get("collecting")) + 128 * bool(m.get("calibrating")) + 256 * bool(m.get("tamper"))
+                for bit, name in ((1024, "HC-SR04"), (2048, "HX711"), (4096, "BME680"), (8192, "BMI160")):
+                    if name in (s.get("faults") or []):
+                        flags += bit
                 self.send(200, {
                     "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "entry_id": int(time.time()),
-                    "field1": str(s["fill"]), "field2": str(s["weight_g"]), "field3": str(s["temp"]), "field4": str(s["humidity"]),
+                    "field1": str(s["fill"]) if "fill" in s else "", "field2": str(s["weight_g"]), "field3": str(s["temp"]), "field4": str(s["humidity"]),
                     "field5": str(s["iaq"]), "field6": str(s["pressure"]), "field7": str(s["tilt"]), "field8": str(flags),
                     "status": "%s:%d" % (ip, b.port),
                 })

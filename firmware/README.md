@@ -108,7 +108,23 @@ What the bin writes, and how often (Integration Guide 6A):
 3. Optional, for LOCK/UNLOCK/COLLECT through ThingSpeak: **Apps > TalkBack > New TalkBack** for each bin, then put its ID and API key in `secrets.h`.
 4. In the dashboard and the app, give each bin its channel ID, Read API key, TalkBack ID and TalkBack key in its SET sheet.
 
-The bin writes every 30 s (sooner for a new alert, never faster than 15 s), skips writes when nothing moved, and always writes at least every 5 minutes. Field 8 is `motion + 2 × lid open + 4 × status`, the `status` text is the bin's IP. A sensor that is missing (no reading) leaves its field out of that write instead of sending `nan`.
+The bin writes every 30 s (sooner for a new alert, never faster than 15 s), skips writes when nothing moved, and always writes at least every 5 minutes. The `status` text is the bin's IP. A sensor that is missing (no reading, or listed in `faults`) leaves its field out of that write, so the chart shows a gap instead of 0 (the fill field stays empty while the ultrasonic is not fitted).
+
+Field 8 packs the flags into one number:
+
+| Bits | Value | Meaning |
+|---|---|---|
+| 0 | 1 | motion |
+| 1 | 2 | lid open |
+| 2-4 | 4 × status | 0 OK, 1 LOCKED, 2 TAMPER, 3 COLLECTING, 4 CALIBRATING (the one-word status) |
+| 5 | 32 | locked |
+| 6 | 64 | collecting (pickup) |
+| 7 | 128 | calibrating |
+| 8 | 256 | tamper |
+| 9 | 512 | always set: bits 5-13 are present (firmware before 29 Oct 2026 sent only bits 0-4) |
+| 10-13 | 1024, 2048, 4096, 8192 | HC-SR04, HX711, BME680, BMI160 not answering |
+
+Bits 5-8 match `modes` in `/api/status`, so a ThingSpeak reader sees a lock under a tamper too. Bits 10-13 match `faults`.
 
 ## 6. The touchscreen
 

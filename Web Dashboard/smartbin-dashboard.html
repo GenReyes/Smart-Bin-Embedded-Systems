@@ -1226,11 +1226,11 @@ html[data-theme="dark"]{--onBrand:#13100D;--brand2:#3FC7C2}
       </div>
       <p class="hint" style="margin:-6px 0 8px">Gives a bin a new Wi-Fi name and password over Bluetooth. The bin keeps its current Wi-Fi until the new one works, and your laptop can stay on Wi-Fi too.</p>
       <ol class="hint" style="margin:0 0 16px;padding-left:20px;line-height:1.6">
-        <li><b>On the bin:</b> tap <b>i</b> (top left), then <b>WI-FI SETUP</b>, and type the <b>Collect PIN</b> (the same 4 digits as for COLLECT).</li>
+        <li><b>On the bin:</b> tap <b>i</b> (top left), then <b>WI-FI SETUP</b>, and type the <b>Collect PIN</b> (the same 4 digits as for COLLECT). The bin <b>restarts once</b> to make room for Bluetooth, and the pairing screen comes up a few seconds later.</li>
         <li><b>Here:</b> press <b>PAIR A BIN</b> and pick <b>SmartBin-01</b> (or 02) in the list the browser shows.</li>
         <li>The bin shows a <b>6-digit pairing code</b>. Windows or your phone opens its own pairing window: type the code <b>there</b>, not on this page.</li>
         <li>Pick the network, type its password, press <b>SEND WI-FI</b>. The bin shows its new IP address, and so does this page.</li>
-        <li>Press <b>TURN BT OFF</b> when you are done.</li>
+        <li>Press <b>TURN BT OFF</b> when you are done. The bin <b>restarts again</b> so Firebase gets its memory back, and is on Wi-Fi about 10 s later. Firebase and ThingSpeak pause between the two restarts.</li>
       </ol>
       <div class="btsteps" id="btSteps"></div>
       <div class="fields" style="margin-top:18px">
@@ -1263,7 +1263,7 @@ html[data-theme="dark"]{--onBrand:#13100D;--brand2:#3FC7C2}
       <div class="fields">
         <div class="field span2"><label for="fb_url">Database URL</label><input id="fb_url" type="text" inputmode="url" spellcheck="false" placeholder="https://...firebasedatabase.app"></div>
         <div class="field"><label for="fb_key">Web API key</label><input id="fb_key" type="text" spellcheck="false" placeholder="AIza..."></div>
-        <div class="field"><label for="fb_email">Account email</label><input id="fb_email" type="text" inputmode="email" spellcheck="false"></div>
+        <div class="field"><label for="fb_email">Your account email</label><input id="fb_email" type="text" inputmode="email" spellcheck="false"></div>
         <div class="field"><label for="fb_pass">Password</label>
           <div class="withbtn"><input id="fb_pass" type="password" spellcheck="false"><button class="btn sm" id="fbEye"></button></div></div>
       </div>
@@ -1271,8 +1271,13 @@ html[data-theme="dark"]{--onBrand:#13100D;--brand2:#3FC7C2}
         <button class="btn" id="fbTest" style="flex:0 0 auto"></button>
         <button class="btn" id="fbSave" style="flex:0 0 auto"></button>
         <button class="btn" id="fbRestore" style="flex:0 0 auto"></button>
-        <button class="btn" id="fbSend" style="flex:0 0 auto"></button>
       </div>
+      <div class="fields" style="margin-top:16px">
+        <div class="field"><label for="fb_bin_email">Bin account email</label><input id="fb_bin_email" type="text" inputmode="email" spellcheck="false" placeholder="bin01@smartbin.test"></div>
+        <div class="field"><label for="fb_bin_pass">Bin account password</label>
+          <div class="withbtn"><input id="fb_bin_pass" type="password" spellcheck="false"><button class="btn" id="fbSend" style="flex:0 0 auto"></button></div></div>
+      </div>
+      <p class="hint" style="margin:8px 0 0">The bins sign in with their own account, not yours. Firebase only accepts bin data from an email that starts with bin, so the operator account is never sent. SEND TO BINS checks this account signs in, then gives it, with the URL and key above, to every bin on Wi-Fi.</p>
       <div class="fields" style="margin-top:16px">
         <div class="field span2"><label for="ts_server">ThingSpeak server</label><input id="ts_server" type="text" inputmode="url" spellcheck="false" placeholder="https://api.thingspeak.com"></div>
       </div>
@@ -1674,7 +1679,7 @@ function fbCheck(f){
 }
 function cloudRender(){
   const op=state.role==='operator';
-  ['fb_url','fb_key','fb_email','fb_pass','fbSave','fbRestore','fbSend','ts_server','btnTouchCal','btnTouchReset'].forEach(id=>{const e=$('#'+id);if(e)e.disabled=!op});
+  ['fb_url','fb_key','fb_email','fb_pass','fbSave','fbRestore','fbSend','fb_bin_email','fb_bin_pass','ts_server','btnTouchCal','btnTouchReset'].forEach(id=>{const e=$('#'+id);if(e)e.disabled=!op});
   const st=$('#cloudState');st.dataset.on=cloud.tested?'1':'0';
   st.innerHTML=icon('cloud')+'<span>'+(cloud.tested?'Working':'Not tested')+'</span>';
   const m=$('#cloudMsg');m.classList.toggle('hide',!cloud.msg);if(cloud.msg){m.className='cloudmsg '+cloud.msg[0];m.textContent=cloud.msg[1];}
@@ -1700,7 +1705,7 @@ function cloudDecorate(){
       cloud.tested=true;
       if(save){cloud.working=Object.assign({},v);fbUse(v);
         try{localStorage.setItem('smartbin.fb',JSON.stringify(v))}catch(err){}
-        cloud.msg=['ok','Signed in and found '+n+' bin'+(n===1?'':'s')+' in the database. Saved on this computer. Press SEND TO BINS to give the bins this account too.'];
+        cloud.msg=['ok','Signed in and found '+n+' bin'+(n===1?'':'s')+' in the database. Saved on this computer. To connect the bins, type their own bin account below and press SEND TO BINS.'];
         state.bins.forEach(b=>{if(!b.hist.length&&isLive(b))b.hist=[]});sfx('saved');}
       else cloud.msg=['ok','Signed in as '+v.email+' and found '+n+' bin'+(n===1?'':'s')+'. Nothing was saved yet.'];
     }catch(err){cloud.msg=['bad',(err.message||String(err))+(save?' Nothing was saved.':'')];sfx('denied');}
@@ -1712,6 +1717,10 @@ function cloudDecorate(){
   if(send){send.classList.add('tint');send.style.setProperty('--cc','var(--c-cloud)');
     send.innerHTML=icon('bins')+'<span>SEND TO BINS</span>';send.style.display='inline-flex';send.style.alignItems='center';send.style.gap='8px';
     send.addEventListener('click',sendCloudToBins);}
+  const be=$('#fb_bin_email');
+  if(be){let saved='';try{saved=localStorage.getItem('smartbin.binEmail')||''}catch(e){}
+    const dom=(cloud.working&&cloud.working.email||'').split('@')[1];
+    be.value=saved||(dom?'bin01@'+dom:'');}
   const tsIn=$('#ts_server');
   if(tsIn){tsIn.value=TS.server;tsIn.addEventListener('change',()=>{TS.server=(tsIn.value.trim()||'https://api.thingspeak.com').replace(/\/+$/,'');
     tsIn.value=TS.server;try{localStorage.setItem('smartbin.ts',TS.server)}catch(e){}toast('ThingSpeak server set to '+TS.server+'.');});}
@@ -1932,7 +1941,7 @@ async function btOff(){
   try{if(bt.dev&&bt.dev.gatt&&bt.dev.gatt.connected)bt.dev.gatt.disconnect();}catch(e){}
   bt.step=4;btRender();bt.off=false;
   sfx('bt_off');
-  btMsg('Bluetooth is off on the bin. It stays on its Wi-Fi until someone opens WI-FI SETUP again.');
+  btMsg('Bluetooth is off on the bin. It restarts now so Firebase has its memory back, and is on Wi-Fi again in about 10 s.');
 }
 const reduce=()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 function setAddCount(n){
@@ -2021,6 +2030,9 @@ function normalise(b,j){
     if(!first&&state.selSim===b.id&&!$('#simBody').contains(document.activeElement))buildSim();
   }
   d.faults=Array.isArray(j.faults)?j.faults:[];
+  /* Firmware leaves fill out while the ultrasonic gives no reading (not fitted yet, or unplugged);
+     a simulated fill is still sent. Older firmware always sent fill and no faults list. */
+  d.noFill=Array.isArray(j.faults)&&!Number.isFinite(+(j.fill??j.fill_percentage??NaN));
   d.tamper_phase=j.tamper_phase||'';
   d.modes=j.modes&&typeof j.modes==='object'?{locked:!!j.modes.locked,collecting:!!j.modes.collecting,
     calibrating:!!j.modes.calibrating,tamper:!!j.modes.tamper}:null;
@@ -2176,12 +2188,20 @@ async function fbTest(v){
   const bins=await fbRest('GET','sb/bins',null,'&shallow=true',c);
   return bins&&typeof bins==='object'?Object.keys(bins).length:0;
 }
+/* The bins sign in with their own account (email starting with bin); the rules refuse bin data
+   from a person's account, and the bin itself refuses any other email, so only that is sent. */
 async function sendCloudToBins(){
+  const stop=m=>{cloud.msg=['bad',m];sfx('denied');cloudRender();};
   if(state.role!=='operator'){toast('Only an operator can send the cloud account to the bins.');return;}
-  const v=fbVals(),e=fbCheck(v);
-  if(e){toast(e);return;}
+  const email=$('#fb_bin_email').value.trim(),pass=$('#fb_bin_pass').value;
+  const v=Object.assign(fbVals(),{email,pass}),e=fbCheck(v);
+  if(!/^bin/i.test(email)||!email.includes('@'))return stop('The bins need their own account, whose email starts with bin (for example bin01@smartbin.test). Firebase refuses bin data from a person\'s account like the operator\'s, so nothing was sent.');
+  if(e)return stop(e);
   const targets=state.bins.filter(b=>b.ip&&!SECURE);
-  if(!targets.length){toast('No bin has an IP address yet, so there is nothing to send to.');return;}
+  if(!targets.length)return stop('No bin has an IP address yet, so there is nothing to send to.');
+  cloud.msg=['ok','Checking that '+email+' signs in\u2026'];cloudRender();
+  try{await fbSignIn(v)}catch(err){return stop(email+' did not sign in: '+(err.message||err)+' Nothing was sent.')}
+  try{localStorage.setItem('smartbin.binEmail',email)}catch(err){}
   let ok=0;const miss=[];let why='';
   await Promise.all(targets.map(async b=>{try{const r=await callRaw(b,'/api/cloud',{url:v.url,key:v.key,email:v.email,pass:v.pass});
     if(r.ok)ok++;else{miss.push(b.name);if(r.j&&r.j.why)why=r.j.why}}catch(err){miss.push(b.name)}}));
@@ -2218,11 +2238,19 @@ async function fbUsageTick(now){
   }catch(e){}
 }
 
-/* ThingSpeak: field1 fill, 2 weight, 3 temperature, 4 humidity, 5 IAQ, 6 pressure, 7 tilt, 8 motion + 2 lid + 4 status. */
+/* ThingSpeak: field1 fill, 2 weight, 3 temperature, 4 humidity, 5 IAQ, 6 pressure, 7 tilt, 8 flags.
+   Field 8: motion + 2 lid + 4 status. Firmware from 29 Oct 2026 adds 512 and then the modes
+   (32 locked, 64 collecting, 128 calibrating, 256 tamper) and the missing sensors
+   (1024 HC-SR04, 2048 HX711, 4096 BME680, 8192 BMI160); a missing sensor's field is empty. */
 function tsMap(o){
   const f=n=>{const v=parseFloat(o['field'+n]);return Number.isFinite(v)?v:undefined};
-  const flags=(f(8)||0)|0;
-  return {fill:f(1),weight_g:f(2),temp:f(3),humidity:f(4),iaq:f(5),pressure:f(6),tilt:f(7),motion:!!(flags&1),lid:(flags&2)?'OPEN':'CLOSED',status:flags>>2};
+  const flags=(f(8)||0)|0,full=!!(flags&512);
+  const m={fill:f(1),weight_g:f(2),temp:f(3),humidity:f(4),iaq:f(5),pressure:f(6),tilt:f(7),motion:!!(flags&1),lid:(flags&2)?'OPEN':'CLOSED',status:(flags>>2)&7};
+  if(full){
+    m.modes={locked:!!(flags&32),collecting:!!(flags&64),calibrating:!!(flags&128),tamper:!!(flags&256)};
+    m.faults=[[1024,'HC-SR04'],[2048,'HX711'],[4096,'BME680'],[8192,'BMI160']].filter(x=>flags&x[0]).map(x=>x[1]);
+  }
+  return m;
 }
 async function tsHistory(b){
   if(!b.tsCh||!b.tsKey||b._tsHist)return;
@@ -2653,7 +2681,7 @@ function updateTiles(){
     t.dataset.bm=bm;
     t.style.outline=(full||tamper)?'2.5px solid var(--bad)':'';
     t.style.outlineOffset='-2px';
-    const fn=t.querySelector('.tfill');if(fn)fn.textContent=pct+'%';
+    const fn=t.querySelector('.tfill');if(fn)fn.textContent=b.data.noFill?'--':pct+'%';
     let warn=t.querySelector('.twarn');
     const hasWarn=b.data.temp>=c.temp_th||b.data.humidity>=c.hum_th||b.data.gas>=c.gas_th;
     if(hasWarn&&!warn){warn=document.createElement('span');warn.className='twarn';warn.textContent='!';t.appendChild(warn);}
@@ -2752,7 +2780,7 @@ function renderOverlayCard(){
 
   /* fill percentage */
   const pctEl=q('pct');
-  if(pctEl){const v=Math.round(d.fill);pctEl.innerHTML=v+'<span>%</span>';}
+  if(pctEl){const v=Math.round(d.fill);pctEl.innerHTML=d.noFill?'--':v+'<span>%</span>';}
 
   /* bar */
   const bar=q('bar');
@@ -2919,7 +2947,7 @@ function makeTile(b,i){
   return '<div class="tile" id="tile-'+b.id+'" data-bm="'+bm+'" data-tid="'+b.id+'"'+((full||tamper)?' style="outline:2.5px solid var(--bad);outline-offset:-2px"':'')+'>'+
     warn+
     ICONS.bin(b.id,pct,colorOf(i),'tclip')+
-    '<span class="tfill" style="color:'+colorOf(i)+'">'+pct+'%</span>'+
+    '<span class="tfill" style="color:'+colorOf(i)+'">'+(d.noFill?'--':pct+'%')+'</span>'+
     '<span class="tname">'+esc(b.name)+'</span>'+
     '<span class="tplace">'+esc(b.place||'')+'</span>'+
     '<div class="tbar"><i style="width:'+clamp(pct,0,100)+'%;background:'+barCol+'"></i></div>'+
@@ -2956,7 +2984,7 @@ function cardHTML(b){
     '<div class="chips" data-r="chips"></div>'+
     '<div class="bar nm-deep"><i data-r="bar"></i><b style="left:50%"></b><b data-r="th"></b></div>'+
     '<div class="ticks"><span>0</span><span>50</span><span data-r="tl">80</span><span>100</span></div>'+
-    '<p class="faultnote hide" data-r="fault">Fill sensor not answering. The bar shows the last reading.</p>'+
+    '<p class="faultnote hide" data-r="fault">No fill reading: the ultrasonic (HC-SR04) is not answering or not fitted yet. Weight and the other sensors still work.</p>'+
     '<div class="cardfoot"><span class="h1">1 h</span><svg data-r="spark" viewBox="0 0 100 22" preserveAspectRatio="none"><path/></svg><span data-r="ago"></span></div>'+
     '<div class="sensors" data-r="sensors"></div>'+
     '<div class="actions" data-r="actions"></div>'+
@@ -3019,8 +3047,9 @@ function renderCard(b){
     if(wrap)wrap.setAttribute('transform','translate(0,'+(42-(clamp(d.fill,0,100)/100)*30).toFixed(1)+')');
   }
 
-  tweenPct(q('pct'),b,d.fill);
-  q('fault').classList.toggle('hide',!(d.faults||[]).includes('HC-SR04'));
+  if(d.noFill){cancelAnimationFrame(b._raf||0);b._shown=0;q('pct').innerHTML='--';}
+  else tweenPct(q('pct'),b,d.fill);
+  q('fault').classList.toggle('hide',!d.noFill&&!(d.faults||[]).includes('HC-SR04'));
   cardFoot(b,q('spark'),q('ago'),levelColor(d.fill,c));
   const bar=q('bar');bar.style.width='calc('+clamp(d.fill,0,100)+'% - 6px)';bar.style.background=levelColor(d.fill,c);
   q('th').style.left=c.fill_th+'%';q('tl').textContent=c.fill_th;
@@ -3158,6 +3187,7 @@ function fillRate(b){
 let collectSig='';
 function ttfText(b){
   const r=fillRate(b),left=b.cal.fill_th-b.data.fill;
+  if(b.data.noFill)return {txt:'No fill sensor',tc:'var(--ink2)',tag:'NO FILL'};
   if(left<=0)return {txt:'Full now',tc:'var(--bad)',tag:'NOW'};
   if(r<=0.05)return {txt:'Not filling',tc:'var(--ink2)',tag:'IDLE'};
   const h=left/r;
@@ -3200,7 +3230,7 @@ function renderCollectNext(){
       '<span class="cn">'+(i+1)+'</span>'+
       '<span style="width:9px;height:9px;border-radius:50%;background:'+tc+';flex-shrink:0"></span>'+
       '<span class="cnm">'+esc(b.name)+'</span>'+
-      '<span class="cpc">'+p+'%</span>'+
+      '<span class="cpc">'+(b.data.noFill?'--':p+'%')+'</span>'+
       '<span class="cwhen" style="color:'+tc+'">'+txt+'</span>'+
       '<span class="lvtag" style="background:'+tc+'">'+tag+'</span></div>';
   }).join('')||'<div class="empty">No bins yet.</div>';

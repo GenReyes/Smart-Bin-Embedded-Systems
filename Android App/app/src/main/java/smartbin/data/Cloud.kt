@@ -99,6 +99,20 @@ class Cloud(private var config: FirebaseConfig) {
         Result.failure(IOException(friendly(e.message.orEmpty())))
     }
 
+    /**
+     * Signs in with a bin's account without keeping the token, so SEND TO BINS can
+     * tell a wrong password here instead of the bin failing quietly afterwards.
+     */
+    suspend fun checkSignIn(cfg: FirebaseConfig): Result<Unit> = try {
+        val body = JSONObject().put("email", cfg.email.trim()).put("password", cfg.password).put("returnSecureToken", true)
+        JSONObject(http("POST", authUrl(cfg), body.toString())).getString("idToken")
+        Result.success(Unit)
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        Result.failure(IOException(friendly(e.message.orEmpty())))
+    }
+
     private suspend fun signInWith(cfg: FirebaseConfig): Pair<String, String> {
         val body = JSONObject().put("email", cfg.email.trim()).put("password", cfg.password).put("returnSecureToken", true)
         val o = JSONObject(http("POST", authUrl(cfg), body.toString()))

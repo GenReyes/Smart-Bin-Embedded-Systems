@@ -62,6 +62,8 @@ data class Reading(
     /** The BMI160 board angle now, in degrees. */
     val pitch: Double? = null,
     val roll: Double? = null,
+    /** False when the bin left "fill" out (no ultrasonic reading and no simulated fill). */
+    val hasFill: Boolean = true,
 ) {
     /** [status] is one word, so a lock hides under a tamper or a calibration; this says each mode, as the dashboard reads it. */
     val mode: Modes get() = modes ?: Modes(
@@ -73,6 +75,8 @@ data class Reading(
         when { it.tamper -> BinStatus.TAMPER; it.collecting -> BinStatus.COLLECTING; it.locked -> BinStatus.LOCKED; else -> BinStatus.OK }
     }
     fun fault(sensor: String) = sensor in faults
+    /** The ultrasonic sent no fill (not answering, or not on the PCB yet), so [fill] is not a reading. A simulated fill still counts. */
+    val noFill get() = !hasFill
     /** The air score is not settled yet. */
     val warming get() = iaqAcc == 0 && !fault("BME680")
 }
@@ -144,7 +148,7 @@ data class Bin(
     val stale get() = source == Source.STALE
     val calibrating get() = reading.mode.calibrating
     val simulating get() = sim.mask > 0
-    val full get() = reading.fill >= cal.v("fill_th")
+    val full get() = !reading.noFill && reading.fill >= cal.v("fill_th")
     val sensorOver get() = reading.temp >= cal.v("temp_th") || reading.hum >= cal.v("hum_th") ||
         reading.gas >= cal.v("gas_th") || reading.weight >= cal.v("weight_cap")
     val urgent get() = reading.mode.tamper || full

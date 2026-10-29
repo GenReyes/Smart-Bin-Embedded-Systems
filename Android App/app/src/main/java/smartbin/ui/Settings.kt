@@ -421,8 +421,11 @@ fun Connection(vm: AppViewModel, hub: HubState) {
             }
             Btn("RESTORE WORKING", { vm.fbRestore() }, Modifier.fillMaxWidth(), Ic.undo, Look.TINT)
             if (vm.operator) {
-                Btn("SEND TO BINS", { vm.sendCloudToBins() }, Modifier.fillMaxWidth(), Ic.bins, Look.TINT, c.cloud, sound = Sfx.TAP)
-                Hint("SEND TO BINS gives every bin on Wi-Fi this account, so they write to the same database. Save it with TEST AND SAVE first.")
+                Sh(Ic.bins, "Bin account", c.cloud)
+                Field("Bin email", Ic.user) { Inp(vm.binEmail, { vm.binEmail = it.trim() }, placeholder = "bin01@smartbin.test", keyboard = KeyboardType.Email) }
+                Field("Bin password", Ic.key) { Inp(vm.binPass, { vm.binPass = it }, password = !vm.fbShow) }
+                Btn(if (vm.fbBusy) "SENDING" else "SEND TO BINS", { vm.sendCloudToBins() }, Modifier.fillMaxWidth(), Ic.bins, Look.TINT, c.cloud, enabled = !vm.fbBusy, sound = Sfx.TAP)
+                Hint("The bins sign in with their own account, not yours. Firebase only accepts bin data from an email that starts with bin, so the app will not send the operator account. SEND TO BINS checks this account signs in, then gives it, with the URL and key saved above, to every bin on Wi-Fi.")
             }
             Hint("TEST signs in and reads the list of bins. TEST AND SAVE keeps the details only when the test passes. RESTORE WORKING puts back the last details that passed. The password is stored encrypted on this phone.")
         }
@@ -459,7 +462,8 @@ fun Connection(vm: AppViewModel, hub: HubState) {
             Hint(
                 "Each bin needs its own channel. Put the channel ID and read API key in the bin's SET sheet, and its TalkBack ID and key for LOCK, UNLOCK and COLLECT. " +
                     "The write API key stays in the bin's firmware. Fields: **1** fill %, **2** weight g, **3** temperature, **4** humidity, **5** air quality, **6** pressure, **7** tilt, " +
-                    "**8** motion + 2 × lid + 4 × status, and the status text holds the bin's IP address. The free licence allows a write every 15 s per channel and 3 million a year in all.",
+                    "**8** flags (motion, lid, status, every mode that is on, and any sensor not answering), and the status text holds the bin's IP address. A missing sensor leaves its field empty. " +
+                    "The free licence allows a write every 15 s per channel and 3 million a year in all. The bin writes over plain http because the ESP32 has no memory for a second HTTPS link next to Firebase; this phone reads over https.",
             )
         }
         Card {
@@ -520,6 +524,7 @@ fun Bluetooth(vm: AppViewModel, hub: HubState) {
         }
         Card {
             Hint("Hand the Wi-Fi name and password to a bin over Bluetooth, read back the address it gets, then switch its Bluetooth off so only Wi-Fi stays on.")
+            Hint("The bin restarts twice, on purpose. Once when WI-FI SETUP opens, to make room for Bluetooth (the pairing screen comes up a few seconds later), and once when Bluetooth goes off, so Firebase has its memory back (it is on Wi-Fi again about 10 s later). Firebase and ThingSpeak pause in between.")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(Ic.bluetooth to "PAIR + CODE", Ic.radar to "PICK NETWORK", Ic.key to "SEND", Ic.power to "BT OFF").forEachIndexed { k, (ic, label) ->
                     val done = vm.bt > k
@@ -584,11 +589,11 @@ fun Bluetooth(vm: AppViewModel, hub: HubState) {
             Btn("TURN BT OFF", { vm.btOff() }, Modifier.fillMaxWidth(), Ic.power, Look.TINT, c.warn, enabled = vm.bt in 1..3, sound = Sfx.TAP)
             Hint(
                 when (vm.bt) {
-                    0 -> "On the bin, tap i, then WI-FI SETUP, and type the Collect PIN. Then press PAIR A BIN, pick the bin, and type the 6-digit code its screen shows."
+                    0 -> "On the bin, tap i, then WI-FI SETUP, and type the Collect PIN. The bin restarts once and then shows the pairing screen. Then press PAIR A BIN, pick the bin, and type the 6-digit code its screen shows."
                     1 -> "Pick the 2.4 GHz network the bin should join, then SEND WI-FI."
                     2 -> "The bin tries the network for up to 15 s. If it fails it goes back to its old Wi-Fi."
                     3 -> "Press ${vm.btUseLabel()} to keep this address, then TURN BT OFF."
-                    else -> "Bluetooth is off on the bin. It stays on Wi-Fi until someone opens WI-FI SETUP on it again."
+                    else -> "Bluetooth is off on the bin, and it restarts to free the memory Firebase needs. It is back on Wi-Fi and the cloud in about 10 s."
                 }
             )
             if (b?.isDemo == true) Hint("${b.name} is a demo bin, so pairing uses a stand-in code here. Pick a real bin, or none, to set up a real one.")

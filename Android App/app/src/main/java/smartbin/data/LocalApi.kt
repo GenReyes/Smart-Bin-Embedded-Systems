@@ -138,6 +138,8 @@ object LocalApi {
             },
             pitch = if (j.has("pitch") && !j.isNull("pitch")) j.optDouble("pitch").takeUnless { it.isNaN() } else null,
             roll = if (j.has("roll") && !j.isNull("roll")) j.optDouble("roll").takeUnless { it.isNaN() } else null,
+            // Firmware leaves "fill" out while the ultrasonic gives no reading. Older firmware always sent it.
+            hasFill = listOf("fill", "fill_percentage").any { j.has(it) && !j.isNull(it) } || !j.has("faults"),
         )
         val cal = j.optJSONObject("cal")?.let { c ->
             val m = DEFAULT_CAL.toMutableMap()

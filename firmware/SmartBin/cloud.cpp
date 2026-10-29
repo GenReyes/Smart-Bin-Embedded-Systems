@@ -360,16 +360,29 @@ static void addField(String& url, int n, float v, int dec) {
   url += "&field" + String(n) + "=" + t;
 }
 
+// Field 8. Bits 0-4 are the old layout (motion + 2 * lid + 4 * status). Bit 9 marks this
+// layout, so a reader knows bits 5-8 (every mode that is on, like "modes" in the status)
+// and bits 10-13 (sensors that stopped answering, like "faults") are there.
+static int tsFlags(const BinState& s) {
+  return (s.v.motion ? 1 : 0) | (s.lidOpen ? 2 : 0) | (s.status << 2) | (s.locked << 5) | (s.collecting << 6) |
+         (s.calibrating << 7) | ((s.tamperPhase != 0) << 8) | (1 << 9) | (faultBits(s) << 10);
+}
+
 static bool tsWrite(const BinState& s) {
   const Reading& v = s.v;
-  int flags = (v.motion ? 1 : 0) + (s.lidOpen ? 2 : 0) + 4 * s.status;
+  const Sim sm = simSnapshot();
+  // A missing sensor leaves its field out, the same as /api/status, so the charts show a gap instead of 0.
+  bool hc = s.okHC || (sm.mask & 1), hx = s.okHX || (sm.mask & 2), bme = s.okBME || (sm.mask & 12) == 12;
+  int flags = tsFlags(s);
   String url = net.tsServer + "/update?api_key=" + enc(net.tsWriteKey);
-  addField(url, 1, v.fill, 1);
-  addField(url, 2, v.weight_g, 0);
-  addField(url, 3, v.temp, 2);
-  addField(url, 4, v.humidity, 1);
-  addField(url, 5, v.iaq, 0);
-  addField(url, 6, v.pressure, 1);
+  if (hc) addField(url, 1, v.fill, 1);
+  if (hx) addField(url, 2, v.weight_g, 0);
+  if (bme || (sm.mask & 8)) {
+    addField(url, 3, v.temp, 2);
+    addField(url, 4, v.humidity, 1);
+  }
+  if (s.okBME || (sm.mask & 4)) addField(url, 5, v.iaq, 0);
+  if (s.okBME) addField(url, 6, v.pressure, 1);
   addField(url, 7, v.tilt, 1);
   url += "&field8=" + String(flags) + "&status=" + enc(localIp());
   if (url.startsWith("https://")) {
