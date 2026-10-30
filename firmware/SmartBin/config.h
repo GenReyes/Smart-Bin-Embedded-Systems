@@ -27,7 +27,9 @@ constexpr int PIN_SCL = 22;
 constexpr int PIN_LED_R = 25;
 constexpr int PIN_LED_G = 26;
 constexpr int PIN_LED_B = 33;
-constexpr int PIN_PIR = 27;
+// IR obstacle sensor module (FC-51 / TCRT5000 type) OUT. Power the module from 3.3 V so OUT
+// never goes above 3.3 V. Its LED lights when it sees something.
+constexpr int PIN_IR = 27;
 constexpr int PIN_IMU_INT = 34;     // optional BMI160 INT1 wire; set USE_IMU_INT to 1 once it is wired
 
 #define USE_IMU_INT 0
@@ -66,14 +68,15 @@ constexpr uint32_t BT_IDLE_OFF_MS = 300000;
 #define BT_RESTART_FOR_MEMORY 1
 
 // 1: the servo signal is switched off 0.8 s after the lid has closed, so the servo stops
-// twitching and its current spikes stop retriggering the PIR. Set 0 if the lid does not
-// stay shut without the servo holding it.
+// twitching and drawing current. Set 0 if the lid does not stay shut without the servo holding it.
 #define SERVO_RELEASE_WHEN_CLOSED 1
 
-// After the minimum-shut time, a PIR that is still high is ignored for at most this long
-// (it is usually still holding the trigger caused by the closing lid). After that it counts
-// as someone standing there and opens the lid.
-constexpr uint32_t LID_PIR_WAIT_MAX_MS = 4000;
+// 1: OUT goes LOW when something is in front of the IR sensor (most FC-51 style modules).
+// 0: OUT goes HIGH instead.
+#define IR_ACTIVE_LOW 1
+// The reading must hold this long before it counts, so a flicker at the edge of the range
+// does not open or keep the lid.
+constexpr uint32_t IR_DEBOUNCE_MS = 80;
 constexpr uint32_t BT_CODE_MS = 60000;
 constexpr uint32_t BT_LOCKOUT_MS = 60000;
 constexpr uint64_t FB_MONTH_LIMIT = 10737418240ULL;

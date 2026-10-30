@@ -3,4 +3,4 @@
 
 void controlInit();
 void controlTask(void*);
-void isrPir();
+void isrIr();

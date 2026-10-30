@@ -438,21 +438,15 @@ static void fmtTtf(const BinState& s, const Cal& c, char* out, size_t n) {
 static void lidRows(const BinState& s, const Cal& c, uint32_t now, int y, uint16_t rowBg, uint8_t id) {
   char label[40];
   if (s.lidOpen && s.v.motion && s.status == ST_OK) {
-    timerRow(id, y, I_LIDOPEN, "LID HOLDING (motion)", 1, P->cy, rowBg);
+    timerRow(id, y, I_LIDOPEN, "LID HOLDING (IR sees you)", 1, P->cy, rowBg);
   } else if (s.lidOpen && s.lidCloseAtMs) {
     float left = max<int32_t>(0, (int32_t)(s.lidCloseAtMs - now)) / 1000.0f;
     snprintf(label, sizeof(label), "LID CLOSES IN %.1f s", left);
     timerRow(id, y, I_LIDOPEN, label, left / max(1, (int)c.pir_hold_s), P->cy, rowBg);
   } else if (!s.lidOpen && !s.lidArmed) {
     int32_t shut = (int32_t)c.lid_close_s * 1000 - (int32_t)(now - s.lidClosedAtMs);
-    if (shut > 0) {
-      snprintf(label, sizeof(label), "LID STAYS SHUT %.1f s", shut / 1000.0f);
-      timerRow(id, y, I_BIN, label, shut / (max(1, (int)c.lid_close_s) * 1000.0f), P->tx2, rowBg);
-    } else {
-      int32_t wait = (int32_t)LID_PIR_WAIT_MAX_MS + shut;
-      snprintf(label, sizeof(label), "PIR STILL ON, WAIT %.1f s", max<int32_t>(0, wait) / 1000.0f);
-      timerRow(id, y, I_BIN, label, max<int32_t>(0, wait) / (float)LID_PIR_WAIT_MAX_MS, P->tx2, rowBg);
-    }
+    snprintf(label, sizeof(label), "LID STAYS SHUT %.1f s", max<int32_t>(0, shut) / 1000.0f);
+    timerRow(id, y, I_BIN, label, max<int32_t>(0, shut) / (max(1, (int)c.lid_close_s) * 1000.0f), P->tx2, rowBg);
   }
 }
 

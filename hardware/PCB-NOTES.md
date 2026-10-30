@@ -25,14 +25,14 @@ Already right in the schematic (keep as they are): BMI160 CS to 3.3 V and SA0 to
                      │                     │     C1 470–1000 µF + C2 100 nF right at the servo connector
                      │                     │
                      │                     └── D1 Schottky (SS34) ──► ESP32 5V pin (U1 pin 19)
-                     │                                                  HC-SR04, PIR (+5V modules)
+                     │                                                  HC-SR04 (+5V module)
  GND ────────────────┴─ wide trace, servo GND back to the battery connector on its own path
 ```
 
 - **Servo branch:** the SG90 draws 100–250 mA moving and up to about 700 mA when stalled. Put a **470–1000 µF** electrolytic and a **100 nF** ceramic right at its connector. Run its + and GND straight to the battery connector, not through the ESP32 area.
 - **D1 Schottky diode (SS34 or 1N5819)** between the battery 5 V and the ESP32's 5V pin. It stops the battery and the USB cable feeding each other, so the note "don't use battery 5V when uploading code" goes away: both can be connected at once. The ESP32 board then sees about 4.7 V, which is fine.
 - **F1 polyfuse 2 A** at the battery input protects the board from a short.
-- **3.3 V rail:** comes from the ESP32 board's own regulator (3V3 pin). Everything on it adds up to about 200 mA plus the ESP32's own Wi-Fi peaks (around 400 mA), which is near that regulator's limit. Keep the servo, HC-SR04 and PIR **off** the 3.3 V rail.
+- **3.3 V rail:** comes from the ESP32 board's own regulator (3V3 pin). Everything on it adds up to about 200 mA plus the ESP32's own Wi-Fi peaks (around 400 mA), which is near that regulator's limit. Keep the servo and HC-SR04 **off** the 3.3 V rail. The IR obstacle sensor (about 20 mA) goes **on** the 3.3 V rail, so its OUT pin never goes above 3.3 V.
 
 ## 3. Capacitors to add
 
@@ -42,7 +42,7 @@ Already right in the schematic (keep as they are): BMI160 CS to 3.3 V and SA0 to
 | ESP32 5V to GND, next to U1 | 10 µF | Supply ripple |
 | Servo connector | 470–1000 µF + 100 nF | Section 2 |
 | HX711 VCC to GND | 10 µF + 100 nF | The weight reading was jumpy |
-| Each module connector (TFT, BME680, BMI160, HC-SR04, PIR) | 100 nF | Local decoupling |
+| Each module connector (TFT, BME680, BMI160, HC-SR04, IR sensor) | 100 nF | Local decoupling |
 
 ## 4. Layout tips
 
@@ -69,7 +69,7 @@ Already right in the schematic (keep as they are): BMI160 CS to 3.3 V and SA0 to
 | 22 | I2C_SCL | BME680 SCL + BMI160 SCL |
 | 23 | SPI_SCK | TFT SCK + T_CLK |
 | 25, 26, 33 | LED_R, LED_G, LED_B | RGB LED through its resistors |
-| 27 | PIR | PIR OUT |
+| 27 | IR_OUT | IR obstacle sensor OUT (module on 3.3 V, LOW when something is in front) |
 | 32 | HX_DT | HX711 DT |
 | 34 | IMU_INT | BMI160 INT1, optional (input only) |
 | 35 | SPI_MISO | T_DO, and TFT SDO through JP1 (input only) |

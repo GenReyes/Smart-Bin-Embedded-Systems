@@ -53,7 +53,7 @@ Redraw the sheets from `hardware/PCB-NOTES.md`, then update the text:
 - Bluetooth setup: "They type the 6-digit code that appears on the screen of the bin (it will expire after 60s and can be tried 3 times) followed by the name and password of the Wi-Fi" → "The 6-digit code on the bin's screen is typed into the phone's or computer's Bluetooth pairing window (it expires after 60 s). The app then lists the Wi-Fi networks the bin can see; the collector picks one and enters its password. The bin remembers the pairing for next time."
 
 ### 2.5 Component Materials
-- **Figure 10 (ESP32):** "It reads all six inputs" → name them: HC-SR04, PIR, BME680, BMI160, HX711 and the touch panel. Optional: add "The PIR and touch panel use hardware interrupts, and the work is split into FreeRTOS tasks."
+- **Figure 10 (ESP32):** "It reads all six inputs" → name them: HC-SR04, IR obstacle sensor, BME680, BMI160, HX711 and the touch panel. Optional: add "The IR sensor and touch panel use hardware interrupts, and the work is split into FreeRTOS tasks."
 - **Figure 11 (HC-SR04):** "once the fill level reaches 80% or more" → "once it reaches the fill limit (80% by default)".
 - **Figure 13 (BME680):** "since a hot temperature may cause it to **swell**" → "since a high temperature may mean a fire or hot material inside". Also say the IAQ is an estimate with a warm-up (same wording as 2.3).
 - **Figure 15 (HX711):**
@@ -75,3 +75,12 @@ Redraw the sheets from `hardware/PCB-NOTES.md`, then update the text:
 - "Passive buzzer module (5V)" → "MH-FMD passive buzzer module". The schematic runs it on 3.3V.
 - The 18650 battery shields are missing. Add them with prices, or say in the note that the group already owned them.
 - If the PCB is made, add: SS34 Schottky diode, 2 A polyfuse, 470–1000 µF capacitor, 10 kΩ resistor, 100 nF capacitors, and the PCB itself.
+
+## 5. Hand sensor: PIR replaced by an IR obstacle sensor (30 Oct 2026)
+
+Everywhere the paper says **HC-SR501 PIR**, change it to **IR obstacle sensor module (FC-51 type)**: Block Diagram (2.2), Flowchart (2.3), Schematic (2.4, pin 27), Component Materials (2.5, its figure and paragraph) and Appendix B.
+
+- Suggested paragraph: "An infrared obstacle sensor detects a hand in front of the lid. An IR LED sends out light and a photodiode sees it bounce back from a nearby object; a comparator turns that into a digital output that goes LOW when something is within range (set with its potentiometer, a few cm to about 30 cm). It runs on 3.3 V and is read with a hardware interrupt on GPIO 27."
+- Why it was changed (good for the Results or Recommendations part): the PIR kept its output high for several seconds after any trigger, and the closing lid and the servo kept retriggering it, so the lid reopened by itself. The IR sensor only reacts to something in front of it, right now.
+- Flowchart wording: "motion detected" → "hand detected". The lid stays open while the hand is there, closes a few seconds after it leaves (5 s by default), and stays shut for at least 2 s.
+- BOM: replace the HC-SR501 line with the IR obstacle sensor module and its price.

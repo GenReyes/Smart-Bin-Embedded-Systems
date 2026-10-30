@@ -6,6 +6,8 @@
 
 The idea in one line: **nothing spins in `loop()` asking "did anything happen yet?"**. Hardware interrupts and FreeRTOS tasks wake the code only when something happens, and the dashboard gets pushed a new status instead of asking the bin every second.
 
+> **Update (Oct 2026):** the PIR was replaced by an IR obstacle sensor module on the same pin, GPIO 27, with the same interrupt. Read "PIR" below as "IR sensor". See `firmware/README.md` section 5b.
+
 ---
 
 ## 1. Is it hard?

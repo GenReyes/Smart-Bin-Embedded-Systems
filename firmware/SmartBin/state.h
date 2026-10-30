@@ -11,14 +11,14 @@ struct Cal {
   uint8_t auto_lock = 0;
   int16_t servo_closed = 0, servo_open = 90;
   uint16_t collect_pin = 0;
-  uint16_t pir_hold_s = 5, buzz_s = 2;
+  uint16_t pir_hold_s = 5, buzz_s = 2;  // pir_hold_s: lid stays open this long after the IR sensor clears (name kept for the API)
   float temp_off = -2, hum_off = 0, press_off = 0;
   uint8_t buzz_on = 1, buzz_vol = 2, buzz_ui = 1, buzz_lid = 0;
   uint16_t buzz_repeat_s = 30;
   uint8_t quiet_on = 0;
   uint16_t quiet_from = 1320, quiet_to = 360;
   // Added after the first bins were built. loadCal() reads an older, shorter block and keeps these defaults.
-  uint16_t lid_close_s = 2;           // after closing, the lid stays shut this long even if the PIR still sees motion
+  uint16_t lid_close_s = 2;           // after closing, the lid stays shut this long even if the IR sensor still sees something
   uint8_t tilt_boot = 1;              // 1 = take the upright reference again at every power-up
 };
 
@@ -68,7 +68,7 @@ struct BinState {
   float fillRatePerHour = 0;
   uint8_t calSteps = 0;               // bit 0 tare, bit 1 empty distance, bit 2 full distance, bit 3 upright
   uint32_t lidClosedAtMs = 0;         // when the lid last closed, for Cal::lid_close_s
-  bool lidArmed = true;               // false after closing until lid_close_s has passed and the PIR read low
+  bool lidArmed = true;               // false after closing until lid_close_s has passed
   float pitch = 0, roll = 0;          // BMI160 angles now, degrees
   float refPitch = 0, refRoll = 0;    // the saved upright reference, degrees
   bool refSaved = false;
@@ -105,7 +105,7 @@ struct AlertEv {
 };
 
 enum : uint32_t {
-  EV_PIR = 1 << 0, EV_TOUCH = 1 << 1, EV_IMU = 1 << 2, EV_STATE = 1 << 3, EV_CMD = 1 << 4,
+  EV_IR = 1 << 0, EV_TOUCH = 1 << 1, EV_IMU = 1 << 2, EV_STATE = 1 << 3, EV_CMD = 1 << 4,
   EV_CAL = 1 << 5, EV_WIFI = 1 << 6, EV_ALERT = 1 << 7, EV_RESULT = 1 << 8, EV_BT = 1 << 9,
 };
 
