@@ -449,7 +449,9 @@ static void lidRows(const BinState& s, const Cal& c, uint32_t now, int y, uint16
       snprintf(label, sizeof(label), "LID STAYS SHUT %.1f s", shut / 1000.0f);
       timerRow(id, y, I_BIN, label, shut / (max(1, (int)c.lid_close_s) * 1000.0f), P->tx2, rowBg);
     } else {
-      timerRow(id, y, I_BIN, "LID WAITS: PIR STILL ON", 1, P->tx2, rowBg);
+      int32_t wait = (int32_t)LID_PIR_WAIT_MAX_MS + shut;
+      snprintf(label, sizeof(label), "PIR STILL ON, WAIT %.1f s", max<int32_t>(0, wait) / 1000.0f);
+      timerRow(id, y, I_BIN, label, max<int32_t>(0, wait) / (float)LID_PIR_WAIT_MAX_MS, P->tx2, rowBg);
     }
   }
 }
