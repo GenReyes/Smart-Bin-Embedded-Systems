@@ -34,10 +34,20 @@ void controlInit() {
   lidAngle = c.servo_closed;
 }
 
+static uint32_t lidMovedMs = 0;
+
 static void setLid(int angle) {
   if (angle == lidAngle) return;
+  if (!lid.attached()) lid.attach(PIN_SERVO, 500, 2400);
   lid.write(angle);
   lidAngle = angle;
+  lidMovedMs = millis();
+}
+
+static void releaseServo(int closedAngle, uint32_t now) {
+#if SERVO_RELEASE_WHEN_CLOSED
+  if (lid.attached() && lidAngle == closedAngle && now - lidMovedMs > 800) lid.detach();
+#endif
 }
 
 static void finish(const Command& c, bool ok, const char* why) {
@@ -154,7 +164,7 @@ static void updateLed(const BinState& s, const Cal& c, uint32_t now) {
 void controlTask(void*) {
   uint32_t lastTick = 0, lastWave = 0, lastFullBuzz = 0, lastEnvBuzz = 0, lastTamperTick = 0;
   bool prevFull = false, prevEnv = false, prevHC = true, prevHX = true, prevBME = true;
-  bool prevMotion = false, firstPass = true, pirArmed = true, ignoredNoted = false;
+  bool prevMotion = false, firstPass = true, ignoredNoted = false;
   BinStatus prevStatus = ST_OK;
   uint8_t prevMask = 0;
 
@@ -223,7 +233,7 @@ void controlTask(void*) {
     } else if (sim.mask & 64) {
       wantOpen = sim.lid;
       st.lidCloseAtMs = 0;
-    } else if (motion && (st.lidOpen || pirArmed)) {
+    } else if (motion && (st.lidOpen || st.lidArmed)) {
       // After the lid shuts, the PIR has to go quiet once (after lid_close_s) before it can
       // open the lid again. The closing servo often retriggers the PIR, which then stays high
       // for its own hold time; without this the lid opened again with nobody there.
@@ -241,19 +251,27 @@ void controlTask(void*) {
     bool lidChanged = wantOpen != st.lidOpen;
     if (lidChanged) {
       st.lidOpen = wantOpen;
-      if (!wantOpen) {
+      if (wantOpen) {
+        Serial.printf("[lid] open: %s\n", status == ST_COLLECTING ? "pickup" : (sim.mask & 64) ? "simulation" : "motion");
+      } else {
         st.lidClosedAtMs = now;
-        pirArmed = false;
+        st.lidArmed = false;
         ignoredNoted = false;
+        if (status != ST_OK) Serial.printf("[lid] closed: %s\n", STATUS_NAMES[status]);
+        else Serial.printf("[lid] closed: no motion for %u s; stays shut at least %u s\n", cl.pir_hold_s, cl.lid_close_s);
       }
       changed = true;
     }
-    if (!st.lidOpen && !pirArmed) {
+    if (!st.lidOpen && !st.lidArmed) {
       bool settled = now - st.lidClosedAtMs >= cl.lid_close_s * 1000UL;
-      if (settled && !motion) pirArmed = true;
-      else if (settled && motion && !ignoredNoted) {
+      if (settled && !motion) {
+        st.lidArmed = true;
+        changed = true;
+        Serial.println("[lid] ready: the PIR is low, the next motion opens the lid");
+      } else if (settled && motion && !ignoredNoted) {
         ignoredNoted = true;
-        Serial.println("[lid] PIR still high since the lid closed; waiting for it to go low before opening again");
+        changed = true;
+        Serial.println("[lid] waiting: the PIR is still high since the lid closed; it must go low first");
       }
     }
     if (motion != prevMotion) changed = true;
@@ -269,6 +287,7 @@ void controlTask(void*) {
     unlockState();
 
     setLid(s.lidOpen ? cl.servo_open : cl.servo_closed);
+    releaseServo(cl.servo_closed, now);
     if (lidChanged) buzz(s.lidOpen ? T_LID_OPEN : T_LID_CLOSE);
     if (motion && !prevMotion && (s.status == ST_LOCKED || s.status == ST_TAMPER) && now - lastWave > 5000) {
       lastWave = now;

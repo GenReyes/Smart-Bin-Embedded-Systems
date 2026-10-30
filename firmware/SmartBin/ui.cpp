@@ -443,10 +443,22 @@ static void lidRows(const BinState& s, const Cal& c, uint32_t now, int y, uint16
     float left = max<int32_t>(0, (int32_t)(s.lidCloseAtMs - now)) / 1000.0f;
     snprintf(label, sizeof(label), "LID CLOSES IN %.1f s", left);
     timerRow(id, y, I_LIDOPEN, label, left / max(1, (int)c.pir_hold_s), P->cy, rowBg);
+  } else if (!s.lidOpen && !s.lidArmed) {
+    int32_t shut = (int32_t)c.lid_close_s * 1000 - (int32_t)(now - s.lidClosedAtMs);
+    if (shut > 0) {
+      snprintf(label, sizeof(label), "LID STAYS SHUT %.1f s", shut / 1000.0f);
+      timerRow(id, y, I_BIN, label, shut / (max(1, (int)c.lid_close_s) * 1000.0f), P->tx2, rowBg);
+    } else {
+      timerRow(id, y, I_BIN, "LID WAITS: PIR STILL ON", 1, P->tx2, rowBg);
+    }
   }
 }
 
-static bool lidRowActive(const BinState& s) { return s.lidOpen && (s.v.motion || s.lidCloseAtMs) && s.status == ST_OK; }
+static bool lidRowActive(const BinState& s) {
+  if (s.status != ST_OK) return false;
+  if (s.lidOpen) return s.v.motion || s.lidCloseAtMs;
+  return !s.lidArmed;
+}
 static bool buzzRowActive(const BinState& s, uint32_t now) { return s.buzzerOn || (int32_t)(s.buzzerUntilMs - now) > 0; }
 
 static void buzzRow(const BinState& s, const Cal& c, uint32_t now, int y, uint16_t rowBg, uint8_t id) {
