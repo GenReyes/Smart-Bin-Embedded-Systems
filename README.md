@@ -28,7 +28,7 @@ Collection priority ranks the fullest bin first, with an estimated time to full.
 | HX711 + 5 kg load cell | Weight |
 | BME680 | Temperature, humidity, pressure, air quality (IAQ) |
 | BMI160 | Tilt / tamper |
-| HC-SR501 PIR | Hand detection |
+| IR obstacle sensor module (FC-51 type, 3.3 V) | Hand detection |
 | SG90 servo | Lid |
 | 2.4 in ILI9341 + XPT2046 | Touchscreen |
 | RGB LED, buzzer module | Status and alarms |

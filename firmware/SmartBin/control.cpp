@@ -8,9 +8,9 @@
 static Servo lid;
 static int lidAngle = -1;
 
-void IRAM_ATTR isrPir() {
+void IRAM_ATTR isrIr() {
   BaseType_t woke = pdFALSE;
-  if (hControl) xTaskNotifyFromISR(hControl, EV_PIR, eSetBits, &woke);
+  if (hControl) xTaskNotifyFromISR(hControl, EV_IR, eSetBits, &woke);
   portYIELD_FROM_ISR(woke);
 }
 
@@ -25,7 +25,7 @@ void controlInit() {
   pinMode(PIN_LED_G, OUTPUT);
   pinMode(PIN_LED_B, OUTPUT);
   led(false, false, true);
-  pinMode(PIN_PIR, INPUT);
+  pinMode(PIN_IR, INPUT_PULLUP);
   ESP32PWM::allocateTimer(0);
   lid.setPeriodHertz(50);
   lid.attach(PIN_SERVO, 500, 2400);
@@ -170,7 +170,8 @@ static void updateLed(const BinState& s, const Cal& c, uint32_t now) {
 void controlTask(void*) {
   uint32_t lastTick = 0, lastWave = 0, lastFullBuzz = 0, lastEnvBuzz = 0, lastTamperTick = 0;
   bool prevFull = false, prevEnv = false, prevHC = true, prevHX = true, prevBME = true;
-  bool prevMotion = false, firstPass = true, ignoredNoted = false;
+  bool prevMotion = false, firstPass = true, irSeen = false;
+  uint32_t irEdgeMs = 0;
   BinStatus prevStatus = ST_OK;
   uint8_t prevMask = 0;
 
@@ -183,12 +184,15 @@ void controlTask(void*) {
 
     uint32_t now = millis();
     Cal cl = calSnapshot();
-    bool pir = digitalRead(PIN_PIR);
+    bool irRaw = digitalRead(PIN_IR) == (IR_ACTIVE_LOW ? LOW : HIGH);
+    if (irRaw == irSeen) irEdgeMs = 0;
+    else if (!irEdgeMs) irEdgeMs = now ? now : 1;
+    else if (now - irEdgeMs >= IR_DEBOUNCE_MS) { irSeen = irRaw; irEdgeMs = 0; }
     bool changed = false;
     char meta[72];
 
     lockState();
-    st.raw.motion = pir;
+    st.raw.motion = irSeen;
     recomputeView();
     bool motion = st.v.motion;
     bool hcOk = st.okHC || (sim.mask & 1);
@@ -240,9 +244,8 @@ void controlTask(void*) {
       wantOpen = sim.lid;
       st.lidCloseAtMs = 0;
     } else if (motion && (st.lidOpen || st.lidArmed)) {
-      // After the lid shuts it stays shut for lid_close_s. Then a PIR that is still high is
-      // ignored until it goes low or LID_PIR_WAIT_MAX_MS passes: the closing servo often
-      // retriggers the PIR, which stays high for its own hold time.
+      // After the lid shuts it stays shut for lid_close_s, so the lid itself swinging past the
+      // IR sensor, or a hand still there, does not flap it.
       wantOpen = true;
       st.lidCloseAtMs = 0;
     } else if (st.lidOpen && st.lidCloseAtMs == 0) {
@@ -258,30 +261,21 @@ void controlTask(void*) {
     if (lidChanged) {
       st.lidOpen = wantOpen;
       if (wantOpen) {
-        Serial.printf("[lid] open: %s\n", status == ST_COLLECTING ? "pickup" : (sim.mask & 64) ? "simulation" : "motion");
+        Serial.printf("[lid] open: %s\n", status == ST_COLLECTING ? "pickup" : (sim.mask & 64) ? "simulation" : "IR sensor");
       } else {
         st.lidClosedAtMs = now;
         st.lidArmed = false;
-        ignoredNoted = false;
         if (status != ST_OK) Serial.printf("[lid] closed: %s\n", STATUS_NAMES[status]);
-        else Serial.printf("[lid] closed: no motion for %u s; stays shut at least %u s\n", cl.pir_hold_s, cl.lid_close_s);
+        else Serial.printf("[lid] closed: IR sensor clear for %u s; stays shut at least %u s\n", cl.pir_hold_s, cl.lid_close_s);
       }
       changed = true;
     }
     if (!st.lidOpen && !st.lidArmed) {
       uint32_t shut = now - st.lidClosedAtMs, minShut = cl.lid_close_s * 1000UL;
-      if (shut >= minShut && !motion) {
+      if (shut >= minShut) {
         st.lidArmed = true;
         changed = true;
-        Serial.println("[lid] ready: the PIR is low, the next motion opens the lid");
-      } else if (shut >= minShut + LID_PIR_WAIT_MAX_MS) {
-        st.lidArmed = true;
-        changed = true;
-        Serial.printf("[lid] ready: the PIR stayed high %.1f s after closing, so someone is there\n", shut / 1000.0f);
-      } else if (shut >= minShut && !ignoredNoted) {
-        ignoredNoted = true;
-        changed = true;
-        Serial.printf("[lid] waiting: the PIR is still high since the lid closed; up to %.0f s more\n", LID_PIR_WAIT_MAX_MS / 1000.0f);
+        Serial.println(motion ? "[lid] ready: something is still in front of the IR sensor, opening" : "[lid] ready: the IR sensor opens the lid again");
       }
     }
     if (motion != prevMotion) changed = true;
