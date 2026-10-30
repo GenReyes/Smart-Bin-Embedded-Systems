@@ -64,6 +64,11 @@ constexpr uint32_t BT_IDLE_OFF_MS = 300000;
 //    but on the bench Firebase then failed its handshakes (BIGNUM alloc, largest block 34 KB).
 // Either way the bin restarts once when setup ends, for a clean heap.
 #define BT_RESTART_FOR_MEMORY 1
+
+// 1: the servo signal is switched off 0.8 s after the lid has closed, so the servo stops
+// twitching and its current spikes stop retriggering the PIR. Set 0 if the lid does not
+// stay shut without the servo holding it.
+#define SERVO_RELEASE_WHEN_CLOSED 1
 constexpr uint32_t BT_CODE_MS = 60000;
 constexpr uint32_t BT_LOCKOUT_MS = 60000;
 constexpr uint64_t FB_MONTH_LIMIT = 10737418240ULL;

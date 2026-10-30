@@ -68,6 +68,7 @@ struct BinState {
   float fillRatePerHour = 0;
   uint8_t calSteps = 0;               // bit 0 tare, bit 1 empty distance, bit 2 full distance, bit 3 upright
   uint32_t lidClosedAtMs = 0;         // when the lid last closed, for Cal::lid_close_s
+  bool lidArmed = true;               // false after closing until lid_close_s has passed and the PIR read low
   float pitch = 0, roll = 0;          // BMI160 angles now, degrees
   float refPitch = 0, refRoll = 0;    // the saved upright reference, degrees
   bool refSaved = false;
