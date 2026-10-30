@@ -79,6 +79,7 @@ static void runCommand(const Command& c) {
   }
   const char* k = c.cmd;
   char meta[72];
+  bool wasLocked = false;
   lockState();
   if (!strcmp(k, "LOCK")) {
     st.locked = true;
@@ -89,6 +90,11 @@ static void runCommand(const Command& c) {
   } else if (!strcmp(k, "CLEAR_TAMPER")) {
     st.tamperPhase = 0;
   } else if (!strcmp(k, "COLLECT")) {
+    // A pickup and a lock are never on together: the pickup opens the lid, so it clears the
+    // lock (manual or auto). LOCK is refused while a pickup runs (validateCommand).
+    wasLocked = st.locked;
+    st.locked = false;
+    st.autoLocked = false;
     st.collecting = true;
   } else if (!strcmp(k, "COLLECT_DONE")) {
     if (st.collecting) st.doneAtMs = millis();
@@ -116,7 +122,7 @@ static void runCommand(const Command& c) {
     buzz(T_TAMPER_SETTLED);
   } else if (!strcmp(k, "COLLECT")) {
     if (c.src != SRC_SCREEN) buzz(T_PIN_OK);
-    snprintf(meta, sizeof(meta), "%s pickup started", BIN_LABEL);
+    snprintf(meta, sizeof(meta), wasLocked ? "%s pickup started (lock cleared)" : "%s pickup started", BIN_LABEL);
     raiseAlert("pickup", "info", "Collection started", meta);
   } else if (!strcmp(k, "COLLECT_DONE")) {
     buzz(T_DONE);

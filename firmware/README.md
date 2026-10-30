@@ -134,7 +134,7 @@ Bits 5-8 match `modes` in `/api/status`, so a ThingSpeak reader sees a lock unde
 | A1 Main | Normal; green, amber (50 %+) and the alarm boxes, timer rows for the lid and buzzer, "Full in ~" line |
 | A2 Urgent | Fill at or over the fill limit |
 | A3 PIN | COLLECT, or WI-FI SETUP on the Info screen; 4 digits, wrong PIN shakes and clears |
-| A4 Collecting / A5 Done | Pickup running / finished, back to main after 30 s |
+| A4 Collecting / A5 Done | Pickup running / finished, back to main after 30 s. COLLECT clears a lock (manual or auto) and LOCK is refused during a pickup, so the two are never on together |
 | A6 Tamper | 10 s countdown, clears if the bin settles, otherwise latched until the dashboard or app clears it |
 | A7 Locked | Locked from the dashboard, app or auto-lock |
 | A8 Calibrating | While the operator calibrates, with CANCEL |
