@@ -1,7 +1,6 @@
 filename | page title | site/seller name | page URL | date accessed
 ESP32.jpg | ESP32-DevKitC ESP32-WROOM-32D WiFi BT 38P development board | Sigmanortec | https://sigmanortec.ro/en/esp32-devkitc-development-board-esp32-wroom-32d-38p | 2026-10-15
 HC-SR04.jpg | Ultrasonic Distance Sensor - 5V (HC-SR04) | SparkFun Electronics | https://www.sparkfun.com/ultrasonic-distance-sensor-hc-sr04.html | 2026-10-15
-HC-SR501.jpg | HC-SR501 PIR Motion Sensor Module | Circuitrocks | https://circuit.rocks/products/pir-motion-sensor-module-digital | 2026-10-15
 SG90.jpg | TowerPro Servo Motor - SG90 Analog | The Pi Hut | https://thepihut.com/products/towerpro-servo-motor-sg90-analog | 2026-10-15
 TFT.jpg | 2.4inch SPI Module ILI9341 SKU:MSP2402 | LCDWIKI (LCD wiki) | https://www.lcdwiki.com/2.4inch_SPI_Module_ILI9341_SKU:MSP2402 | 2026-10-15
 BMI160.jpg | GY-BMI160 Module 6DOF 6 Axis Angular Velocity | ElectroPeak | https://electropeak.com/gy-bmi160-module-6dof-6-axis-angular-velocity | 2026-10-15

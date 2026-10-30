@@ -2,9 +2,9 @@
 
 One sketch runs each bin. It reads the sensors, drives the lid, buzzer, RGB LED and the 2.4 in touchscreen, serves the local API the dashboard and the Android app use, and copies the bin's status to Firebase and ThingSpeak.
 
-It follows `Web Dashboard/ESP32-Integration-Guide.md` (the API, Firebase and ThingSpeak layout the app v1.2 already reads) and `Web Dashboard/Interrupt-Driven-Design-Guide.md` (tasks and interrupts). The screens follow `Mockups/smartbin-touchscreen-mockup v4.html`.
+The local API, Firebase paths and ThingSpeak fields below are the ones the web dashboard and the Android app (v3.1) read.
 
-> **Status:** it compiles cleanly for the ESP32 (Arduino core 3.3.12, all libraries below). It has **not been run on the real bins yet**, so expect to tune touch calibration, the servo angles and the load-cell scale on the bench.
+> **Status:** final version. It compiles cleanly for the ESP32 (Arduino core 3.3.12, all libraries below) and runs on Bin 01. Touch, servo angles and the load-cell scale still need calibrating on each new bin (section 3).
 
 ## Folder
 
@@ -16,7 +16,7 @@ It follows `Web Dashboard/ESP32-Integration-Guide.md` (the API, Firebase and Thi
 | `SmartBin/state.*` | The shared bin state, calibration saved in flash, the status JSON |
 | `SmartBin/sensors.*` | HC-SR04, HX711, BME680, BMI160 |
 | `SmartBin/control.*` | Lid, lock, collect, tamper countdown, auto-lock, alarms, RGB LED, commands |
-| `SmartBin/buzzer.*` | Every tune from Integration Guide 9.2, with the priority rules |
+| `SmartBin/buzzer.*` | Every tune, with the priority rules (alarms over UI sounds) |
 | `SmartBin/net.*` | Wi-Fi, `smartbin-01.local`, the local API, push updates (`/api/events`) |
 | `SmartBin/cloud.*` | Firebase (status, commands, results, alerts, data meter) and ThingSpeak (fields, TalkBack) |
 | `SmartBin/ui.*` | The touchscreen screens A1 to A10 and touch |
@@ -90,7 +90,7 @@ Everything you save is kept in the ESP32's flash and survives a restart.
 8. Put the URL, key and the **bin's** email and password in `secrets.h` and upload again. Or, in the dashboard's Cloud panel, type the bin account and press **SEND TO BINS**.
 9. The Serial Monitor shows `[firebase] reachable` and the bin's Info screen shows *Firebase OK*.
 
-What the bin writes, and how often (Integration Guide 6A):
+What the bin writes, and how often:
 
 | Path | When |
 |---|---|
@@ -159,10 +159,14 @@ The sun/moon key switches light and dark and is remembered. Info and PIN screens
 
 ## 7. Local API
 
-Everything in Integration Guide section 4 (`/api/status`, `/api/command`, `/api/calibrate`, `/api/simulate`) with the recommended replies (`409 {"ok":false,"why":"TAMPER active"}` for a refusal), plus:
+Base `http://<bin-ip>` (port 80), or `http://smartbin-01.local`. Every reply carries CORS headers, so a dashboard on another bin or on `localhost` can call it.
 
 | Call | What it does |
 |---|---|
+| `GET /api/status` | The bin's readings, `status` (`OK`, `LOCKED`, `TAMPER`, `COLLECTING`, `CALIBRATING`), `lid`, `sim_mask` and the saved `cal` block |
+| `POST /api/command {"cmd":"LOCK"}` | `LOCK`, `UNLOCK`, `COLLECT`, `COLLECT_DONE`, `CLEAR_TAMPER`, `CALIBRATE_START`, `CALIBRATE_END`, `TARE`, `CAL_WEIGHT` (with `"grams"`), `RESET_GAS`. Replies `200 {"ok":true,"cmd":...,"status":...}`, `409 {"ok":false,"why":"TAMPER active"}` for a refusal, `400` for an unknown command |
+| `POST /api/calibrate` | Any subset of the `cal` keys; saved in flash |
+| `POST /api/simulate {"mask":5,"values":{...}}` | Holds sensors at set values. Mask bits: 0 fill, 1 weight, 2 air quality, 3 temperature and humidity, 4 tamper, 5 motion, 6 lid. `mask:0` ends it |
 | `modes` in the status | `{"locked","collecting","calibrating","tamper"}`, each true or false. `status` is one word with a priority (calibrating, collecting, tamper, locked), so a lock under a tamper hides there; the dashboard and the app read these flags so both show the same keys. Also `pitch`/`roll` (board angle), `cal.tilt_ref_pitch`/`tilt_ref_roll`/`tilt_boot`/`lid_close_s`, and `sim` (the value each simulated sensor is held at). |
 | `GET /api/events` | Server-Sent Events: a `status` event on every change (at most 4 a second), a `ping` every 10 s. The dashboard uses it; `/api/status` stays for the app. |
 | `POST /api/cloud` | `{"url","key","email","pass"}` stores the Firebase account on the bin (the dashboard's SEND TO BINS) |
@@ -193,6 +197,6 @@ Readings live in one shared state behind a mutex; nobody holds it across I2C, SP
 
 - **Air quality (IAQ).** This uses its own estimate from the BME680 gas resistance and humidity (a warm-up of 5 minutes on first use, 2 minutes after that, and a baseline saved every hour), not Bosch's BSEC library. `iaq_acc` goes 0 (warming up, the screen shows `--`) to 3 over about 30 minutes. Say "estimated IAQ" in the paper.
 - **HTTPS certificates are not checked** (`setInsecure()`), which is common on student ESP32 projects but means the bin trusts any server. Adding the Google and ThingSpeak root certificates fixes that.
-- **GPIO 12 (buzzer)** is a boot strapping pin. Our buzzer module is transistor-driven, so no pull-up or pull-down is needed. If the board ever refuses to boot with the buzzer plugged in, that pin is the first suspect.
+- **Buzzer on GPIO 4, not GPIO 12.** GPIO 12 is a boot strapping pin; the buzzer module pulled it high and the ESP32 would not boot. The TFT runs on 3.3V and the servo has its own 5V branch, because on the shared 5V rail the board browned out.
 - **BMI160 INT1 to GPIO 34** is optional. Without the wire the tilt is read every 200 ms, which is fast enough.
-- `FB_REQUIRE_WATCHERS` in `config.h` is 0, so the bin keeps the fast cloud pace even when only the app watches (the app v1.2 does not write `/sb/watchers` yet). Set it to 1 once it does, to save more of the free allowance.
+- `FB_REQUIRE_WATCHERS` in `config.h` is 0, so the bin keeps the fast cloud pace all the time. The app and the dashboard both write `/sb/watchers` now, so it can be set to 1 to save more of the free allowance.

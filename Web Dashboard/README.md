@@ -1,6 +1,6 @@
 # Smart-Bin web dashboard
 
-`smartbin-dashboard.html` is the working operator dashboard. It is the v12 mockup (`Mockups/smartbin-dashboard-v12.html`) with the same screens, sounds and operator PIN, plus real links to the bins:
+`smartbin-dashboard.html` is the working operator dashboard. It has the screens, sounds and operator PIN of the group's design, plus real links to the bins:
 
 1. **The bin's own Wi-Fi** first. It keeps one push connection per bin (`/api/events`) and falls back to reading `/api/status` every second.
 2. **Firebase** when a bin does not answer on Wi-Fi.
@@ -57,25 +57,14 @@ The mock server now sends CORS headers and answers the Firebase PUT, PATCH and D
 
 This version was checked in headless Chrome against the mock server on all three links (readings arrive, LOCK and UNLOCK reach the bin and confirm) and against a test bin that pushes `/api/events`, with no script errors.
 
-## Decisions taken (for Brian)
+## Choices behind it
 
-Answers to section 12 of `ESP32-Integration-Guide.md` and section 9 of `Interrupt-Driven-Design-Guide.md`, so the app can be matched:
+| Topic | Choice |
+|---|---|
+| Where it is served from | From each bin (`http://<bin-ip>/`, packed into `firmware/SmartBin/dashboard_gz.h`) for presenting, `localhost` for developing. A page on `https://` works with the cloud only. |
+| Firebase | Plain REST, polled every 5 s. Watchers at `/sb/watchers/<client>`, results at `/sb/results/<push id>`, alerts at `/sb/alerts/<bin>` (newest 50), usage at `/sb/usage`. Rules in `firmware/firebase.rules.json`. |
+| ThingSpeak | Charts read `feeds.json` into the dashboard's own chart, no iframe. |
+| Operator security | PIN in the dashboard and the app. The bin refuses unsafe commands itself (COLLECT during tamper or calibration, LOCK during a pickup). |
+| Finding the bins | `smartbin-01.local` / `smartbin-02.local` (mDNS), the IP on the screen, and `local_ip` in Firebase and the ThingSpeak status. A DHCP reservation on the router is still the most reliable. |
 
-| # | Question | Choice |
-|---|---|---|
-| 1 | Where the dashboard is served from | A (from each bin, `http://<bin-ip>/`) for presenting, B (`localhost`) for developing. C works for cloud only. |
-| 2 | Web server, `/api/command` reply | ESPAsyncWebServer. Replies `200 {"ok":true,"cmd":...,"status":...}`, `409 {"ok":false,"why":...}` for a refusal, `400` for an unknown command. |
-| 3 | `last_cmd`, `uptime_s`, `rssi`, `fw` | Added. Also `faults`, `tamper_phase`, `name`. Faulted readings are left out instead of sent as 0. |
-| 4 | Firebase | Plain REST on the bin and the dashboard. Watchers at `/sb/watchers/<client>` (with `.indexOn: ts`), results at `/sb/results/<push id>`, alerts at `/sb/alerts/<bin>` (newest 50), usage at `/sb/usage` with `bytes_month` kept for the app. Rules in `firmware/firebase.rules.json`. |
-| 5 | ThingSpeak | Every 30 s, 15 s minimum, at once for a new alert, at least every 5 min. Charts come from `feeds.json` in the dashboard's own chart, no iframe. |
-| 6 | Operator security | Level 0 for now (PIN in the dashboard and the app). The bin refuses unsafe commands itself (COLLECT during tamper or calibration, LOCK during a pickup). |
-| 7 | Finding the bins | `smartbin-01.local` / `smartbin-02.local` (mDNS), the IP on the screen, and `local_ip` in Firebase and the ThingSpeak status. A DHCP reservation on the router is still the most reliable. |
-| 8 | Bluetooth pairing | Passkey on the touchscreen (4.8). Started from the bin only (Info > WI-FI SETUP, behind the collect PIN). CTRL `2` also forgets paired phones. |
-| 9 | Buzzer | Module on GPIO 12, all 9.2 tunes and settings, `BUZZ_TEST` added. |
-| 10 | Renamed fields | None. |
-| I-1 | `/api/events` (SSE) | Added. `/api/status` stays. |
-| I-2 | BMI160 INT1 to GPIO 34 | Optional, off by default; tilt is read every 200 ms. |
-| I-3 | HC-SR04 | `pulseIn()` with a 25 ms timeout inside the sensor task. |
-| I-4 | Dashboard Firebase reading | REST polling every 5 s. |
-
-One request for the app: please write `/sb/watchers/<id>` while in cloud mode (6A). Until then the bins keep the fast pace all the time (`FB_REQUIRE_WATCHERS 0` in `firmware/SmartBin/config.h`), which stays well inside the free plan for two bins.
+After `smartbin-dashboard.html` changes, run `py firmware/tools/embed_dashboard.py` and upload the firmware again so the bins serve the new page.

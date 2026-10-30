@@ -1,12 +1,12 @@
 # Smart-Bin Android app
 
-The phone app for the Smart-Bin system, for both the operator and the collector. It follows `Mockups/smartbin-app-mockup v3.html` screen for screen and borrows the feel of the Garbage-Guard app: a light and a dark logo on the home screen, its own sound for each kind of action, and a vibration pattern for each kind of alert.
+The phone app for the Smart-Bin system, for both the operator and the collector. It borrows the feel of the Garbage-Guard app: a light and a dark logo on the home screen, its own sound for each kind of action, and a vibration pattern for each kind of alert.
 
 It runs with no hardware. Turn DEMO on at the start page and three made-up bins appear next to the real ones. Left alone, they walk through every outcome by themselves (full, tamper, bad air, a sensor that stops answering, links coming and going, a pickup) so every screen can be shown in class. Pair a real bin over Bluetooth and it switches to live readings over Wi-Fi.
 
-**Connecting to the real bins:** [INTEGRATION.md](INTEGRATION.md) lists what the firmware does. Version 2.0 covers all of it: Bluetooth Wi-Fi setup, the new status fields, touch calibration, Firebase command results and watchers.
+**Connecting to the real bins:** the app covers everything the firmware offers: Bluetooth Wi-Fi setup, the status fields (including `modes`, `faults`, tilt and simulation values), touch calibration, Firebase command results and watchers, and ThingSpeak with TalkBack. The API and cloud paths are listed in `firmware/README.md`.
 
-Version 2.2. Kotlin and Jetpack Compose, the same stack as Garbage-Guard (AGP 9.4.1, Gradle 9.6.0, compile and target SDK 37, minimum Android 8.0).
+Version 3.1. Kotlin and Jetpack Compose, the same stack as Garbage-Guard (AGP 9.4.1, Gradle 9.6.0, compile and target SDK 37, minimum Android 8.0).
 
 ## Build and run
 
@@ -24,7 +24,7 @@ gradlew :app:assembleDebug
 
 The APK lands in `app/build/outputs/apk/debug/app-debug.apk`. Copy it to a phone to install it there.
 
-A ready-built debug APK, `Smart-Bin v3.0.apk`, sits in this folder for installing on a phone without building.
+A ready-built debug APK, `Smart-Bin v3.1.apk`, sits in this folder for installing on a phone without building.
 
 ## What is in it
 

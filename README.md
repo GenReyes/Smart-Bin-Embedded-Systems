@@ -17,7 +17,7 @@ Two table-size smart bins, each with its own ESP32. Each bin measures how full i
 - Android app for the collector
 - On-bin 2.4 in touchscreen with PIN-protected collection
 
-Collection priority ranks the fullest bin first, with an estimated time to full. Live data goes over a local REST API (about 1 s), and history and alerts go to ThingSpeak (every 15 s).
+Collection priority ranks the fullest bin first, with an estimated time to full. Live data goes over a local REST API (about 1 s). Firebase carries status, commands and alerts when a phone is away from the bin's Wi-Fi, and ThingSpeak keeps the history (every 30 s while readings change).
 
 ## Hardware per bin
 
@@ -38,10 +38,9 @@ Collection priority ranks the fullest bin first, with an estimated time to full.
 | Folder | Contents |
 |---|---|
 | `firmware/` | ESP32 firmware (`firmware/SmartBin`), Firebase rules and setup steps. See its README |
-| `Web Dashboard/` | Operator web dashboard (`smartbin-dashboard.html`, single HTML file) and the integration guides. See its README |
-| `Mockups/` | The UI mockups the dashboard, app and touchscreen follow |
-| `Android App/` | Android app for operators and collectors (Kotlin, Compose). See its README |
-| `hardware/` | Schematic, and `PCB-NOTES.md`: changes for the PCB from bench testing (pins, servo power, capacitors) |
+| `Web Dashboard/` | Operator web dashboard (`smartbin-dashboard.html`, single HTML file). See its README |
+| `Android App/` | Android app for operators and collectors (Kotlin, Compose) and the ready-built `Smart-Bin v3.1.apk`. See its README |
+| `Hardware/` | Schematic (`Smart-bin_Schematic_Diagram v3.pdf`) |
 | `Documents/` | Paper, figures, implementation plan, UI mockups compilation, references |
 
 ## Secrets
