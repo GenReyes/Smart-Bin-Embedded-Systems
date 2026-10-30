@@ -41,7 +41,7 @@ Collection priority ranks the fullest bin first, with an estimated time to full.
 | `Web Dashboard/` | Operator web dashboard (`smartbin-dashboard.html`, single HTML file). See its README |
 | `Android App/` | Android app for operators and collectors (Kotlin, Compose) and the ready-built `Smart-Bin v3.1.apk`. See its README |
 | `Hardware/` | Schematic (`Smart-bin_Schematic_Diagram v3.pdf`) |
-| `Documents/` | Paper, figures, implementation plan, UI mockups compilation, references |
+| `Documents/` | Paper, figures (diagrams, Gantt chart, app screens, component photos), references |
 
 ## Secrets
 
