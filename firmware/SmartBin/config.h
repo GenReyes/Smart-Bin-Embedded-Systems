@@ -69,6 +69,11 @@ constexpr uint32_t BT_IDLE_OFF_MS = 300000;
 // twitching and its current spikes stop retriggering the PIR. Set 0 if the lid does not
 // stay shut without the servo holding it.
 #define SERVO_RELEASE_WHEN_CLOSED 1
+
+// After the minimum-shut time, a PIR that is still high is ignored for at most this long
+// (it is usually still holding the trigger caused by the closing lid). After that it counts
+// as someone standing there and opens the lid.
+constexpr uint32_t LID_PIR_WAIT_MAX_MS = 4000;
 constexpr uint32_t BT_CODE_MS = 60000;
 constexpr uint32_t BT_LOCKOUT_MS = 60000;
 constexpr uint64_t FB_MONTH_LIMIT = 10737418240ULL;

@@ -234,9 +234,9 @@ void controlTask(void*) {
       wantOpen = sim.lid;
       st.lidCloseAtMs = 0;
     } else if (motion && (st.lidOpen || st.lidArmed)) {
-      // After the lid shuts, the PIR has to go quiet once (after lid_close_s) before it can
-      // open the lid again. The closing servo often retriggers the PIR, which then stays high
-      // for its own hold time; without this the lid opened again with nobody there.
+      // After the lid shuts it stays shut for lid_close_s. Then a PIR that is still high is
+      // ignored until it goes low or LID_PIR_WAIT_MAX_MS passes: the closing servo often
+      // retriggers the PIR, which stays high for its own hold time.
       wantOpen = true;
       st.lidCloseAtMs = 0;
     } else if (st.lidOpen && st.lidCloseAtMs == 0) {
@@ -263,15 +263,19 @@ void controlTask(void*) {
       changed = true;
     }
     if (!st.lidOpen && !st.lidArmed) {
-      bool settled = now - st.lidClosedAtMs >= cl.lid_close_s * 1000UL;
-      if (settled && !motion) {
+      uint32_t shut = now - st.lidClosedAtMs, minShut = cl.lid_close_s * 1000UL;
+      if (shut >= minShut && !motion) {
         st.lidArmed = true;
         changed = true;
         Serial.println("[lid] ready: the PIR is low, the next motion opens the lid");
-      } else if (settled && motion && !ignoredNoted) {
+      } else if (shut >= minShut + LID_PIR_WAIT_MAX_MS) {
+        st.lidArmed = true;
+        changed = true;
+        Serial.printf("[lid] ready: the PIR stayed high %.1f s after closing, so someone is there\n", shut / 1000.0f);
+      } else if (shut >= minShut && !ignoredNoted) {
         ignoredNoted = true;
         changed = true;
-        Serial.println("[lid] waiting: the PIR is still high since the lid closed; it must go low first");
+        Serial.printf("[lid] waiting: the PIR is still high since the lid closed; up to %.0f s more\n", LID_PIR_WAIT_MAX_MS / 1000.0f);
       }
     }
     if (motion != prevMotion) changed = true;
