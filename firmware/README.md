@@ -126,6 +126,15 @@ Field 8 packs the flags into one number:
 
 Bits 5-8 match `modes` in `/api/status`, so a ThingSpeak reader sees a lock under a tamper too. Bits 10-13 match `faults`.
 
+## 5b. Hand sensor (IR obstacle module)
+
+The lid opens for an **IR obstacle sensor module** (FC-51 / TCRT5000 type) on GPIO 27. It replaced the HC-SR501 PIR, which kept retriggering from the closing lid and the servo.
+
+- Power the module from **3.3 V**, not 5 V. Its OUT pin is pulled up to its own supply, so on 5 V it would put 5 V on the ESP32 pin.
+- `IR_ACTIVE_LOW` in `config.h` is 1: OUT goes LOW when something is in front (the module's LED lights). Set it to 0 for a module that goes HIGH instead.
+- Turn the blue potentiometer to set the range. Aim the sensor where a hand comes in, not at the lid's path.
+- A reading must hold for `IR_DEBOUNCE_MS` (80 ms) before it counts. The lid stays open while the sensor sees something, closes `pir_hold_s` seconds after it clears (the setting keeps its old name so the app and dashboard still work), then stays shut for at least `lid_close_s` seconds.
+
 ## 6. The touchscreen
 
 | Screen | When |
@@ -134,7 +143,7 @@ Bits 5-8 match `modes` in `/api/status`, so a ThingSpeak reader sees a lock unde
 | A1 Main | Normal; green, amber (50 %+) and the alarm boxes, timer rows for the lid and buzzer, "Full in ~" line |
 | A2 Urgent | Fill at or over the fill limit |
 | A3 PIN | COLLECT, or WI-FI SETUP on the Info screen; 4 digits, wrong PIN shakes and clears |
-| A4 Collecting / A5 Done | Pickup running / finished, back to main after 30 s |
+| A4 Collecting / A5 Done | Pickup running / finished, back to main after 30 s. COLLECT clears a lock (manual or auto) and LOCK is refused during a pickup, so the two are never on together |
 | A6 Tamper | 10 s countdown, clears if the bin settles, otherwise latched until the dashboard or app clears it |
 | A7 Locked | Locked from the dashboard, app or auto-lock |
 | A8 Calibrating | While the operator calibrates, with CANCEL |
@@ -172,7 +181,7 @@ The buzzer settings `buzz_on`, `buzz_vol` (1 to 3), `buzz_ui`, `buzz_lid`, `buzz
 
 | Task | Core | Job |
 |---|---|---|
-| control | 1 | PIR interrupt, commands, lid timer, lock, tamper, auto-lock, alarms, RGB LED. The only task that moves the servo. |
+| control | 1 | IR sensor interrupt, commands, lid timer, lock, tamper, auto-lock, alarms, RGB LED. The only task that moves the servo. |
 | sensor | 1 | HC-SR04 (median of 5), HX711, BME680 (start, then collect later, never blocking), BMI160. The only task on I2C. |
 | ui | 1 | Touch interrupt and the screen. The only task on SPI. Redraws only what changed. |
 | cloud | 0 | Firebase and ThingSpeak, so a slow HTTPS call never freezes the lid or the screen. Backs off 5, 15, 30, 60 s when the internet is down. |

@@ -8,9 +8,9 @@
 static Servo lid;
 static int lidAngle = -1;
 
-void IRAM_ATTR isrPir() {
+void IRAM_ATTR isrIr() {
   BaseType_t woke = pdFALSE;
-  if (hControl) xTaskNotifyFromISR(hControl, EV_PIR, eSetBits, &woke);
+  if (hControl) xTaskNotifyFromISR(hControl, EV_IR, eSetBits, &woke);
   portYIELD_FROM_ISR(woke);
 }
 
@@ -25,7 +25,7 @@ void controlInit() {
   pinMode(PIN_LED_G, OUTPUT);
   pinMode(PIN_LED_B, OUTPUT);
   led(false, false, true);
-  pinMode(PIN_PIR, INPUT);
+  pinMode(PIN_IR, INPUT_PULLUP);
   ESP32PWM::allocateTimer(0);
   lid.setPeriodHertz(50);
   lid.attach(PIN_SERVO, 500, 2400);
@@ -34,10 +34,20 @@ void controlInit() {
   lidAngle = c.servo_closed;
 }
 
+static uint32_t lidMovedMs = 0;
+
 static void setLid(int angle) {
   if (angle == lidAngle) return;
+  if (!lid.attached()) lid.attach(PIN_SERVO, 500, 2400);
   lid.write(angle);
   lidAngle = angle;
+  lidMovedMs = millis();
+}
+
+static void releaseServo(int closedAngle, uint32_t now) {
+#if SERVO_RELEASE_WHEN_CLOSED
+  if (lid.attached() && lidAngle == closedAngle && now - lidMovedMs > 800) lid.detach();
+#endif
 }
 
 static void finish(const Command& c, bool ok, const char* why) {
@@ -69,6 +79,7 @@ static void runCommand(const Command& c) {
   }
   const char* k = c.cmd;
   char meta[72];
+  bool wasLocked = false;
   lockState();
   if (!strcmp(k, "LOCK")) {
     st.locked = true;
@@ -79,6 +90,11 @@ static void runCommand(const Command& c) {
   } else if (!strcmp(k, "CLEAR_TAMPER")) {
     st.tamperPhase = 0;
   } else if (!strcmp(k, "COLLECT")) {
+    // A pickup and a lock are never on together: the pickup opens the lid, so it clears the
+    // lock (manual or auto). LOCK is refused while a pickup runs (validateCommand).
+    wasLocked = st.locked;
+    st.locked = false;
+    st.autoLocked = false;
     st.collecting = true;
   } else if (!strcmp(k, "COLLECT_DONE")) {
     if (st.collecting) st.doneAtMs = millis();
@@ -106,7 +122,7 @@ static void runCommand(const Command& c) {
     buzz(T_TAMPER_SETTLED);
   } else if (!strcmp(k, "COLLECT")) {
     if (c.src != SRC_SCREEN) buzz(T_PIN_OK);
-    snprintf(meta, sizeof(meta), "%s pickup started", BIN_LABEL);
+    snprintf(meta, sizeof(meta), wasLocked ? "%s pickup started (lock cleared)" : "%s pickup started", BIN_LABEL);
     raiseAlert("pickup", "info", "Collection started", meta);
   } else if (!strcmp(k, "COLLECT_DONE")) {
     buzz(T_DONE);
@@ -154,7 +170,8 @@ static void updateLed(const BinState& s, const Cal& c, uint32_t now) {
 void controlTask(void*) {
   uint32_t lastTick = 0, lastWave = 0, lastFullBuzz = 0, lastEnvBuzz = 0, lastTamperTick = 0;
   bool prevFull = false, prevEnv = false, prevHC = true, prevHX = true, prevBME = true;
-  bool prevMotion = false, firstPass = true, pirArmed = true, ignoredNoted = false;
+  bool prevMotion = false, firstPass = true, irSeen = false;
+  uint32_t irEdgeMs = 0;
   BinStatus prevStatus = ST_OK;
   uint8_t prevMask = 0;
 
@@ -167,12 +184,15 @@ void controlTask(void*) {
 
     uint32_t now = millis();
     Cal cl = calSnapshot();
-    bool pir = digitalRead(PIN_PIR);
+    bool irRaw = digitalRead(PIN_IR) == (IR_ACTIVE_LOW ? LOW : HIGH);
+    if (irRaw == irSeen) irEdgeMs = 0;
+    else if (!irEdgeMs) irEdgeMs = now ? now : 1;
+    else if (now - irEdgeMs >= IR_DEBOUNCE_MS) { irSeen = irRaw; irEdgeMs = 0; }
     bool changed = false;
     char meta[72];
 
     lockState();
-    st.raw.motion = pir;
+    st.raw.motion = irSeen;
     recomputeView();
     bool motion = st.v.motion;
     bool hcOk = st.okHC || (sim.mask & 1);
@@ -223,10 +243,9 @@ void controlTask(void*) {
     } else if (sim.mask & 64) {
       wantOpen = sim.lid;
       st.lidCloseAtMs = 0;
-    } else if (motion && (st.lidOpen || pirArmed)) {
-      // After the lid shuts, the PIR has to go quiet once (after lid_close_s) before it can
-      // open the lid again. The closing servo often retriggers the PIR, which then stays high
-      // for its own hold time; without this the lid opened again with nobody there.
+    } else if (motion && (st.lidOpen || st.lidArmed)) {
+      // After the lid shuts it stays shut for lid_close_s, so the lid itself swinging past the
+      // IR sensor, or a hand still there, does not flap it.
       wantOpen = true;
       st.lidCloseAtMs = 0;
     } else if (st.lidOpen && st.lidCloseAtMs == 0) {
@@ -241,19 +260,22 @@ void controlTask(void*) {
     bool lidChanged = wantOpen != st.lidOpen;
     if (lidChanged) {
       st.lidOpen = wantOpen;
-      if (!wantOpen) {
+      if (wantOpen) {
+        Serial.printf("[lid] open: %s\n", status == ST_COLLECTING ? "pickup" : (sim.mask & 64) ? "simulation" : "IR sensor");
+      } else {
         st.lidClosedAtMs = now;
-        pirArmed = false;
-        ignoredNoted = false;
+        st.lidArmed = false;
+        if (status != ST_OK) Serial.printf("[lid] closed: %s\n", STATUS_NAMES[status]);
+        else Serial.printf("[lid] closed: IR sensor clear for %u s; stays shut at least %u s\n", cl.pir_hold_s, cl.lid_close_s);
       }
       changed = true;
     }
-    if (!st.lidOpen && !pirArmed) {
-      bool settled = now - st.lidClosedAtMs >= cl.lid_close_s * 1000UL;
-      if (settled && !motion) pirArmed = true;
-      else if (settled && motion && !ignoredNoted) {
-        ignoredNoted = true;
-        Serial.println("[lid] PIR still high since the lid closed; waiting for it to go low before opening again");
+    if (!st.lidOpen && !st.lidArmed) {
+      uint32_t shut = now - st.lidClosedAtMs, minShut = cl.lid_close_s * 1000UL;
+      if (shut >= minShut) {
+        st.lidArmed = true;
+        changed = true;
+        Serial.println(motion ? "[lid] ready: something is still in front of the IR sensor, opening" : "[lid] ready: the IR sensor opens the lid again");
       }
     }
     if (motion != prevMotion) changed = true;
@@ -269,6 +291,7 @@ void controlTask(void*) {
     unlockState();
 
     setLid(s.lidOpen ? cl.servo_open : cl.servo_closed);
+    releaseServo(cl.servo_closed, now);
     if (lidChanged) buzz(s.lidOpen ? T_LID_OPEN : T_LID_CLOSE);
     if (motion && !prevMotion && (s.status == ST_LOCKED || s.status == ST_TAMPER) && now - lastWave > 5000) {
       lastWave = now;

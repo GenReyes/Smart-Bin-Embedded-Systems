@@ -44,7 +44,7 @@ void setup() {
   xTaskCreatePinnedToCore(controlTask, "control", 4096, nullptr, 4, &hControl, 1);
   xTaskCreatePinnedToCore(sensorTask, "sensor", 4096, nullptr, 3, &hSensor, 1);
 
-  attachInterrupt(digitalPinToInterrupt(PIN_PIR), isrPir, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(PIN_IR), isrIr, CHANGE);
   attachInterrupt(digitalPinToInterrupt(PIN_TOUCH_IRQ), isrTouch, FALLING);
 #if USE_IMU_INT
   pinMode(PIN_IMU_INT, INPUT);
