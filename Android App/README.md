@@ -1,6 +1,15 @@
 # Smart-Bin Android app
 
-The phone app for the Smart-Bin system, for both the operator and the collector. It borrows the feel of the Garbage-Guard app: a light and a dark logo on the home screen, its own sound for each kind of action, and a vibration pattern for each kind of alert.
+The phone app for the Smart-Bin system, for both the operator and the collector.
+
+<p align="center">
+  <img src="../Documents/Figures/App%20Screens/01_start.png" width="170" alt="Start page">
+  <img src="../Documents/Figures/App%20Screens/03_overview.png" width="170" alt="Overview">
+  <img src="../Documents/Figures/App%20Screens/13_alerts.png" width="170" alt="Alerts">
+  <img src="../Documents/Figures/App%20Screens/v3.0/settings_cal_on.png" width="170" alt="Settings with calibration on">
+</p>
+
+More screens are in [`Documents/Figures/App Screens`](../Documents/Figures/App%20Screens) and in Appendix C of the paper. It borrows the feel of the Garbage-Guard app: a light and a dark logo on the home screen, its own sound for each kind of action, and a vibration pattern for each kind of alert.
 
 It runs with no hardware. Turn DEMO on at the start page and three made-up bins appear next to the real ones. Left alone, they walk through every outcome by themselves (full, tamper, bad air, a sensor that stops answering, links coming and going, a pickup) so every screen can be shown in class. Pair a real bin over Bluetooth and it switches to live readings over Wi-Fi.
 
@@ -59,7 +68,7 @@ A ready-built debug APK, `Smart-Bin v3.1.apk`, sits in this folder for installin
 ## Garbage-Guard features carried over
 
 - **Light and dark home-screen logo.** The app has two launcher entries, one per logo, and switches them as it leaves the screen to match the theme it was left in. Some launchers take a few seconds to redraw the icon.
-- **Sounds.** 46 short sounds made by `tools/make_sounds.py`: taps, choices, switches, steppers, tabs, open and back, confirm and danger, theme changes, the boot chime, saved, lock and unlock, pickup and done, calibration, simulation, the link going up, down or to the cloud, a bin going quiet or coming back, the PIN keypad (digit, wrong PIN, locked out, operator in, back to collector, PIN changed), a bin confirming a command or not, Bluetooth pairing (paired, wrong code, pairing stopped) and the bin joining Wi-Fi, and one per kind of alert. No two moments share a sound or a vibration. Rising tones mean on, forward or OK; falling tones mean off, back or no. Run `python tools/make_sounds.py` to make them again after changing the table.
+- **Sounds.** 49 short sounds made by `tools/make_sounds.py`: taps, choices, switches, steppers, tabs, open and back, confirm and danger, theme changes, the boot chime, saved, lock and unlock, pickup and done, calibration, simulation, the link going up, down or to the cloud, a bin going quiet or coming back, the PIN keypad (digit, wrong PIN, locked out, operator in, back to collector, PIN changed), a bin confirming a command or not, Bluetooth pairing (paired, wrong code, pairing stopped) and the bin joining Wi-Fi, and one per kind of alert. No two moments share a sound or a vibration. Rising tones mean on, forward or OK; falling tones mean off, back or no. Run `python tools/make_sounds.py` to make them again after changing the table.
 - **Vibration.** Plain keys use Android's own touch clicks. Events and alerts each have their own rhythm, so a full bin, a tamper and a lock feel different in a pocket. The strength setting scales them all.
 - **Notifications.** One Android channel per kind of alert (full, tamper, sensor, lock, pickup, setup), each with its own sound and vibration, so each can be changed or silenced in Android settings. A full-bin alert has a Start pickup button that works without opening the app. While push alerts are on, a quiet foreground service keeps reading the bins every 5 s while the app is in the background, so alerts arrive there. Alerts are posted only after you are past the start page and the role picker. Swiping the app away from recent apps, or backing out of it, stops the service and the alerts. Unrestricted battery in App settings keeps Android from pausing it.
 - **Keep screen on**, and the logo tap chime.
@@ -76,7 +85,7 @@ Over Firebase and ThingSpeak only LOCK, UNLOCK and COLLECT work. Calibration and
 |---|---|---|
 | `GET /api/status` | | Readings, status, `modes` (locked, collecting, calibrating, tamper flags), `pitch`/`roll`, `cal` object (incl. `lid_close_s`, `tilt_boot`, `tilt_ref_pitch`, `tilt_ref_roll`), `sim_mask` and `sim` values |
 | `POST /api/command` | `{"cmd": "LOCK"}` | LOCK, UNLOCK, CLEAR_TAMPER, COLLECT, COLLECT_DONE, CALIBRATE_START, CALIBRATE_END, RESET_GAS, TARE, CAL_WEIGHT (`"grams"`), TOUCH_CAL, TOUCH_CAL_RESET, BUZZ_TEST (`"sound"`) |
-| `POST /api/calibrate` | calibration values | Stores them in EEPROM |
+| `POST /api/calibrate` | calibration values | Saves them in the bin's flash |
 | `POST /api/simulate` | `{"mask": 5, "values": {...}}` | Holds the chosen sensors at the given values |
 
 Status fields the app reads: `fill`, `distance_cm`, `weight_g`, `temp`, `temp_raw`, `humidity`, `pressure`, `iaq`, `iaq_acc`, `tilt`, `motion`, `lid` (`OPEN` or `CLOSED`), `status` (`OK`, `LOCKED`, `TAMPER`, `COLLECTING`, `CALIBRATING`), `cal`, `sim_mask`, and `touch` (`swap`, `x0`, `x1`, `y0`, `y1`, `custom`). The dashboard's older names (`fill_percentage`, `weight_grams` and so on) also work. Simulation mask bits: 0 fill, 1 weight, 2 air quality, 3 temperature and humidity, 4 tamper, 5 motion, 6 lid.
@@ -118,7 +127,7 @@ Each bin has its own channel. The firmware writes it with the channel's write AP
 | field5 | Air quality (IAQ) |
 | field6 | Pressure hPa |
 | field7 | Tilt deg |
-| field8 | motion + 2 × lid open + 4 × status (0 OK, 1 LOCKED, 2 TAMPER, 3 COLLECTING, 4 CALIBRATING) |
+| field8 | Flags: motion, lid open, the one-word status, then locked, collecting, calibrating and tamper as their own bits and the sensors not answering (full table in `firmware/README.md`, section 5) |
 | status | The bin's local IP address |
 
 Commands go through the bin's TalkBack queue: the app adds `LOCK`, `UNLOCK` or `COLLECT`, and the bin takes the next command each time it polls. In the app, put the channel ID, read API key, TalkBack ID and TalkBack API key in the bin's SET sheet. The server is `https://api.thingspeak.com` unless you change it on the Connection page.
@@ -146,9 +155,9 @@ For ThingSpeak, enter `http://<computer address>:8095` as the server on the Conn
 
 | Path | Contents |
 |---|---|
-| `app/src/main/java/smartbin/data/` | Models, the Wi-Fi and Firebase clients, saved settings, demo data, and `Hub`, which reads the bins and raises alerts |
+| `app/src/main/java/smartbin/data/` | Models, the Wi-Fi, Firebase, ThingSpeak and Bluetooth (`Ble.kt`) clients, saved settings, the operator PIN (`OperatorLock.kt`), demo data, and `Hub`, which reads the bins and raises alerts |
 | `app/src/main/java/smartbin/notify/` | Sounds, vibration patterns, notification channels, the Start pickup action, the background service |
-| `app/src/main/java/smartbin/ui/` | Theme tokens and shadows from the mockup, icons, shared controls, and one file per group of screens |
+| `app/src/main/java/smartbin/ui/` | Theme tokens and shadows, icons, the animated logo (`Logo.kt`), shared controls, and one file per group of screens |
 | `app/src/main/res/` | Launcher logos (light and dark), fonts, sounds |
 | `tools/` | The sound maker and the mock bin server |
 

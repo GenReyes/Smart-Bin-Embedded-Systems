@@ -9,11 +9,6 @@ build/
 .pio/
 .vscode/
 
-*-backups/
-*.kicad_prl
-fp-info-cache
-_autosave-*
-
 .gradle/
 local.properties
 *.apk
@@ -21,5 +16,5 @@ local.properties
 .idea/
 captures/
 
-# Keep the ready-built app APKs (Smart-Bin vX.apk) in the repo
+# Keep the ready-built app APK (Smart-Bin vX.Y.apk) in the repo
 !Android App/Smart-Bin v*.apk
