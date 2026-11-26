@@ -1,10 +1,14 @@
 # Smart-Bin ESP32 firmware
 
+<p align="center">
+  <img src="../Documents/Figures/SmartBin_Block_Diagram%20(white).png" width="520" alt="Block diagram of one bin">
+</p>
+
 One sketch runs each bin. It reads the sensors, drives the lid, buzzer, RGB LED and the 2.4 in touchscreen, serves the local API the dashboard and the Android app use, and copies the bin's status to Firebase and ThingSpeak.
 
 The local API, Firebase paths and ThingSpeak fields below are the ones the web dashboard and the Android app (v3.1) read.
 
-> **Status:** final version. It compiles cleanly for the ESP32 (Arduino core 3.3.12, all libraries below) and runs on Bin 01. Touch, servo angles and the load-cell scale still need calibrating on each new bin (section 3).
+> **Status:** final version (firmware 1.0.0). It compiles cleanly for the ESP32 (Arduino core 3.3.12, all libraries below) and runs on both built bins. Touch, servo angles and the load-cell scale need calibrating on each new bin (section 3).
 
 ## Folder
 
@@ -195,8 +199,8 @@ Readings live in one shared state behind a mutex; nobody holds it across I2C, SP
 
 ## 9. Things to know
 
-- **Air quality (IAQ).** This uses its own estimate from the BME680 gas resistance and humidity (a warm-up of 5 minutes on first use, 2 minutes after that, and a baseline saved every hour), not Bosch's BSEC library. `iaq_acc` goes 0 (warming up, the screen shows `--`) to 3 over about 30 minutes. Say "estimated IAQ" in the paper.
+- **Air quality (IAQ).** This uses its own estimate from the BME680 gas resistance and humidity (a warm-up of 5 minutes on first use, 2 minutes after that, and a baseline saved every hour), not Bosch's BSEC library. `iaq_acc` goes 0 (warming up, the screen shows `--`) to 3 over about 30 minutes. The paper calls it estimated IAQ.
 - **HTTPS certificates are not checked** (`setInsecure()`), which is common on student ESP32 projects but means the bin trusts any server. Adding the Google and ThingSpeak root certificates fixes that.
 - **Buzzer on GPIO 4, not GPIO 12.** GPIO 12 is a boot strapping pin; the buzzer module pulled it high and the ESP32 would not boot. The TFT runs on 3.3V and the servo has its own 5V branch, because on the shared 5V rail the board browned out.
 - **BMI160 INT1 to GPIO 34** is optional. Without the wire the tilt is read every 200 ms, which is fast enough.
-- `FB_REQUIRE_WATCHERS` in `config.h` is 0, so the bin keeps the fast cloud pace all the time. The app and the dashboard both write `/sb/watchers` now, so it can be set to 1 to save more of the free allowance.
+- `FB_REQUIRE_WATCHERS` in `config.h` is 0, so the bin keeps the fast cloud pace all the time. The app and the dashboard both write `/sb/watchers`, so it can be set to 1 to save more of the free allowance.

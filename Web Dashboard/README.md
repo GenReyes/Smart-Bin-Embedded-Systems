@@ -1,6 +1,14 @@
 # Smart-Bin web dashboard
 
-`smartbin-dashboard.html` is the working operator dashboard. It has the screens, sounds and operator PIN of the group's design, plus real links to the bins:
+<p align="center">
+  <img src="../Documents/Figures/Dashboard%20Screens/overview.png" width="720" alt="Dashboard overview">
+</p>
+
+| Charts | Settings | Alerts |
+|---|---|---|
+| <img src="../Documents/Figures/Dashboard%20Screens/charts.png" width="240" alt="Charts"> | <img src="../Documents/Figures/Dashboard%20Screens/settings.png" width="240" alt="Settings"> | <img src="../Documents/Figures/Dashboard%20Screens/alerts.png" width="240" alt="Alerts"> |
+
+`smartbin-dashboard.html` is the operator dashboard, one HTML file with the screens, sounds and operator PIN of the group's design and real links to the bins:
 
 1. **The bin's own Wi-Fi** first. It keeps one push connection per bin (`/api/events`) and falls back to reading `/api/status` every second.
 2. **Firebase** when a bin does not answer on Wi-Fi.
@@ -53,9 +61,7 @@ py "Android App/tools/smartbin_mock_server.py" --bins 2 --cloud 8090 --ts 8095
 - Firebase: URL `http://127.0.0.1:8090`, any key, any email, a password of 6+ characters. Add `--no-local` to the command to make the dashboard fall back to it.
 - ThingSpeak: server `http://127.0.0.1:8095`, channels `1001` and `1002`, TalkBack `2001` and `2002`, any keys.
 
-The mock server now sends CORS headers and answers the Firebase PUT, PATCH and DELETE calls, so the dashboard can run against it in a browser.
-
-This version was checked in headless Chrome against the mock server on all three links (readings arrive, LOCK and UNLOCK reach the bin and confirm) and against a test bin that pushes `/api/events`, with no script errors.
+The mock server sends CORS headers and answers the Firebase PUT, PATCH and DELETE calls, so the dashboard can run against it in a browser.
 
 ## Choices behind it
 
